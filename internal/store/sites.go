@@ -24,6 +24,7 @@ type Site struct {
 	RetentionDays   int
 	FirstPageviewAt *time.Time
 	HMACKey         []byte
+	MapPresetJSON   string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -102,6 +103,7 @@ func (s *Store) CreateSite(ctx context.Context, params CreateSiteParams) (Site, 
 		DedupWindowDays: dedupWindow,
 		RetentionDays:   retention,
 		HMACKey:         key,
+		MapPresetJSON:   "{}",
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}, nil
@@ -116,9 +118,9 @@ func (s *Store) GetSite(ctx context.Context, id string) (Site, error) {
 	var key []byte
 	err := s.DB.QueryRowContext(ctx, `
 		SELECT id, name, timezone, allowed_origins, accept_pageviews, publish_public,
-		       dedup_window_days, retention_days, first_pageview_at, hmac_key, created_at, updated_at
+		       dedup_window_days, retention_days, first_pageview_at, hmac_key, map_preset, created_at, updated_at
 		FROM sites WHERE id = ?
-	`, id).Scan(&result.ID, &result.Name, &result.Timezone, &originsJSON, &accept, &publish, &dedup, &retention, &firstPageview, &key, &created, &updated)
+	`, id).Scan(&result.ID, &result.Name, &result.Timezone, &originsJSON, &accept, &publish, &dedup, &retention, &firstPageview, &key, &result.MapPresetJSON, &created, &updated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return Site{}, fmt.Errorf("Site %q not found", id)
@@ -149,6 +151,101 @@ func (s *Store) GetSite(ctx context.Context, id string) (Site, error) {
 		return Site{}, fmt.Errorf("parse Site updated timestamp: %w", err)
 	}
 	return result, nil
+}
+
+type UpdateSiteParams struct {
+	Name            string
+	Timezone        string
+	AllowedOrigins  []string
+	AcceptPageviews bool
+	PublishPublic   bool
+	DedupWindowDays int
+	RetentionDays   int
+}
+
+func (s *Store) UpdateSite(ctx context.Context, id string, params UpdateSiteParams) (Site, error) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
+	name := strings.TrimSpace(params.Name)
+	if name == "" || len(name) > 100 {
+		return Site{}, fmt.Errorf("site name must contain between 1 and 100 bytes")
+	}
+	if _, err := time.LoadLocation(params.Timezone); err != nil {
+		return Site{}, fmt.Errorf("invalid site timezone: %w", err)
+	}
+	origins, err := site.NormalizeOrigins(params.AllowedOrigins)
+	if err != nil {
+		return Site{}, err
+	}
+	if params.DedupWindowDays < 1 || params.DedupWindowDays > 30 {
+		return Site{}, fmt.Errorf("deduplication window must be between 1 and 30 days")
+	}
+	if params.RetentionDays < 1 || params.RetentionDays > 90 {
+		return Site{}, fmt.Errorf("retention period must be between 1 and 90 days")
+	}
+	originJSON, err := json.Marshal(origins)
+	if err != nil {
+		return Site{}, fmt.Errorf("encode allowed origins: %w", err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return Site{}, fmt.Errorf("begin update Site transaction: %w", err)
+	}
+	defer tx.Rollback()
+	var firstPageview sql.NullString
+	if err := tx.QueryRowContext(ctx, `SELECT first_pageview_at FROM sites WHERE id = ?`, id).Scan(&firstPageview); err != nil {
+		if err == sql.ErrNoRows {
+			return Site{}, fmt.Errorf("Site %q not found", id)
+		}
+		return Site{}, fmt.Errorf("read Site state: %w", err)
+	}
+	if firstPageview.Valid {
+		var currentTimezone string
+		if err := tx.QueryRowContext(ctx, `SELECT timezone FROM sites WHERE id = ?`, id).Scan(&currentTimezone); err != nil {
+			return Site{}, fmt.Errorf("read Site timezone: %w", err)
+		}
+		if params.Timezone != currentTimezone {
+			return Site{}, fmt.Errorf("Site timezone is locked after the first Pageview")
+		}
+	}
+	_, err = tx.ExecContext(ctx, `
+		UPDATE sites
+		SET name = ?, timezone = ?, allowed_origins = ?, accept_pageviews = ?, publish_public = ?,
+		    dedup_window_days = ?, retention_days = ?, updated_at = ?
+		WHERE id = ?
+	`, name, params.Timezone, string(originJSON), boolInt(params.AcceptPageviews), boolInt(params.PublishPublic), params.DedupWindowDays, params.RetentionDays, now, id)
+	if err != nil {
+		return Site{}, fmt.Errorf("update Site: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return Site{}, fmt.Errorf("commit Site update: %w", err)
+	}
+	return s.GetSite(ctx, id)
+}
+
+func (s *Store) UpdateMapPreset(ctx context.Context, id, presetJSON string) error {
+	if strings.TrimSpace(presetJSON) == "" {
+		presetJSON = "{}"
+	}
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	result, err := s.DB.ExecContext(ctx, `UPDATE sites SET map_preset = ?, updated_at = ? WHERE id = ?`, presetJSON, time.Now().UTC().Format(time.RFC3339Nano), id)
+	if err != nil {
+		return fmt.Errorf("update Map Preset: %w", err)
+	}
+	if affected, _ := result.RowsAffected(); affected != 1 {
+		return fmt.Errorf("Site %q not found", id)
+	}
+	return nil
+}
+
+func boolInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func (s *Store) ListSites(ctx context.Context) ([]Site, error) {

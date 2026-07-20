@@ -36,15 +36,16 @@ type pageviewPayload struct {
 }
 
 type Server struct {
-	Config    config.Config
-	Store     *store.Store
-	Started   time.Time
-	clientIP  *clientip.Resolver
-	ipLimit   *ratelimit.Limiter
-	siteLimit *ratelimit.Limiter
-	logger    *slog.Logger
-	geoIP     *geoip.Resolver
-	mapCache  *mapCache
+	Config     config.Config
+	Store      *store.Store
+	Started    time.Time
+	clientIP   *clientip.Resolver
+	ipLimit    *ratelimit.Limiter
+	siteLimit  *ratelimit.Limiter
+	logger     *slog.Logger
+	geoIP      *geoip.Resolver
+	mapCache   *mapCache
+	loginLimit *ratelimit.Limiter
 }
 
 func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
@@ -54,14 +55,15 @@ func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
 		logger = loggers[0]
 	}
 	return &Server{
-		Config:    cfg,
-		Store:     st,
-		Started:   time.Now().UTC(),
-		clientIP:  resolver,
-		ipLimit:   ratelimit.New(120, 30),
-		siteLimit: ratelimit.New(3000, 500),
-		logger:    logger,
-		mapCache:  newMapCache(),
+		Config:     cfg,
+		Store:      st,
+		Started:    time.Now().UTC(),
+		clientIP:   resolver,
+		ipLimit:    ratelimit.New(120, 30),
+		siteLimit:  ratelimit.New(3000, 500),
+		logger:     logger,
+		mapCache:   newMapCache(),
+		loginLimit: ratelimit.New(10, 5),
 	}
 }
 
@@ -69,6 +71,17 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health/live", s.live)
 	mux.HandleFunc("GET /health/ready", s.ready)
+	mux.HandleFunc("/admin/login", s.adminLogin)
+	mux.HandleFunc("/admin/logout", s.adminLogout)
+	mux.HandleFunc("GET /admin/assets/style.css", s.adminAssets)
+	mux.HandleFunc("GET /admin", s.adminDashboard)
+	mux.HandleFunc("GET /admin/sites/new", s.adminNewSite)
+	mux.HandleFunc("POST /admin/sites/new", s.adminCreateSite)
+	mux.HandleFunc("GET /admin/sites/{siteID}", s.adminSite)
+	mux.HandleFunc("POST /admin/sites/{siteID}/settings", s.adminUpdateSite)
+	mux.HandleFunc("POST /admin/sites/{siteID}/preset", s.adminUpdatePreset)
+	mux.HandleFunc("GET /admin/sites/{siteID}/preset-preview.svg", s.adminPresetPreview)
+	mux.HandleFunc("GET /public/{siteID}/analytics", s.publicAnalytics)
 	mux.HandleFunc("POST /api/v1/sites/{siteID}/pageviews", s.collectPageview)
 	mux.HandleFunc("GET /embed/tracker.js", s.trackerScript)
 	mux.HandleFunc("GET /embed/widget.js", s.widgetScript)
@@ -247,7 +260,18 @@ func (s *Server) serveEmbedScript(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) mapSVG(w http.ResponseWriter, r *http.Request) {
 	siteID := r.PathValue("siteID")
-	options, err := maprender.ParseOptions(r.URL.Query())
+	configuredSite, err := s.Store.GetSite(r.Context(), siteID)
+	if err != nil || !configuredSite.PublishPublic {
+		http.Error(w, "unknown Site", http.StatusNotFound)
+		return
+	}
+	preset, err := maprender.ParsePresetJSON(configuredSite.MapPresetJSON)
+	if err != nil {
+		s.logger.Error("load Map Preset failed", "site_id", siteID, "error", err)
+		http.Error(w, "could not load Map Preset", http.StatusInternalServerError)
+		return
+	}
+	options, err := maprender.ParseOptionsWithDefaults(r.URL.Query(), preset)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

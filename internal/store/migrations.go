@@ -87,6 +87,19 @@ var migrations = []migration{
 			) WITHOUT ROWID`,
 		},
 	},
+	{
+		version: 4,
+		statements: []string{
+			`CREATE TABLE administrator_sessions (
+				token_digest BLOB PRIMARY KEY CHECK (length(token_digest) = 32),
+				csrf_token BLOB NOT NULL CHECK (length(csrf_token) = 32),
+				created_at TEXT NOT NULL,
+				last_seen_at TEXT NOT NULL,
+				expires_at TEXT NOT NULL
+			) WITHOUT ROWID`,
+			`CREATE INDEX administrator_sessions_expiry ON administrator_sessions (expires_at)`,
+		},
+	},
 }
 
 func (s *Store) initializeBaseSchema(ctx context.Context, passwordHash string) error {

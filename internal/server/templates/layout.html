@@ -1,0 +1,34 @@
+{{define "layout"}}
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{{if .Title}}{{.Title}} · {{end}}VisitorTrace · 访迹</title>
+  <link rel="stylesheet" href="/admin/assets/style.css">
+</head>
+<body class="{{if .Admin}}admin-shell{{else}}public-shell{{end}}">
+  {{if .Admin}}
+  <aside class="sidebar">
+    <a class="brand" href="/admin"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>
+    <nav class="side-nav" aria-label="后台导航">
+      <a href="/admin" {{if eq .Active "dashboard"}}aria-current="page"{{end}}>管理总览</a>
+      <a href="/admin/sites/new" {{if eq .Active "sites"}}aria-current="page"{{end}}>站点管理</a>
+    </nav>
+    <form class="logout-form" method="post" action="/admin/logout">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <button class="button ghost full" type="submit">退出登录</button>
+    </form>
+  </aside>
+  <main class="workspace">
+    {{if .Flash}}<div class="notice success" role="status">{{.Flash}}</div>{{end}}
+    {{if .Error}}<div class="notice danger" role="alert">{{.Error}}</div>{{end}}
+    {{template "content" .}}
+  </main>
+  {{else}}
+  {{template "content" .}}
+  {{end}}
+</body>
+</html>
+{{end}}

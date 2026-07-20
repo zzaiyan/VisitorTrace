@@ -28,6 +28,14 @@ type PublicMapData struct {
 }
 
 func (s *Store) PublicMapData(ctx context.Context, siteID string) (PublicMapData, error) {
+	return s.mapData(ctx, siteID, true)
+}
+
+func (s *Store) AdminMapData(ctx context.Context, siteID string) (PublicMapData, error) {
+	return s.mapData(ctx, siteID, false)
+}
+
+func (s *Store) mapData(ctx context.Context, siteID string, requirePublished bool) (PublicMapData, error) {
 	var result PublicMapData
 	var published int
 	err := s.DB.QueryRowContext(ctx, `SELECT id, name, publish_public FROM sites WHERE id = ?`, siteID).Scan(&result.SiteID, &result.SiteName, &published)
@@ -37,7 +45,7 @@ func (s *Store) PublicMapData(ctx context.Context, siteID string) (PublicMapData
 		}
 		return PublicMapData{}, fmt.Errorf("read Public Map Site: %w", err)
 	}
-	if published != 1 {
+	if requirePublished && published != 1 {
 		return PublicMapData{}, ErrPublicationDisabled
 	}
 	err = s.DB.QueryRowContext(ctx, `

@@ -7,13 +7,17 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/config"
+	"github.com/zzaiyan/VisitorTrace/internal/maprender"
+	"github.com/zzaiyan/VisitorTrace/internal/password"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
@@ -176,6 +180,123 @@ func TestPublicMapRejectsUnknownOption(t *testing.T) {
 	}
 }
 
+func TestAdminLoginAndDashboard(t *testing.T) {
+	app, _, site := testAdminServer(t)
+	login := httptest.NewRequest(http.MethodPost, "/admin/login", strings.NewReader(url.Values{"password": {"correct horse"}}.Encode()))
+	login.Host = "127.0.0.1:8790"
+	login.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	loggedIn := httptest.NewRecorder()
+	app.Handler().ServeHTTP(loggedIn, login)
+	if loggedIn.Code != http.StatusSeeOther {
+		t.Fatalf("login status = %d, body = %q", loggedIn.Code, loggedIn.Body.String())
+	}
+	cookies := loggedIn.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != "visitortrace_admin" {
+		t.Fatalf("login cookies = %#v", cookies)
+	}
+	dashboard := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	dashboard.Host = "127.0.0.1:8790"
+	dashboard.AddCookie(cookies[0])
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, dashboard)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), site.Name) || !strings.Contains(response.Body.String(), "管理总览") {
+		t.Fatalf("dashboard status = %d, body = %q", response.Code, response.Body.String())
+	}
+	csrfMatch := regexp.MustCompile(`name="csrf" value="([a-f0-9]{64})"`).FindStringSubmatch(response.Body.String())
+	if len(csrfMatch) != 2 {
+		t.Fatal("dashboard did not render a CSRF token")
+	}
+	presetForm := url.Values{
+		"csrf": {csrfMatch[1]}, "w": {"640"}, "h": {"320"}, "title": {"Preview"},
+		"pv_label": {"PV"}, "uv_label": {"UV"}, "fs": {"12"}, "bg": {"#f2f3f3"},
+		"land": {"#6f808f"}, "border": {"#ffffff"}, "text": {"#54606a"}, "marker": {"#e34949"},
+		"metric": {"pv"}, "show_title": {"on"}, "show_pv": {"on"},
+	}
+	presetRequest := httptest.NewRequest(http.MethodPost, "/admin/sites/"+site.ID+"/preset", strings.NewReader(presetForm.Encode()))
+	presetRequest.Host = "127.0.0.1:8790"
+	presetRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	presetRequest.AddCookie(cookies[0])
+	presetResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(presetResponse, presetRequest)
+	if presetResponse.Code != http.StatusSeeOther {
+		t.Fatalf("preset update status = %d, body = %q", presetResponse.Code, presetResponse.Body.String())
+	}
+	previewRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID+"/preset-preview.svg", nil)
+	previewRequest.Host = "127.0.0.1:8790"
+	previewRequest.AddCookie(cookies[0])
+	previewResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(previewResponse, previewRequest)
+	if previewResponse.Code != http.StatusOK || !strings.Contains(previewResponse.Body.String(), `width="640" height="320"`) {
+		t.Fatalf("admin preset preview = status %d body prefix %q", previewResponse.Code, previewResponse.Body.String()[:min(140, len(previewResponse.Body.String()))])
+	}
+	sitePage := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID, nil)
+	sitePage.Host = "127.0.0.1:8790"
+	sitePage.AddCookie(cookies[0])
+	sitePageResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(sitePageResponse, sitePage)
+	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") {
+		t.Fatalf("admin Site page = status %d, body = %q", sitePageResponse.Code, sitePageResponse.Body.String())
+	}
+}
+
+func TestPublicAnalyticsHidesSensitiveFields(t *testing.T) {
+	app, st, site := testServer(t)
+	now := time.Now().UTC()
+	_, err := st.RecordPageview(context.Background(), store.PageviewObservation{
+		SiteID: site.ID, OccurredAt: now, Path: "/private-page-path", CountryCode: "CN", RegionCode: "HB", City: "Wuhan",
+		VisitorDigest: bytes.Repeat([]byte{7}, 32), OriginalIP: "203.0.113.7", OperatingSystem: "Linux", Browser: "Firefox",
+	})
+	if err != nil {
+		t.Fatalf("RecordPageview() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/public/"+site.ID+"/analytics?range=30d", nil)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("Public Analytics status = %d, body = %q", response.Code, response.Body.String())
+	}
+	body := response.Body.String()
+	if strings.Contains(body, "203.0.113.7") {
+		t.Fatal("Public Analytics exposed the original IP")
+	}
+	if strings.Contains(body, "0707070707070707070707070707070707070707070707070707070707070707") {
+		t.Fatal("Public Analytics exposed the Visitor Digest")
+	}
+	if strings.Contains(body, "/private-page-path") {
+		t.Fatal("Public Analytics exposed a page path")
+	}
+	if !strings.Contains(body, "Firefox") || !strings.Contains(body, "Wuhan") {
+		t.Fatalf("Public Analytics is missing aggregate data: %q", body)
+	}
+}
+
+func TestMapPresetDefaultsAndOverrides(t *testing.T) {
+	app, st, site := testServer(t)
+	options := maprender.DefaultOptions()
+	options.Width = 640
+	options.Height = 320
+	options.Show = map[string]bool{}
+	preset, err := maprender.PresetJSON(options)
+	if err != nil {
+		t.Fatalf("PresetJSON() error = %v", err)
+	}
+	if err := st.UpdateMapPreset(context.Background(), site.ID, preset); err != nil {
+		t.Fatalf("UpdateMapPreset() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/sites/"+site.ID+"/map.svg", nil)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `width="640" height="320"`) {
+		t.Fatalf("preset map = status %d body prefix %q", response.Code, response.Body.String()[:min(120, len(response.Body.String()))])
+	}
+	override := httptest.NewRequest(http.MethodGet, "/api/v1/sites/"+site.ID+"/map.svg?w=300&h=168&show=title", nil)
+	overrideResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(overrideResponse, override)
+	if overrideResponse.Code != http.StatusOK || !strings.Contains(overrideResponse.Body.String(), `width="300" height="168"`) || strings.Contains(overrideResponse.Body.String(), "Total Pageviews") {
+		t.Fatalf("preset override = status %d body prefix %q", overrideResponse.Code, overrideResponse.Body.String()[:min(160, len(overrideResponse.Body.String()))])
+	}
+}
+
 func testServer(t *testing.T) (*Server, *store.Store, store.Site) {
 	t.Helper()
 	dir := t.TempDir()
@@ -193,4 +314,31 @@ func testServer(t *testing.T) (*Server, *store.Store, store.Site) {
 		t.Fatalf("CreateSite() error = %v", err)
 	}
 	return New(cfg, st), st, created
+}
+
+func testAdminServer(t *testing.T) (*Server, *store.Store, store.Site) {
+	t.Helper()
+	dir := t.TempDir()
+	cfg := config.Default(dir)
+	passwordHash, err := password.Hash([]byte("correct horse"))
+	if err != nil {
+		t.Fatalf("Hash() error = %v", err)
+	}
+	st, err := store.Initialize(context.Background(), filepath.Join(dir, "visitortrace.sqlite3"), passwordHash)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	site, err := st.CreateSite(context.Background(), store.CreateSiteParams{Name: "Admin Site", AllowedOrigins: []string{"https://example.com"}})
+	if err != nil {
+		t.Fatalf("CreateSite() error = %v", err)
+	}
+	return New(cfg, st), st, site
+}
+
+func min(left, right int) int {
+	if left < right {
+		return left
+	}
+	return right
 }

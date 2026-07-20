@@ -19,6 +19,13 @@ This document is the current architecture snapshot for VisitorTrace (访迹). Do
 - Keep CPU, memory, storage, and operational overhead low.
 - Keep observations and statistics isolated per Site.
 
+## Current Implementation Milestone
+
+- Schema version 4 stores Sites, Pageview Records, visitor registrations, daily Aggregates, durable geographic coordinates, and opaque Administrator sessions.
+- The service currently exposes Pageview collection, both public integration modes, SVG Public Maps, Public Analytics, Administrator login, Site settings, recent Pageview Records, Map Preset editing, and live administrative map previews.
+- The current analytics pages use server-rendered tables and a small dependency-free trend visualization. The planned tree-shaken ECharts bundle remains a later enhancement for richer pan, zoom, and chart inspection.
+- Retention cleanup, backup and restore commands, GeoIP auto-update, password reset, and release self-update remain later operational milestones.
+
 ## Runtime and Packaging
 
 - The application is implemented as one Go service process.
@@ -308,7 +315,7 @@ A Pageview Record does not contain:
 - State-changing Admin Console requests require a CSRF token.
 - Failed login attempts are rate-limited by source IP without an external CAPTCHA service.
 - Changing or resetting the Administrator password revokes every active session.
-- The Admin Console is available only over HTTPS.
+- The Admin Console requires HTTPS outside the local machine. Loopback hosts may use HTTP solely for local development and preview.
 
 ## Backup and Restore
 

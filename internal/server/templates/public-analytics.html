@@ -1,0 +1,46 @@
+{{define "content"}}
+<header class="public-header">
+  <a class="brand" href="/public/{{.Site.ID}}/analytics"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>
+  <span class="public-site-id">{{.Site.ID}}</span>
+</header>
+<main class="public-main">
+  <header class="analytics-heading">
+    <div><p class="eyebrow">PUBLIC ANALYTICS</p><h1>{{.Site.Name}}</h1><p class="subhead">{{.Analytics.StartDate}} 至 {{.Analytics.EndDate}}</p></div>
+    <nav class="range-nav" aria-label="统计范围"><a href="?range=today" {{if selected .Range "today"}}aria-current="page"{{end}}>今天</a><a href="?range=7d" {{if selected .Range "7d"}}aria-current="page"{{end}}>7 天</a><a href="?range=30d" {{if selected .Range "30d"}}aria-current="page"{{end}}>30 天</a><a href="?range=90d" {{if selected .Range "90d"}}aria-current="page"{{end}}>90 天</a><a href="?range=all" {{if selected .Range "all"}}aria-current="page"{{end}}>全部</a></nav>
+  </header>
+  <section class="metric-strip public-metrics" aria-label="统计摘要">
+    <div><span>Pageviews</span><strong>{{formatCount .Analytics.Pageviews}}</strong></div>
+    <div><span>Unique Visitors</span><strong>{{formatCount .Analytics.UniqueVisitors}}</strong></div>
+    <div><span>城市</span><strong>{{len .Analytics.Cities}}</strong></div>
+    <div><span>国家或地区</span><strong>{{len .Analytics.Countries}}</strong></div>
+  </section>
+  <section class="analytics-grid">
+    <div class="analytics-map">
+      <div class="section-heading"><div><p class="eyebrow">GEOGRAPHY</p><h2>访客地图</h2></div><span class="muted">累计数据</span></div>
+      <a href="{{.MapURL}}" target="_blank" rel="noopener"><img src="{{.MapURL}}" alt="{{.Site.Name}} 访客地图"></a>
+      <a class="attribution" href="https://db-ip.com" target="_blank" rel="noopener">IP geolocation by DB-IP</a>
+    </div>
+    <div class="trend-panel">
+      <div class="section-heading"><div><p class="eyebrow">TREND</p><h2>访问趋势</h2></div></div>
+      <div class="trend-chart" id="trend-chart" aria-label="每日 Pageview 趋势">{{range .Analytics.Daily}}<span class="trend-bar" data-value="{{.Pageviews}}" title="{{.Date}} · {{.Pageviews}} PV / {{.UniqueVisitors}} UV"></span>{{else}}<p class="muted">暂无数据</p>{{end}}</div>
+      <div class="trend-legend"><span><i class="legend-pv"></i>Pageviews</span><span>{{len .Analytics.Daily}} 个有数据日期</span></div>
+    </div>
+  </section>
+  <section class="dimension-grid">
+    <div class="data-panel"><div class="section-heading"><h2>国家或地区</h2></div><table><thead><tr><th>代码</th><th>PV</th><th>UV</th></tr></thead><tbody>{{range .Analytics.Countries}}<tr><td>{{.Value}}</td><td>{{formatCount .Pageviews}}</td><td>{{formatCount .UniqueVisitors}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">暂无数据</td></tr>{{end}}</tbody></table></div>
+    <div class="data-panel"><div class="section-heading"><h2>城市</h2></div><table><thead><tr><th>城市</th><th>PV</th><th>UV</th></tr></thead><tbody>{{range .Analytics.Cities}}<tr><td>{{geoLabel .Value}}</td><td>{{formatCount .Pageviews}}</td><td>{{formatCount .UniqueVisitors}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">暂无数据</td></tr>{{end}}</tbody></table></div>
+    <div class="data-panel"><div class="section-heading"><h2>浏览器</h2></div><table><thead><tr><th>类型</th><th>PV</th><th>占比</th></tr></thead><tbody>{{range .Analytics.Browsers}}<tr><td>{{.Value}}</td><td>{{formatCount .Pageviews}}</td><td>{{metricPercent .Pageviews $.Analytics.Pageviews}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">暂无数据</td></tr>{{end}}</tbody></table></div>
+    <div class="data-panel"><div class="section-heading"><h2>操作系统</h2></div><table><thead><tr><th>类型</th><th>PV</th><th>占比</th></tr></thead><tbody>{{range .Analytics.OperatingSystems}}<tr><td>{{.Value}}</td><td>{{formatCount .Pageviews}}</td><td>{{metricPercent .Pageviews $.Analytics.Pageviews}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">暂无数据</td></tr>{{end}}</tbody></table></div>
+  </section>
+  <section class="custom-range"><form method="get"><input type="hidden" name="range" value="custom"><label class="field"><span>开始日期</span><input type="date" name="start" value="{{.Analytics.StartDate}}" required></label><label class="field"><span>结束日期</span><input type="date" name="end" value="{{.Analytics.EndDate}}" required></label><button class="button ghost" type="submit">查询</button></form></section>
+</main>
+<footer class="public-footer"><span>VisitorTrace · 访迹</span><span>Aggregate-only public view</span></footer>
+<script>
+(function () {
+  var bars = document.querySelectorAll(".trend-bar");
+  var max = 0;
+  bars.forEach(function (bar) { max = Math.max(max, Number(bar.dataset.value) || 0); });
+  bars.forEach(function (bar) { bar.style.height = (max ? Math.max(3, Number(bar.dataset.value) / max * 100) : 3) + "%"; });
+}());
+</script>
+{{end}}

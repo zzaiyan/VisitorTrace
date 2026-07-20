@@ -4,7 +4,7 @@ A tiny self-hosted visitor map and pageview tracker.
 
 VisitorTrace is a lightweight, self-hosted service for recording Pageviews, maintaining aggregate visitor statistics, and publishing embeddable visitor maps for personal websites.
 
-The project is currently in early implementation. The first runnable milestone provides secure bootstrap, SQLite initialization, diagnostics, structured logging, and health endpoints. Tracking, map rendering, analytics, and the Admin Console are not implemented yet.
+The current runnable milestone provides secure bootstrap, SQLite initialization, Pageview collection, local GeoIP lookup, SVG Public Maps, Public Analytics, an authenticated Admin Console, and per-Site Map Preset management. Retention cleanup, backups, self-update, and password reset remain follow-up operational work.
 
 ## Documentation
 
@@ -76,6 +76,19 @@ The current Public Map and integrated widget routes are:
 GET /api/v1/sites/<SITE-ID>/map.svg?w=300&h=168
 GET /embed/widget.js?site_id=<SITE-ID>&w=300&h=168
 ```
+
+The browser-facing views are:
+
+```text
+GET /public/<SITE-ID>/analytics?range=30d
+GET /admin/login
+GET /admin
+GET /admin/sites/<SITE-ID>
+```
+
+The Admin Console accepts the single Administrator password created by `visitortrace init`. It manages Sites, publication and collection settings, recent Pageview Records, Map Presets, and live SVG previews. The Public Analytics view exposes only aggregate trends, geography, browser, and operating-system statistics.
+
+For a local preview, create a disposable instance and Site, start `visitortrace serve`, then open `/admin/login` at `http://127.0.0.1:8790`. A valid DB-IP City Lite MMDB is required for `/health/ready` and real geographic markers; without it the service still renders the basemap and aggregate counters.
 
 To regenerate the checked-in Natural Earth basemap after obtaining the pinned source file:
 

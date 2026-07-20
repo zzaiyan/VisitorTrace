@@ -1,0 +1,19 @@
+{{define "content"}}
+<header class="page-header">
+  <div><p class="eyebrow">SITE</p><h1>新增 Site</h1></div>
+  <a class="button ghost" href="/admin">取消</a>
+</header>
+<section class="form-panel narrow">
+  <form method="post" action="/admin/sites/new" class="stack-form">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label class="field"><span>显示名称</span><input type="text" name="name" maxlength="100" value="{{.Name}}" required></label>
+    <label class="field"><span>Allowed Origins</span><textarea name="origins" rows="4" spellcheck="false" required>{{.Origins}}</textarea><small>每行一个完整 Origin，例如 https://example.com</small></label>
+    <label class="field"><span>IANA 时区</span><input type="text" name="timezone" value="{{.Timezone}}" required></label>
+    <div class="field-grid two">
+      <label class="field"><span>访客合并周期</span><div class="input-unit"><input type="number" name="dedup_window_days" min="1" max="30" value="{{.DedupWindowDays}}" required><span>天</span></div></label>
+      <label class="field"><span>逐条记录保留期</span><div class="input-unit"><input type="number" name="retention_days" min="1" max="90" value="{{.RetentionDays}}" required><span>天</span></div></label>
+    </div>
+    <div class="form-actions"><button class="button primary" type="submit">创建 Site</button></div>
+  </form>
+</section>
+{{end}}

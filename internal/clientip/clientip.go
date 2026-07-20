@@ -54,6 +54,14 @@ func (r *Resolver) Resolve(request *http.Request) (netip.Addr, error) {
 	return chain[0], nil
 }
 
+func (r *Resolver) IsTrustedRemote(remoteAddr string) bool {
+	if r == nil {
+		return false
+	}
+	direct, err := parseRemoteAddr(remoteAddr)
+	return err == nil && r.isTrusted(direct)
+}
+
 func (r *Resolver) isTrusted(address netip.Addr) bool {
 	for _, prefix := range r.trusted {
 		if prefix.Contains(address) {

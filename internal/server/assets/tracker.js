@@ -87,11 +87,11 @@
     image.src = mapURL.href;
     var width = parseInt(scriptURL.searchParams.get("w"), 10);
     var height = parseInt(scriptURL.searchParams.get("h"), 10);
-    image.width = width >= 160 && width <= 1200 ? width : 300;
-    image.height = height >= 90 && height <= 800 ? height : 168;
+	if (width >= 160 && width <= 1200) image.width = width;
+	if (height >= 90 && height <= 800) image.height = height;
     image.loading = "eager";
     image.alt = "Visitor map";
-    image.title = "VisitorTrace Public Map";
+    image.title = "VisitorTrace Public Map | IP geolocation by DB-IP";
     link.appendChild(image);
     wrapper.appendChild(link);
     if (script.parentNode) script.parentNode.insertBefore(wrapper, script.nextSibling);

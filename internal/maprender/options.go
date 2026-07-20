@@ -1,7 +1,10 @@
 package maprender
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"regexp"
 	"sort"
@@ -44,7 +47,11 @@ func DefaultOptions() Options {
 }
 
 func ParseOptions(values url.Values) (Options, error) {
-	options := DefaultOptions()
+	return ParseOptionsWithDefaults(values, DefaultOptions())
+}
+
+func ParseOptionsWithDefaults(values url.Values, defaults Options) (Options, error) {
+	options := cloneOptions(defaults)
 	allowed := map[string]bool{
 		"w": true, "h": true, "title": true, "pv_label": true, "uv_label": true,
 		"show": true, "fs": true, "bg": true, "land": true, "border": true,
@@ -108,6 +115,138 @@ func ParseOptions(values url.Values) (Options, error) {
 		options.Metric = value[0]
 	}
 	return options, nil
+}
+
+type presetJSON struct {
+	Width    *int            `json:"w,omitempty"`
+	Height   *int            `json:"h,omitempty"`
+	Title    *string         `json:"title,omitempty"`
+	PVLabel  *string         `json:"pv_label,omitempty"`
+	UVLabel  *string         `json:"uv_label,omitempty"`
+	FontSize *int            `json:"fs,omitempty"`
+	BG       *string         `json:"bg,omitempty"`
+	Land     *string         `json:"land,omitempty"`
+	Border   *string         `json:"border,omitempty"`
+	Text     *string         `json:"text,omitempty"`
+	Marker   *string         `json:"marker,omitempty"`
+	Metric   *string         `json:"metric,omitempty"`
+	Show     map[string]bool `json:"show"`
+}
+
+func ParsePresetJSON(value string) (Options, error) {
+	options := DefaultOptions()
+	if strings.TrimSpace(value) == "" || strings.TrimSpace(value) == "{}" {
+		return options, nil
+	}
+	var preset presetJSON
+	decoder := json.NewDecoder(bytes.NewBufferString(value))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&preset); err != nil {
+		return Options{}, fmt.Errorf("decode Map Preset: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return Options{}, fmt.Errorf("decode Map Preset: trailing content")
+	}
+	if preset.Width != nil {
+		options.Width = *preset.Width
+	}
+	if preset.Height != nil {
+		options.Height = *preset.Height
+	}
+	if preset.Title != nil {
+		options.Title = *preset.Title
+	}
+	if preset.PVLabel != nil {
+		options.PVLabel = *preset.PVLabel
+	}
+	if preset.UVLabel != nil {
+		options.UVLabel = *preset.UVLabel
+	}
+	if preset.FontSize != nil {
+		options.FontSize = *preset.FontSize
+	}
+	if preset.BG != nil {
+		options.BG = *preset.BG
+	}
+	if preset.Land != nil {
+		options.Land = *preset.Land
+	}
+	if preset.Border != nil {
+		options.Border = *preset.Border
+	}
+	if preset.Text != nil {
+		options.Text = *preset.Text
+	}
+	if preset.Marker != nil {
+		options.Marker = *preset.Marker
+	}
+	if preset.Metric != nil {
+		options.Metric = *preset.Metric
+	}
+	if preset.Show != nil {
+		options.Show = preset.Show
+	}
+	if err := validateOptions(options); err != nil {
+		return Options{}, err
+	}
+	return options, nil
+}
+
+func PresetJSON(options Options) (string, error) {
+	if err := validateOptions(options); err != nil {
+		return "", err
+	}
+	show := make(map[string]bool, len(options.Show))
+	for key, value := range options.Show {
+		if value {
+			show[key] = true
+		}
+	}
+	value, err := json.Marshal(presetJSON{
+		Width: &options.Width, Height: &options.Height, Title: &options.Title,
+		PVLabel: &options.PVLabel, UVLabel: &options.UVLabel, FontSize: &options.FontSize,
+		BG: &options.BG, Land: &options.Land, Border: &options.Border, Text: &options.Text,
+		Marker: &options.Marker, Metric: &options.Metric, Show: show,
+	})
+	if err != nil {
+		return "", fmt.Errorf("encode Map Preset: %w", err)
+	}
+	return string(value), nil
+}
+
+func cloneOptions(value Options) Options {
+	if value.Show == nil {
+		value.Show = make(map[string]bool)
+	}
+	return value
+}
+
+func validateOptions(options Options) error {
+	if options.Width < 160 || options.Width > 1200 || options.Height < 90 || options.Height > 800 {
+		return fmt.Errorf("Map Preset dimensions are out of range")
+	}
+	if options.FontSize < 8 || options.FontSize > 32 {
+		return fmt.Errorf("Map Preset font size must be between 8 and 32")
+	}
+	for key, value := range map[string]string{"title": options.Title, "pv_label": options.PVLabel, "uv_label": options.UVLabel} {
+		if _, err := label(value); err != nil {
+			return fmt.Errorf("Map Preset %s: %w", key, err)
+		}
+	}
+	for key, value := range map[string]string{"bg": options.BG, "land": options.Land, "border": options.Border, "text": options.Text, "marker": options.Marker} {
+		if _, err := color(value); err != nil {
+			return fmt.Errorf("Map Preset %s: %w", key, err)
+		}
+	}
+	if options.Metric != "pv" && options.Metric != "uv" {
+		return fmt.Errorf("Map Preset metric must be pv or uv")
+	}
+	for key, enabled := range options.Show {
+		if enabled && key != "title" && key != "pv" && key != "uv" {
+			return fmt.Errorf("Map Preset show contains unsupported value %q", key)
+		}
+	}
+	return nil
 }
 
 func (o Options) CacheKey() string {

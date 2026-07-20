@@ -1,0 +1,10 @@
+{{define "content"}}
+<main class="login-shell">
+  <section class="login-panel error-panel">
+    <p class="eyebrow">ERROR {{.Status}}</p>
+    <h1>请求未完成</h1>
+    <p class="muted">{{.Message}}</p>
+    <a class="button primary" href="/admin">返回后台</a>
+  </section>
+</main>
+{{end}}

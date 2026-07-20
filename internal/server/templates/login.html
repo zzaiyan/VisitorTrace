@@ -1,0 +1,17 @@
+{{define "content"}}
+<main class="login-shell">
+  <section class="login-panel">
+    <a class="brand login-brand" href="/admin"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>
+    <div class="login-heading">
+      <p class="eyebrow">ADMIN CONSOLE</p>
+      <h1>管理员登录</h1>
+    </div>
+    {{if .Error}}<div class="notice danger" role="alert">{{.Error}}</div>{{end}}
+    <form method="post" action="/admin/login" class="stack-form">
+      <input type="hidden" name="next" value="{{.Next}}">
+      <label class="field"><span>管理员密码</span><input type="password" name="password" minlength="8" maxlength="128" autocomplete="current-password" autofocus required></label>
+      <button class="button primary full" type="submit">登录后台</button>
+    </form>
+  </section>
+</main>
+{{end}}

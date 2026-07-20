@@ -1,0 +1,34 @@
+{{define "content"}}
+<header class="page-header">
+  <div><p class="eyebrow">ADMIN CONSOLE</p><h1>管理总览</h1><p class="subhead">{{len .Sites}} 个 Site</p></div>
+  <a class="button primary" href="/admin/sites/new">新增 Site</a>
+</header>
+{{if .Sites}}
+<section class="site-grid" aria-label="站点列表">
+  {{range .Sites}}
+  <article class="site-card">
+    <div class="site-card-copy">
+      <div class="status-line">
+        {{if .Site.AcceptPageviews}}<span class="status live">接收中</span>{{else}}<span class="status paused">已暂停</span>{{end}}
+        {{if .Site.PublishPublic}}<span class="status public">公开</span>{{else}}<span class="status private">未公开</span>{{end}}
+      </div>
+      <h2><a href="/admin/sites/{{.Site.ID}}">{{.Site.Name}}</a></h2>
+      <code>{{.Site.ID}}</code>
+      <dl class="compact-stats">
+        <div><dt>Pageviews</dt><dd>{{formatCount .Overview.Pageviews}}</dd></div>
+        <div><dt>Unique Visitors</dt><dd>{{formatCount .Overview.UniqueVisitors}}</dd></div>
+        <div><dt>Records</dt><dd>{{formatCount .Overview.PageviewRecords}}</dd></div>
+      </dl>
+      <div class="inline-actions">
+        <a class="text-link" href="/admin/sites/{{.Site.ID}}">管理</a>
+        {{if .Site.PublishPublic}}<a class="text-link" href="/public/{{.Site.ID}}/analytics" target="_blank" rel="noopener">公开分析</a>{{end}}
+      </div>
+    </div>
+    <a class="site-map" href="/admin/sites/{{.Site.ID}}" aria-label="管理 {{.Site.Name}}"><img src="{{.MapPreviewURL}}" alt="{{.Site.Name}} 访客地图"></a>
+  </article>
+  {{end}}
+</section>
+{{else}}
+<section class="empty-state"><p class="eyebrow">NO SITES</p><h2>还没有 Site</h2><a class="button primary" href="/admin/sites/new">创建第一个 Site</a></section>
+{{end}}
+{{end}}
