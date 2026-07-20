@@ -77,6 +77,8 @@ GET /api/v1/sites/<SITE-ID>/map.svg?w=300&h=168
 GET /embed/widget.js?site_id=<SITE-ID>&w=300&h=168
 ```
 
+`bg=transparent` makes the SVG background transparent. The Map Preset editor exposes the same option as a background toggle.
+
 The browser-facing views are:
 
 ```text
@@ -89,6 +91,14 @@ GET /admin/sites/<SITE-ID>
 The Admin Console accepts the single Administrator password created by `visitortrace init`. It manages Sites, publication and collection settings, recent Pageview Records, Map Presets, and live SVG previews. The Public Analytics view exposes only aggregate trends, geography, browser, and operating-system statistics.
 
 For a local preview, create a disposable instance and Site, start `visitortrace serve`, then open `/admin/login` at `http://127.0.0.1:8790`. A valid DB-IP City Lite MMDB is required for `/health/ready` and real geographic markers; without it the service still renders the basemap and aggregate counters.
+
+The repository includes a disposable demo launcher that seeds geographically distributed fake Pageviews and keeps the service in the foreground:
+
+```sh
+./tools/preview-demo.sh
+```
+
+Set `VISITORTRACE_LISTEN=127.0.0.1:8791` when the default local port is already occupied. The generated data is removed when the launcher exits.
 
 To regenerate the checked-in Natural Earth basemap after obtaining the pinned source file:
 

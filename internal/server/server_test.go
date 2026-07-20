@@ -208,9 +208,9 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	}
 	presetForm := url.Values{
 		"csrf": {csrfMatch[1]}, "w": {"640"}, "h": {"320"}, "title": {"Preview"},
-		"pv_label": {"PV"}, "uv_label": {"UV"}, "fs": {"12"}, "bg": {"#f2f3f3"},
+		"pv_label": {"PV"}, "uv_label": {"UV"}, "fs": {"12"}, "bg_color": {"#f2f3f3"},
 		"land": {"#6f808f"}, "border": {"#ffffff"}, "text": {"#54606a"}, "marker": {"#e34949"},
-		"metric": {"pv"}, "show_title": {"on"}, "show_pv": {"on"},
+		"metric": {"pv"}, "show_title": {"on"}, "show_pv": {"on"}, "bg_transparent": {"on"},
 	}
 	presetRequest := httptest.NewRequest(http.MethodPost, "/admin/sites/"+site.ID+"/preset", strings.NewReader(presetForm.Encode()))
 	presetRequest.Host = "127.0.0.1:8790"
@@ -218,7 +218,7 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	presetRequest.AddCookie(cookies[0])
 	presetResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(presetResponse, presetRequest)
-	if presetResponse.Code != http.StatusSeeOther {
+	if presetResponse.Code != http.StatusSeeOther || presetResponse.Header().Get("Location") != "/admin/sites/"+site.ID+"?saved=preset" {
 		t.Fatalf("preset update status = %d, body = %q", presetResponse.Code, presetResponse.Body.String())
 	}
 	previewRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID+"/preset-preview.svg", nil)
@@ -226,7 +226,7 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	previewRequest.AddCookie(cookies[0])
 	previewResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(previewResponse, previewRequest)
-	if previewResponse.Code != http.StatusOK || !strings.Contains(previewResponse.Body.String(), `width="640" height="320"`) {
+	if previewResponse.Code != http.StatusOK || !strings.Contains(previewResponse.Body.String(), `width="640" height="320"`) || !strings.Contains(previewResponse.Body.String(), `fill="none"`) {
 		t.Fatalf("admin preset preview = status %d body prefix %q", previewResponse.Code, previewResponse.Body.String()[:min(140, len(previewResponse.Body.String()))])
 	}
 	sitePage := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID, nil)

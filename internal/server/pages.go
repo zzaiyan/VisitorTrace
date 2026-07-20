@@ -250,8 +250,13 @@ func (s *Server) adminUpdatePreset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	values := url.Values{}
-	for _, key := range []string{"w", "h", "title", "pv_label", "uv_label", "fs", "bg", "land", "border", "text", "marker", "metric"} {
+	for _, key := range []string{"w", "h", "title", "pv_label", "uv_label", "fs", "land", "border", "text", "marker", "metric"} {
 		values.Set(key, r.FormValue(key))
+	}
+	if r.FormValue("bg_transparent") == "on" {
+		values.Set("bg", "transparent")
+	} else {
+		values.Set("bg", r.FormValue("bg_color"))
 	}
 	show := make([]string, 0, 3)
 	for _, key := range []string{"title", "pv", "uv"} {

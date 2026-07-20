@@ -36,7 +36,7 @@
       </div>
       <fieldset class="check-group"><legend>显示内容</legend><label><input type="checkbox" name="show_title" {{if mapShow .Preset "title"}}checked{{end}}>标题</label><label><input type="checkbox" name="show_pv" {{if mapShow .Preset "pv"}}checked{{end}}>PV</label><label><input type="checkbox" name="show_uv" {{if mapShow .Preset "uv"}}checked{{end}}>UV</label></fieldset>
       <div class="color-grid">
-        <label class="color-field"><span>背景</span><input type="color" name="bg" value="#{{.Preset.BG}}"></label>
+        <div class="color-field"><span>背景</span><div class="color-control"><input type="color" name="bg_color" value="#{{if eq .Preset.BG "transparent"}}f2f3f3{{else}}{{.Preset.BG}}{{end}}"><label><input type="checkbox" name="bg_transparent" {{if eq .Preset.BG "transparent"}}checked{{end}}>透明</label></div></div>
         <label class="color-field"><span>陆地</span><input type="color" name="land" value="#{{.Preset.Land}}"></label>
         <label class="color-field"><span>边界</span><input type="color" name="border" value="#{{.Preset.Border}}"></label>
         <label class="color-field"><span>文字</span><input type="color" name="text" value="#{{.Preset.Text}}"></label>
@@ -91,10 +91,11 @@
   function update() {
     var data = new FormData(form);
     var query = new URLSearchParams();
-    ["w","h","title","pv_label","uv_label","fs","bg","land","border","text","marker","metric"].forEach(function (key) {
+    ["w","h","title","pv_label","uv_label","fs","land","border","text","marker","metric"].forEach(function (key) {
       var value = data.get(key);
       if (value !== null) query.set(key, value);
     });
+    query.set("bg", data.get("bg_transparent") === "on" ? "transparent" : data.get("bg_color"));
     var show = ["title","pv","uv"].filter(function (key) { return data.get("show_" + key) === "on"; });
     query.set("show", show.length ? show.join(",") : "none");
     preview.src = preview.dataset.previewBase + "?" + query.toString();

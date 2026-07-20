@@ -30,6 +30,27 @@ func TestParseOptionsRejectsUnknownParameter(t *testing.T) {
 	}
 }
 
+func TestTransparentBackground(t *testing.T) {
+	options, err := ParseOptions(url.Values{"bg": {"transparent"}})
+	if err != nil {
+		t.Fatalf("ParseOptions() transparent error = %v", err)
+	}
+	if options.BG != "transparent" {
+		t.Fatalf("transparent background = %q", options.BG)
+	}
+	data := store.PublicMapData{SiteName: "Transparent", Pageviews: 1, UniqueVisitors: 1}
+	result, err := Render(data, options)
+	if err != nil {
+		t.Fatalf("Render() transparent error = %v", err)
+	}
+	if !strings.Contains(string(result), `<rect width="100%" height="100%" fill="none"/>`) {
+		t.Fatalf("transparent background was not rendered as none")
+	}
+	if strings.Contains(string(result), "#transparent") {
+		t.Fatal("transparent background produced an invalid SVG color")
+	}
+}
+
 func TestRenderEscapesLabelsAndIncludesMap(t *testing.T) {
 	options := DefaultOptions()
 	options.Title = "A <Site>"

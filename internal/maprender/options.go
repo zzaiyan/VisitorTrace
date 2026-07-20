@@ -101,7 +101,12 @@ func ParseOptionsWithDefaults(values url.Values, defaults Options) (Options, err
 	}
 	for key, destination := range map[string]*string{"bg": &options.BG, "land": &options.Land, "border": &options.Border, "text": &options.Text, "marker": &options.Marker} {
 		if value, ok := values[key]; ok {
-			parsed, err := color(value[0])
+			var parsed string
+			if key == "bg" && value[0] == "transparent" {
+				parsed = "transparent"
+			} else {
+				parsed, err = color(value[0])
+			}
 			if err != nil {
 				return Options{}, fmt.Errorf("%s: %w", key, err)
 			}
@@ -233,9 +238,14 @@ func validateOptions(options Options) error {
 			return fmt.Errorf("Map Preset %s: %w", key, err)
 		}
 	}
-	for key, value := range map[string]string{"bg": options.BG, "land": options.Land, "border": options.Border, "text": options.Text, "marker": options.Marker} {
+	for key, value := range map[string]string{"land": options.Land, "border": options.Border, "text": options.Text, "marker": options.Marker} {
 		if _, err := color(value); err != nil {
 			return fmt.Errorf("Map Preset %s: %w", key, err)
+		}
+	}
+	if options.BG != "transparent" {
+		if _, err := color(options.BG); err != nil {
+			return fmt.Errorf("Map Preset bg: %w", err)
 		}
 	}
 	if options.Metric != "pv" && options.Metric != "uv" {

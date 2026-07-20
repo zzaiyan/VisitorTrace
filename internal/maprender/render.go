@@ -32,7 +32,11 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 	output.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
 	fmt.Fprintf(&output, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\" role=\"img\">", options.Width, options.Height, options.Width, options.Height)
 	fmt.Fprintf(&output, "<title>%s</title>", html.EscapeString(mapTitle(data, options)))
-	fmt.Fprintf(&output, "<rect width=\"100%%\" height=\"100%%\" fill=\"#%s\"/>", options.BG)
+	backgroundFill := "#" + options.BG
+	if options.BG == "transparent" {
+		backgroundFill = "none"
+	}
+	fmt.Fprintf(&output, "<rect width=\"100%%\" height=\"100%%\" fill=\"%s\"/>", backgroundFill)
 	fmt.Fprintf(&output, "<g transform=\"scale(%s %s)\"><path d=\"%s\" fill=\"#%s\" stroke=\"#%s\" stroke-width=\"0.7\" vector-effect=\"non-scaling-stroke\"/></g>",
 		format(float64(options.Width)/1000), format(float64(mapHeight)/500), pathData, options.Land, options.Border)
 	if options.Show["title"] {
@@ -41,7 +45,7 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 			value = data.SiteName
 		}
 		if value != "" {
-			fmt.Fprintf(&output, "<rect x=\"0\" y=\"0\" width=\"100%%\" height=\"%d\" fill=\"#%s\" fill-opacity=\"0.82\"/>", options.FontSize+10, options.BG)
+			fmt.Fprintf(&output, "<rect x=\"0\" y=\"0\" width=\"100%%\" height=\"%d\" fill=\"%s\" fill-opacity=\"0.82\"/>", options.FontSize+10, backgroundFill)
 			fmt.Fprintf(&output, "<text x=\"10\" y=\"%d\" fill=\"#%s\" font-family=\"system-ui,sans-serif\" font-size=\"%d\" font-weight=\"600\"%s>%s</text>", options.FontSize+4, options.Text, options.FontSize, fitTextAttributes(value, options.FontSize, options.Width), html.EscapeString(value))
 		}
 	}

@@ -120,6 +120,7 @@ func runServe(args []string) int {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	configPath := fs.String("config", config.DefaultConfigPath(), "protected config path")
+	listen := fs.String("listen", "", "temporary listen address override")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -127,6 +128,9 @@ func runServe(args []string) int {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "serve: %v\n", err)
 		return 1
+	}
+	if *listen != "" {
+		cfg.Listen = *listen
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

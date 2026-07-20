@@ -215,7 +215,7 @@ The route names are part of the first-version public contract; implementation co
 - Public SVG endpoints accept only documented query parameters and return `400 Bad Request` for unknown, malformed, or out-of-range values.
 - Rendered dimensions range from 160 through 1200 pixels wide and 90 through 800 pixels high.
 - Font sizes range from 8 through 32 pixels, custom labels contain at most 40 characters, and colors use normalized hexadecimal values.
-- The first-version override fields are `w`, `h`, `title`, `pv_label`, `uv_label`, `show`, `fs`, `bg`, `land`, `border`, `text`, `marker`, and `metric`.
+- The first-version override fields are `w`, `h`, `title`, `pv_label`, `uv_label`, `show`, `fs`, `bg`, `land`, `border`, `text`, `marker`, and `metric`; `bg=transparent` is the explicit transparent-background value.
 - `show` selects a combination of title, Pageview, and Unique Visitor labels; `metric` selects Pageviews or Unique Visitors as the city-marker scale.
 - Font families, map projections, arbitrary CSS, marker-radius controls, and time-range controls are not configurable in the first version.
 - Rendered SVG variants are held in an in-memory LRU cache for five minutes, with at most 256 variants per Site and 32 MiB across the service.
