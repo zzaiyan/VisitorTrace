@@ -13,7 +13,7 @@ coverage.out
 *.sqlite3
 *.mmdb
 .env
-visitortrace.toml
+visitortrace.json
 
 # Editor and operating-system files
 .DS_Store

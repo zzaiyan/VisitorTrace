@@ -1,0 +1,188 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+
+	_ "modernc.org/sqlite"
+)
+
+const schemaVersion = 1
+
+const MinimumSQLiteVersion = "3.51.3"
+
+type Store struct {
+	DB   *sql.DB
+	Path string
+}
+
+func Initialize(ctx context.Context, path, passwordHash string) (*Store, error) {
+	if _, err := os.Stat(path); err == nil {
+		return nil, fmt.Errorf("database already exists: %s", path)
+	} else if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("check database: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, fmt.Errorf("create database directory: %w", err)
+	}
+	store, err := open(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	initialized := false
+	defer func() {
+		if !initialized {
+			_ = store.Close()
+			removeDatabaseFiles(path)
+		}
+	}()
+	tx, err := store.DB.BeginTx(ctx, nil)
+	if err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("begin schema transaction: %w", err)
+	}
+	statements := []string{
+		`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`,
+		`CREATE TABLE service_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+		`CREATE TABLE administrators (id INTEGER PRIMARY KEY CHECK (id = 1), password_hash TEXT NOT NULL, created_at TEXT NOT NULL)`,
+		`INSERT INTO service_meta (key, value) VALUES ('schema_version', '1')`,
+		`INSERT INTO schema_migrations (version, applied_at) VALUES (1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
+		`INSERT INTO administrators (id, password_hash, created_at) VALUES (1, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
+	}
+	for i, statement := range statements {
+		var execErr error
+		if i == len(statements)-1 {
+			_, execErr = tx.ExecContext(ctx, statement, passwordHash)
+		} else {
+			_, execErr = tx.ExecContext(ctx, statement)
+		}
+		if execErr != nil {
+			_ = tx.Rollback()
+			_ = store.Close()
+			return nil, fmt.Errorf("apply schema statement %d: %w", i+1, execErr)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("commit schema: %w", err)
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("protect database: %w", err)
+	}
+	initialized = true
+	return store, nil
+}
+
+func OpenExisting(ctx context.Context, path string) (*Store, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("database is unavailable: %w", err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+		return nil, fmt.Errorf("database permissions %o are too broad; want 600", info.Mode().Perm())
+	}
+	return open(ctx, path)
+}
+
+func open(ctx context.Context, path string) (*Store, error) {
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, fmt.Errorf("open sqlite: %w", err)
+	}
+	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(4)
+	store := &Store{DB: db, Path: path}
+	pragmas := []string{
+		"PRAGMA foreign_keys = ON",
+		"PRAGMA busy_timeout = 5000",
+	}
+	for _, pragma := range pragmas {
+		if _, err := db.ExecContext(ctx, pragma); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("configure sqlite: %w", err)
+		}
+	}
+	var journalMode string
+	if err := db.QueryRowContext(ctx, "PRAGMA journal_mode = WAL").Scan(&journalMode); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("enable sqlite WAL: %w", err)
+	}
+	if journalMode != "wal" && journalMode != "WAL" {
+		_ = db.Close()
+		return nil, fmt.Errorf("sqlite did not enable WAL mode: %s", journalMode)
+	}
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ping sqlite: %w", err)
+	}
+	return store, nil
+}
+
+func (s *Store) SchemaReady(ctx context.Context) error {
+	var version string
+	if err := s.DB.QueryRowContext(ctx, "SELECT value FROM service_meta WHERE key = 'schema_version'").Scan(&version); err != nil {
+		return fmt.Errorf("read schema version: %w", err)
+	}
+	if version != fmt.Sprint(schemaVersion) {
+		return fmt.Errorf("unsupported schema version %s", version)
+	}
+	return nil
+}
+
+func (s *Store) SQLiteVersion(ctx context.Context) (string, error) {
+	var version string
+	if err := s.DB.QueryRowContext(ctx, "SELECT sqlite_version()").Scan(&version); err != nil {
+		return "", fmt.Errorf("read sqlite version: %w", err)
+	}
+	return version, nil
+}
+
+func SQLiteVersionAtLeast(actual, minimum string) bool {
+	a, ok := parseVersion(actual)
+	if !ok {
+		return false
+	}
+	m, ok := parseVersion(minimum)
+	if !ok {
+		return false
+	}
+	for i := range a {
+		if a[i] != m[i] {
+			return a[i] > m[i]
+		}
+	}
+	return true
+}
+
+func parseVersion(value string) ([3]int, bool) {
+	var result [3]int
+	parts := strings.Split(value, ".")
+	if len(parts) != len(result) {
+		return result, false
+	}
+	for i, part := range parts {
+		n, err := strconv.Atoi(part)
+		if err != nil || n < 0 {
+			return result, false
+		}
+		result[i] = n
+	}
+	return result, true
+}
+
+func (s *Store) Close() error {
+	return s.DB.Close()
+}
+
+func removeDatabaseFiles(path string) {
+	_ = os.Remove(path)
+	_ = os.Remove(path + "-wal")
+	_ = os.Remove(path + "-shm")
+}
