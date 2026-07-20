@@ -104,7 +104,7 @@ func TestRenderUsesCenteredNonStretchingTextAndSeparateTitleBand(t *testing.T) {
 	if !strings.Contains(value, `transform="translate(0 22`) || !strings.Contains(value, `text-anchor="middle"`) {
 		t.Fatal("title/map layout is not separated and centered")
 	}
-	if strings.Count(value, `class="visitortrace-stat"`) != 2 {
-		t.Fatalf("statistics were not split into two centered lines: %d", strings.Count(value, `class="visitortrace-stat"`))
+	if strings.Count(value, `class="visitortrace-stat"`) != 1 {
+		t.Fatalf("statistics did not remain on one centered line: %d", strings.Count(value, `class="visitortrace-stat"`))
 	}
 }

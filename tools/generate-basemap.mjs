@@ -9,6 +9,8 @@ const source = JSON.parse(await readFile(inputPath, "utf8"));
 const paths = [];
 const minLatitude = -60;
 const maxLatitude = 90;
+const mapWidth = 1000;
+const mapHeight = mapWidth * (maxLatitude - minLatitude) / 360;
 
 for (const feature of source.features || []) {
   if (isAntarctica(feature.properties || {})) continue;
@@ -35,8 +37,8 @@ await writeFile(outputPath, paths.join(""), "utf8");
 
 function project([longitude, latitude]) {
   return [
-    ((longitude + 180) / 360) * 1000,
-    ((maxLatitude - latitude) / (maxLatitude - minLatitude)) * 500,
+    ((longitude + 180) / 360) * mapWidth,
+    ((maxLatitude - latitude) / (maxLatitude - minLatitude)) * mapHeight,
   ];
 }
 

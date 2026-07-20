@@ -59,6 +59,7 @@ type adminSiteData struct {
 	Recent        []store.PageviewRecord
 	OriginsText   string
 	MapPreviewURL string
+	MapAspect     float64
 	BaseURL       string
 	Saved         string
 }
@@ -204,7 +205,7 @@ func (s *Server) adminSite(w http.ResponseWriter, r *http.Request) {
 	data := adminSiteData{
 		pageLayout: s.adminLayout(r, session, site.Name, "sites"), Site: site, Overview: overview,
 		Preset: preset, Recent: recent, OriginsText: strings.Join(site.AllowedOrigins, "\n"),
-		MapPreviewURL: "/admin/sites/" + site.ID + "/preset-preview.svg", BaseURL: s.externalBaseURL(r), Saved: adminFlash(r),
+		MapPreviewURL: "/admin/sites/" + site.ID + "/preset-preview.svg", MapAspect: maprender.MapAspect, BaseURL: s.externalBaseURL(r), Saved: adminFlash(r),
 	}
 	data.Error = r.URL.Query().Get("error")
 	s.renderPage(w, r, "site", data)

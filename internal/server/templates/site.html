@@ -19,11 +19,11 @@
       <img id="preset-preview" src="{{.MapPreviewURL}}" data-preview-base="{{.MapPreviewURL}}" alt="地图预设实时预览">
       <a class="attribution" href="https://db-ip.com" target="_blank" rel="noopener">IP geolocation by DB-IP</a>
     </div>
-    <form id="preset-form" method="post" action="/admin/sites/{{.Site.ID}}/preset" class="preset-form">
+    <form id="preset-form" method="post" action="/admin/sites/{{.Site.ID}}/preset" class="preset-form" data-map-aspect="{{.MapAspect}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div class="field-grid two">
-        <label class="field"><span>宽度</span><div class="input-unit"><input type="number" name="w" min="160" max="1200" value="{{.Preset.Width}}" required><span>px</span></div></label>
-        <label class="field"><span>高度</span><div class="input-unit"><input type="number" name="h" min="90" max="800" value="{{.Preset.Height}}" required><span>px</span></div></label>
+        <div class="field"><label for="preset-width">宽度</label><div class="input-unit"><input id="preset-width" type="number" name="w" min="160" max="1200" value="{{.Preset.Width}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="width" title="按当前选项自动计算宽度">auto</button></div></div>
+        <div class="field"><label for="preset-height">高度</label><div class="input-unit"><input id="preset-height" type="number" name="h" min="90" max="800" value="{{.Preset.Height}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="height" title="按当前选项自动计算高度">auto</button></div></div>
       </div>
       <label class="field"><span>标题</span><input type="text" name="title" maxlength="40" value="{{.Preset.Title}}"></label>
       <div class="field-grid two">
@@ -34,9 +34,9 @@
         <label class="field"><span>字体大小</span><div class="input-unit"><input type="number" name="fs" min="8" max="32" value="{{.Preset.FontSize}}" required><span>px</span></div></label>
         <label class="field"><span>标记指标</span><select name="metric"><option value="pv" {{if selected .Preset.Metric "pv"}}selected{{end}}>Pageviews</option><option value="uv" {{if selected .Preset.Metric "uv"}}selected{{end}}>Unique Visitors</option></select></label>
       </div>
-      <fieldset class="check-group"><legend>显示内容</legend><label><input type="checkbox" name="show_title" {{if mapShow .Preset "title"}}checked{{end}}>标题</label><label><input type="checkbox" name="show_pv" {{if mapShow .Preset "pv"}}checked{{end}}>PV</label><label><input type="checkbox" name="show_uv" {{if mapShow .Preset "uv"}}checked{{end}}>UV</label></fieldset>
+      <fieldset class="check-group"><legend>显示内容</legend><label><input type="checkbox" name="show_title" {{if mapShow .Preset "title"}}checked{{end}}>标题</label><label><input type="checkbox" name="show_pv" {{if mapShow .Preset "pv"}}checked{{end}}>PV</label><label><input type="checkbox" name="show_uv" {{if mapShow .Preset "uv"}}checked{{end}}>UV</label><label><input type="checkbox" name="bg_transparent" {{if eq .Preset.BG "transparent"}}checked{{end}}>透明背景</label></fieldset>
       <div class="color-grid">
-        <div class="color-field"><span>背景</span><div class="color-control"><input type="color" name="bg_color" value="#{{if eq .Preset.BG "transparent"}}f2f3f3{{else}}{{.Preset.BG}}{{end}}"><label><input type="checkbox" name="bg_transparent" {{if eq .Preset.BG "transparent"}}checked{{end}}>透明</label></div></div>
+        <label class="color-field"><span>背景色</span><input type="color" name="bg_color" value="#{{if eq .Preset.BG "transparent"}}f2f3f3{{else}}{{.Preset.BG}}{{end}}"></label>
         <label class="color-field"><span>陆地</span><input type="color" name="land" value="#{{.Preset.Land}}"></label>
         <label class="color-field"><span>边界</span><input type="color" name="border" value="#{{.Preset.Border}}"></label>
         <label class="color-field"><span>文字</span><input type="color" name="text" value="#{{.Preset.Text}}"></label>
@@ -102,6 +102,27 @@
   }
   form.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(update, 90); });
   form.addEventListener("change", update);
+  function chromeHeight() {
+    var fontSize = Number(form.elements.fs.value) || 12;
+    var titleHeight = form.elements.show_title.checked ? fontSize + 10 : 0;
+    var footerHeight = (form.elements.show_pv.checked || form.elements.show_uv.checked) ? fontSize + 12 : 0;
+    return titleHeight + footerHeight;
+  }
+  function autoDimension(dimension) {
+    var chrome = chromeHeight();
+    var mapAspect = Number(form.dataset.mapAspect) || 2.4;
+    if (dimension === "width") {
+      var mapHeight = Number(form.elements.h.value) - chrome;
+      if (mapHeight > 0) form.elements.w.value = Math.round(mapHeight * mapAspect);
+    } else {
+      var mapWidth = Number(form.elements.w.value);
+      if (mapWidth > 0) form.elements.h.value = Math.round(mapWidth / mapAspect + chrome);
+    }
+    update();
+  }
+  form.querySelectorAll("[data-auto-dimension]").forEach(function (button) {
+    button.addEventListener("click", function () { autoDimension(button.dataset.autoDimension); });
+  });
 }());
 </script>
 {{end}}

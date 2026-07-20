@@ -7,7 +7,6 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
@@ -15,6 +14,9 @@ import (
 const (
 	mapMinLatitude = -60.0
 	mapMaxLatitude = 90.0
+	mapBaseWidth   = 1000.0
+	MapAspect      = 360.0 / (mapMaxLatitude - mapMinLatitude)
+	mapBaseHeight  = mapBaseWidth / MapAspect
 )
 
 //go:embed assets/world.path
@@ -37,10 +39,9 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 		titleHeight = options.FontSize + 10
 	}
 	stats := mapStats(data, options)
-	statLines := layoutStatLines(stats, options.Width, options.FontSize)
 	footerHeight := 0
-	if len(statLines) > 0 {
-		footerHeight = len(statLines)*(options.FontSize+4) + 8
+	if len(stats) > 0 {
+		footerHeight = options.FontSize + 12
 	}
 	mapHeight := options.Height - titleHeight - footerHeight
 	if mapHeight < 1 {
@@ -60,7 +61,7 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 		fmt.Fprintf(&output, "<text class=\"visitortrace-title\" x=\"%s\" y=\"%d\" text-anchor=\"middle\" fill=\"#%s\" font-family=\"system-ui,sans-serif\" font-size=\"%d\" font-weight=\"600\">%s</text>", format(float64(options.Width)/2), options.FontSize+3, options.Text, options.FontSize, html.EscapeString(title))
 	}
 	fmt.Fprintf(&output, "<g class=\"visitortrace-map\" transform=\"translate(0 %d) scale(%s %s)\"><path d=\"%s\" fill=\"#%s\" stroke=\"#%s\" stroke-width=\"0.7\" vector-effect=\"non-scaling-stroke\"/></g>",
-		titleHeight, format(float64(options.Width)/1000), format(float64(mapHeight)/500), pathData, options.Land, options.Border)
+		titleHeight, format(float64(options.Width)/mapBaseWidth), format(float64(mapHeight)/mapBaseHeight), pathData, options.Land, options.Border)
 	maxMetric := int64(0)
 	for _, point := range data.Points {
 		value := point.Pageviews
@@ -90,8 +91,9 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 		fmt.Fprintf(&output, "<g class=\"visitortrace-marker\"><title>%s</title><circle cx=\"%s\" cy=\"%s\" r=\"%s\" fill=\"#%s\" fill-opacity=\"0.78\" stroke=\"#ffffff\" stroke-width=\"0.6\"/></g>", html.EscapeString(tooltip), format(x), format(y), format(radius), options.Marker)
 	}
 	footerTop := options.Height - footerHeight
-	for index, line := range statLines {
-		y := footerTop + options.FontSize + 4 + index*(options.FontSize+4)
+	if len(stats) > 0 {
+		line := strings.Join(stats, "  ·  ")
+		y := footerTop + options.FontSize + 4
 		fmt.Fprintf(&output, "<text class=\"visitortrace-stat\" x=\"%s\" y=\"%d\" text-anchor=\"middle\" fill=\"#%s\" font-family=\"system-ui,sans-serif\" font-size=\"%d\">%s</text>", format(float64(options.Width)/2), y, options.Text, options.FontSize, html.EscapeString(line))
 	}
 	output.WriteString("</svg>")
@@ -132,20 +134,4 @@ func mapStats(data store.PublicMapData, options Options) []string {
 		stats = append(stats, fmt.Sprintf("%s: %s", labelOrDefault(options.UVLabel, "Unique Visitors"), formatCount(data.UniqueVisitors)))
 	}
 	return stats
-}
-
-func layoutStatLines(stats []string, width, fontSize int) []string {
-	if len(stats) == 0 {
-		return nil
-	}
-	joined := strings.Join(stats, "  ·  ")
-	if len(stats) == 2 && estimatedTextWidth(joined, fontSize) > float64(width-20) {
-		return stats
-	}
-	return []string{joined}
-}
-
-func estimatedTextWidth(value string, fontSize int) float64 {
-	estimatedWidth := float64(utf8.RuneCountInString(value)) * float64(fontSize) * 0.62
-	return estimatedWidth
 }

@@ -89,7 +89,9 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .field-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .input-unit { display: flex; align-items: center; }
 .input-unit input { min-width: 0; border-radius: 4px 0 0 4px; }
-.input-unit span { display: grid; height: 42px; min-width: 38px; place-items: center; border: 1px solid #cfdad8; border-left: 0; border-radius: 0 4px 4px 0; background: #f2f5f3; color: var(--muted); font-size: 11px; font-weight: 500; }
+.input-unit span { display: grid; height: 42px; min-width: 38px; place-items: center; border: 1px solid #cfdad8; border-left: 0; background: #f2f5f3; color: var(--muted); font-size: 11px; font-weight: 500; }
+.input-auto { height: 42px; padding: 0 9px; border: 1px solid #cfdad8; border-left: 0; border-radius: 0 4px 4px 0; background: #f2f5f3; color: var(--green); cursor: pointer; font-size: 11px; font-weight: 800; text-transform: lowercase; }
+.input-auto:hover { background: #e2f0e9; }
 
 .metric-strip { display: grid; grid-template-columns: repeat(4, 1fr); margin-bottom: 32px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: white; }
 .metric-strip > div { min-height: 104px; padding: 21px 20px; border-right: 1px solid var(--line); }
@@ -111,9 +113,6 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .color-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .color-field { display: grid; gap: 6px; color: var(--muted); font-size: 11px; }
 .color-field input { width: 100%; height: 34px; padding: 3px; border: 1px solid var(--line); background: white; cursor: pointer; }
-.color-control { display: grid; gap: 6px; }
-.color-control label { color: var(--ink); font-size: 11px; font-weight: 500; }
-.color-control label input { width: auto; height: auto; padding: 0; accent-color: var(--green); }
 .toggle-field { display: flex; min-height: 42px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 10px; border: 1px solid var(--line); }
 .toggle-field strong, .toggle-field small { display: block; }
 .toggle-field strong { color: var(--ink); font-size: 12px; }

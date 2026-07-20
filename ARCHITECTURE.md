@@ -207,7 +207,7 @@ The route names are part of the first-version public contract; implementation co
 - Its default footprint is 300 by 168 CSS pixels to replace the current academic-homepage widget without changing the footer layout.
 - The SVG presents a world basemap, city markers scaled by aggregate activity, cumulative Pageviews, and cumulative Unique Visitors.
 - The world basemap excludes Antarctica and uses a `-60` through `90` degree display latitude range so the remaining landmass fills the map area without a polar empty band.
-- The title and statistics occupy dedicated centered bands above and below the map. Text keeps its configured font size and is never stretched with SVG `textLength`; paired Pageview and Unique Visitor statistics wrap to separate centered lines when needed.
+- The title and statistics occupy dedicated centered bands above and below the map. Text keeps its configured font size, is never stretched with SVG `textLength`, and remains on one line even when its content exceeds the SVG width.
 - The footer preview does not provide zooming or rich interaction; clicking it opens the Site's Public Analytics.
 - Sites embed the SVG as a lazily loaded image, independently of Pageview tracking.
 - SVG responses use an `ETag` and a five-minute public cache lifetime.
@@ -223,6 +223,7 @@ The route names are part of the first-version public contract; implementation co
 - Rendered SVG variants are held in an in-memory LRU cache for five minutes, with at most 256 variants per Site and 32 MiB across the service.
 - Concurrent cache misses for one normalized configuration are coalesced into one render operation.
 - The Admin Console renders a live preview through the same override and rendering path before the Map Preset is saved.
+- Width and height controls provide independent `auto` actions. They account for the currently visible title and statistics bands, then calculate the other dimension from the basemap's `2.4:1` projection ratio.
 - The SVG image itself does not draw provider attribution.
 - Generated embed markup contains a DB-IP attribution link that appears when the map is hovered or keyboard-focused; the same behavior is visible in the Admin Console preview.
 - Public Analytics displays a persistent DB-IP attribution link.
