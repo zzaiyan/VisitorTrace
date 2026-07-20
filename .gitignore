@@ -19,3 +19,10 @@ visitortrace.json
 .DS_Store
 .idea/
 .vscode/
+
+# Internal development documentation
+/ARCHITECTURE.md
+/CONTEXT.md
+/docs/adr/
+/docs/research/
+/docs/internal/

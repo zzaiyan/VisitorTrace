@@ -1,8 +1,20 @@
-# Third-Party Notices
+# 第三方声明 / Third-Party Notices
 
-## Natural Earth
+## 中文
 
-VisitorTrace includes a generated world basemap derived from Natural Earth 1:110m Admin 0 Countries vector data, with the Antarctica feature omitted for the compact visitor-map presentation.
+VisitorTrace 包含一个由 Natural Earth 1:110m Admin 0 Countries 矢量数据生成的世界底图。为了适应紧凑的访客地图展示，生成过程会排除南极洲要素。
+
+- 源仓库：<https://github.com/nvkelso/natural-earth-vector>
+- 源提交：`ca96624a56bd078437bca8184e78163e5039ad19`
+- 源文件：`geojson/ne_110m_admin_0_countries.geojson`
+- 源文件 SHA-256：`6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f`
+- 生成文件：`internal/maprender/assets/world.path`
+
+Natural Earth 矢量和栅格地图数据属于公有领域，参见 <https://www.naturalearthdata.com/about/terms-of-use/>。
+
+## English
+
+VisitorTrace includes a generated world basemap derived from Natural Earth 1:110m Admin 0 Countries vector data. The Antarctica feature is omitted for the compact visitor-map presentation.
 
 - Source repository: <https://github.com/nvkelso/natural-earth-vector>
 - Source commit: `ca96624a56bd078437bca8184e78163e5039ad19`

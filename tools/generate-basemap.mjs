@@ -23,6 +23,7 @@ for (const feature of source.features || []) {
       : [];
   for (const polygon of polygons) {
     for (const ring of polygon) {
+      if (!ring.some(([, latitude]) => latitude >= minLatitude)) continue;
       const points = ring.map(project);
       const simplified = simplifyClosed(points, 0.8);
       if (simplified.length < 3) continue;
@@ -36,9 +37,10 @@ for (const feature of source.features || []) {
 await writeFile(outputPath, paths.join(""), "utf8");
 
 function project([longitude, latitude]) {
+  const visibleLatitude = Math.max(minLatitude, Math.min(maxLatitude, latitude));
   return [
     ((longitude + 180) / 360) * mapWidth,
-    ((maxLatitude - latitude) / (maxLatitude - minLatitude)) * mapHeight,
+    ((maxLatitude - visibleLatitude) / (maxLatitude - minLatitude)) * mapHeight,
   ];
 }
 

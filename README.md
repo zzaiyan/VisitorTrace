@@ -1,30 +1,34 @@
 # VisitorTrace · 访迹
 
-A tiny self-hosted visitor map and pageview tracker.
+轻量、自托管的访客地图与访问记录服务。
 
-VisitorTrace is a lightweight, self-hosted service for recording Pageviews, maintaining aggregate visitor statistics, and publishing embeddable visitor maps for personal websites.
+A tiny self-hosted visitor map and Pageview tracker.
 
-The current runnable milestone provides secure bootstrap, SQLite initialization, Pageview collection, local GeoIP lookup, SVG Public Maps, Public Analytics, an authenticated Admin Console, and per-Site Map Preset management. Retention cleanup, backups, self-update, and password reset remain follow-up operational work.
+[中文用户指南](./docs/user-guide.zh-CN.md) · [English User Guide](./docs/user-guide.en.md) · [Third-Party Notices](./THIRD_PARTY_NOTICES.md)
 
-## Documentation
+## 中文
 
-- [Architecture](./ARCHITECTURE.md)
-- [Domain language](./CONTEXT.md)
-- [Architecture decisions](./docs/adr/)
-- [Academic homepage and MapMyVisitors research](./docs/research/academic-homepage-and-mapmyvisitors.md)
+VisitorTrace 面向个人主页、博客和其他小型网站，在一个 Go 服务中提供：
 
-## Planned Runtime
+- Pageview 采集与 Site 隔离
+- SQLite 逐条记录和持久化聚合
+- 本地 GeoIP 查询与 SVG 访客地图
+- Public Analytics
+- 密码保护的 Admin Console
+- 可实时预览的 Map Preset
+- 一体式 Widget 和分离式 Tracker
 
-- One Go service and executable
-- SQLite as the sole durable datastore
-- Local IP geolocation
-- Script-free SVG Public Maps
-- Integrated Widget and Separated Integration modes
-- Public Analytics and a password-protected Admin Console
+### 快速预览
 
-## Development
+```sh
+./tools/preview-demo.sh
+```
 
-VisitorTrace requires Go 1.25 or newer. The current development toolchain is Go 1.26.5.
+脚本会创建临时数据库、生成带地理坐标的伪数据并启动本地服务。默认后台密码为 `VisitorTrace2026`，按 `Ctrl-C` 后自动清理。
+
+### 构建
+
+需要 Go 1.25 或更新版本。
 
 ```sh
 make check
@@ -32,85 +36,64 @@ make build
 ./bin/visitortrace version
 ```
 
-Initialize a development instance interactively:
+### 基本启动
 
 ```sh
 ./bin/visitortrace init \
   --data-dir "$HOME/.local/share/visitortrace" \
   --config "$HOME/.config/visitortrace/config.json" \
   --geoip /path/to/geoip.mmdb
-```
 
-Start the loopback-only HTTP server:
-
-```sh
 ./bin/visitortrace serve \
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-Create a Site for local integration testing:
+完整配置、Site 创建、网站接入、地图参数和部署说明请参阅[中文用户指南](./docs/user-guide.zh-CN.md)。
 
-```sh
-./bin/visitortrace site create \
-  --config "$HOME/.config/visitortrace/config.json" \
-  --name "Academic homepage" \
-  --origin "https://example.com"
-```
+## English
 
-The current separated integration tracker is available at:
+VisitorTrace is designed for personal homepages, blogs, and other small websites. One Go service provides:
 
-```text
-GET /embed/tracker.js?site_id=<SITE-ID>
-```
+- Site-isolated Pageview ingestion
+- SQLite Pageview Records and durable aggregates
+- Local GeoIP lookup and SVG visitor maps
+- Public Analytics
+- A password-protected Admin Console
+- Live Map Preset previews
+- Integrated Widget and separated Tracker modes
 
-It posts Pageviews to:
-
-```text
-POST /api/v1/sites/<SITE-ID>/pageviews
-Content-Type: text/plain
-```
-
-The current Public Map and integrated widget routes are:
-
-```text
-GET /api/v1/sites/<SITE-ID>/map.svg?w=300&h=168
-GET /embed/widget.js?site_id=<SITE-ID>&w=300&h=168
-```
-
-`bg=transparent` makes the SVG background transparent. The Map Preset editor exposes the same option as a background toggle.
-
-The browser-facing views are:
-
-```text
-GET /public/<SITE-ID>/analytics?range=30d
-GET /admin/login
-GET /admin
-GET /admin/sites/<SITE-ID>
-```
-
-The Admin Console accepts the single Administrator password created by `visitortrace init`. It manages Sites, publication and collection settings, recent Pageview Records, Map Presets, and live SVG previews. The Public Analytics view exposes only aggregate trends, geography, browser, and operating-system statistics.
-
-For a local preview, create a disposable instance and Site, start `visitortrace serve`, then open `/admin/login` at `http://127.0.0.1:8790`. A valid DB-IP City Lite MMDB is required for `/health/ready` and real geographic markers; without it the service still renders the basemap and aggregate counters.
-
-The repository includes a disposable demo launcher that seeds geographically distributed fake Pageviews and keeps the service in the foreground:
+### Quick Preview
 
 ```sh
 ./tools/preview-demo.sh
 ```
 
-Set `VISITORTRACE_LISTEN=127.0.0.1:8791` when the default local port is already occupied. The generated data is removed when the launcher exits.
+The launcher creates a temporary database, seeds geographically distributed fake data, and starts the local service. The default Admin password is `VisitorTrace2026`; pressing `Ctrl-C` removes the temporary data.
 
-To regenerate the checked-in Natural Earth basemap after obtaining the pinned source file:
+### Build
+
+Go 1.25 or newer is required.
 
 ```sh
-node tools/generate-basemap.mjs \
-  /path/to/ne_110m_admin_0_countries.geojson \
-  internal/maprender/assets/world.path
+make check
+make build
+./bin/visitortrace version
 ```
 
-The initial HTTP surface is:
+### Basic Startup
 
-- `GET /health/live`
-- `GET /health/ready`
+```sh
+./bin/visitortrace init \
+  --data-dir "$HOME/.local/share/visitortrace" \
+  --config "$HOME/.config/visitortrace/config.json" \
+  --geoip /path/to/geoip.mmdb
 
-The ready endpoint remains unavailable until SQLite, the schema, and a valid GeoIP MMDB are loaded.
+./bin/visitortrace serve \
+  --config "$HOME/.config/visitortrace/config.json"
+```
+
+See the [English User Guide](./docs/user-guide.en.md) for complete configuration, Site creation, integration, map parameters, and deployment guidance.
+
+## License Status
+
+The project license has not been selected yet. Third-party data and notices are documented separately in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).

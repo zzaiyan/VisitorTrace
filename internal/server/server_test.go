@@ -218,8 +218,22 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	presetRequest.AddCookie(cookies[0])
 	presetResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(presetResponse, presetRequest)
-	if presetResponse.Code != http.StatusSeeOther || presetResponse.Header().Get("Location") != "/admin/sites/"+site.ID+"?saved=preset" {
+	if presetResponse.Code != http.StatusSeeOther || presetResponse.Header().Get("Location") != "/admin/sites/"+site.ID+"?saved=preset#preset" {
 		t.Fatalf("preset update status = %d, body = %q", presetResponse.Code, presetResponse.Body.String())
+	}
+	settingsForm := url.Values{
+		"csrf": {csrfMatch[1]}, "name": {site.Name}, "timezone": {site.Timezone},
+		"origins": {"https://example.com"}, "dedup_window_days": {"1"}, "retention_days": {"30"},
+		"accept_pageviews": {"on"}, "publish_public": {"on"},
+	}
+	settingsRequest := httptest.NewRequest(http.MethodPost, "/admin/sites/"+site.ID+"/settings", strings.NewReader(settingsForm.Encode()))
+	settingsRequest.Host = "127.0.0.1:8790"
+	settingsRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	settingsRequest.AddCookie(cookies[0])
+	settingsResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(settingsResponse, settingsRequest)
+	if settingsResponse.Code != http.StatusSeeOther || settingsResponse.Header().Get("Location") != "/admin/sites/"+site.ID+"?saved=settings#settings" {
+		t.Fatalf("settings update status = %d, body = %q", settingsResponse.Code, settingsResponse.Body.String())
 	}
 	previewRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID+"/preset-preview.svg", nil)
 	previewRequest.Host = "127.0.0.1:8790"

@@ -12,11 +12,13 @@ import (
 )
 
 const (
-	mapMinLatitude = -60.0
-	mapMaxLatitude = 90.0
-	mapBaseWidth   = 1000.0
-	MapAspect      = 360.0 / (mapMaxLatitude - mapMinLatitude)
-	mapBaseHeight  = mapBaseWidth / MapAspect
+	mapMinLatitude   = -60.0
+	mapMaxLatitude   = 90.0
+	mapLeftLongitude = -170.0
+	mapBaseWidth     = 1000.0
+	MapAspect        = 360.0 / (mapMaxLatitude - mapMinLatitude)
+	mapBaseHeight    = mapBaseWidth / MapAspect
+	mapBaseOffset    = (mapLeftLongitude + 180.0) / 360.0 * mapBaseWidth
 )
 
 //go:embed assets/world.path
@@ -60,10 +62,17 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 	if title != "" {
 		fmt.Fprintf(&output, "<text class=\"visitortrace-title\" x=\"%s\" y=\"%d\" text-anchor=\"middle\" fill=\"#%s\" font-family=\"system-ui,sans-serif\" font-size=\"%d\" font-weight=\"600\">%s</text>", format(float64(options.Width)/2), options.FontSize+3, options.Text, options.FontSize, html.EscapeString(title))
 	}
-	fmt.Fprintf(&output, "<g class=\"visitortrace-map\" transform=\"translate(0 %d) scale(%s %s)\"><path d=\"%s\" fill=\"#%s\" stroke=\"#%s\" stroke-width=\"0.7\" vector-effect=\"non-scaling-stroke\"/></g>",
-		titleHeight, format(float64(options.Width)/mapBaseWidth), format(float64(mapHeight)/mapBaseHeight), pathData, options.Land, options.Border)
+	fmt.Fprintf(&output, "<g class=\"visitortrace-map-viewport\" transform=\"translate(0 %d)\">", titleHeight)
+	fmt.Fprintf(&output, "<g class=\"visitortrace-map\" transform=\"scale(%s %s)\">", format(float64(options.Width)/mapBaseWidth), format(float64(mapHeight)/mapBaseHeight))
+	for _, shift := range []float64{-mapBaseOffset, mapBaseWidth - mapBaseOffset} {
+		fmt.Fprintf(&output, "<path d=\"%s\" transform=\"translate(%s 0)\" fill=\"#%s\" stroke=\"#%s\" stroke-width=\"0.7\" vector-effect=\"non-scaling-stroke\"/>", pathData, format(shift), options.Land, options.Border)
+	}
+	output.WriteString("</g>")
 	maxMetric := int64(0)
 	for _, point := range data.Points {
+		if point.Latitude < mapMinLatitude || point.Latitude > mapMaxLatitude {
+			continue
+		}
 		value := point.Pageviews
 		if options.Metric == "uv" {
 			value = point.UniqueVisitors
@@ -73,6 +82,9 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 		}
 	}
 	for _, point := range data.Points {
+		if point.Latitude < mapMinLatitude || point.Latitude > mapMaxLatitude {
+			continue
+		}
 		value := point.Pageviews
 		if options.Metric == "uv" {
 			value = point.UniqueVisitors
@@ -81,8 +93,8 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 		if maxMetric > 0 && value > 0 {
 			radius += 4 * math.Sqrt(float64(value)/float64(maxMetric))
 		}
-		x := (point.Longitude + 180) / 360 * float64(options.Width)
-		y := float64(titleHeight) + (mapMaxLatitude-point.Latitude)/(mapMaxLatitude-mapMinLatitude)*float64(mapHeight)
+		x := mapLongitude(point.Longitude, options.Width)
+		y := (mapMaxLatitude - point.Latitude) / (mapMaxLatitude - mapMinLatitude) * float64(mapHeight)
 		name := point.City
 		if name == "" {
 			name = point.CountryCode
@@ -90,6 +102,7 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 		tooltip := fmt.Sprintf("%s: %s Pageviews, %s Unique Visitors", name, formatCount(point.Pageviews), formatCount(point.UniqueVisitors))
 		fmt.Fprintf(&output, "<g class=\"visitortrace-marker\"><title>%s</title><circle cx=\"%s\" cy=\"%s\" r=\"%s\" fill=\"#%s\" fill-opacity=\"0.78\" stroke=\"#ffffff\" stroke-width=\"0.6\"/></g>", html.EscapeString(tooltip), format(x), format(y), format(radius), options.Marker)
 	}
+	output.WriteString("</g>")
 	footerTop := options.Height - footerHeight
 	if len(stats) > 0 {
 		line := strings.Join(stats, "  ·  ")
@@ -134,4 +147,12 @@ func mapStats(data store.PublicMapData, options Options) []string {
 		stats = append(stats, fmt.Sprintf("%s: %s", labelOrDefault(options.UVLabel, "Unique Visitors"), formatCount(data.UniqueVisitors)))
 	}
 	return stats
+}
+
+func mapLongitude(longitude float64, width int) float64 {
+	normalized := math.Mod(longitude-mapLeftLongitude, 360)
+	if normalized < 0 {
+		normalized += 360
+	}
+	return normalized / 360 * float64(width)
 }

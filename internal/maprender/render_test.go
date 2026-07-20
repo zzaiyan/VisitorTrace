@@ -101,10 +101,30 @@ func TestRenderUsesCenteredNonStretchingTextAndSeparateTitleBand(t *testing.T) {
 	if titleIndex < 0 || mapIndex < 0 || titleIndex > mapIndex {
 		t.Fatal("title is not rendered before the map band")
 	}
-	if !strings.Contains(value, `transform="translate(0 22`) || !strings.Contains(value, `text-anchor="middle"`) {
+	if !strings.Contains(value, `class="visitortrace-map-viewport" transform="translate(0 22)"`) || !strings.Contains(value, `text-anchor="middle"`) {
 		t.Fatal("title/map layout is not separated and centered")
 	}
 	if strings.Count(value, `class="visitortrace-stat"`) != 1 {
 		t.Fatalf("statistics did not remain on one centered line: %d", strings.Count(value, `class="visitortrace-stat"`))
+	}
+}
+
+func TestRenderUsesBeringStraitLongitudeBoundary(t *testing.T) {
+	options := DefaultOptions()
+	options.Width = 240
+	data := store.PublicMapData{Points: []store.MapPoint{
+		{City: "Bering", Longitude: -170, Latitude: 60, Pageviews: 1},
+		{City: "Center", Longitude: 10, Latitude: 0, Pageviews: 1},
+	}}
+	result, err := Render(data, options)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	value := string(result)
+	if !strings.Contains(value, `cx="0.00"`) || !strings.Contains(value, `cx="120.00"`) {
+		t.Fatalf("markers do not use the 170W map boundary")
+	}
+	if strings.Count(value, `<path d=`) != 2 {
+		t.Fatalf("wrapped basemap path count = %d, want 2", strings.Count(value, `<path d=`))
 	}
 }

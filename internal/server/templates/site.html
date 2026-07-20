@@ -22,8 +22,8 @@
     <form id="preset-form" method="post" action="/admin/sites/{{.Site.ID}}/preset" class="preset-form" data-map-aspect="{{.MapAspect}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div class="field-grid two">
-        <div class="field"><label for="preset-width">宽度</label><div class="input-unit"><input id="preset-width" type="number" name="w" min="160" max="1200" value="{{.Preset.Width}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="width" title="按当前选项自动计算宽度">auto</button></div></div>
-        <div class="field"><label for="preset-height">高度</label><div class="input-unit"><input id="preset-height" type="number" name="h" min="90" max="800" value="{{.Preset.Height}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="height" title="按当前选项自动计算高度">auto</button></div></div>
+        <div class="field"><label for="preset-width">宽度</label><div class="input-unit"><input id="preset-width" type="number" name="w" min="160" max="1200" value="{{.Preset.Width}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="width" title="按当前选项自动计算宽度" aria-label="自动计算宽度">↔</button></div></div>
+        <div class="field"><label for="preset-height">高度</label><div class="input-unit"><input id="preset-height" type="number" name="h" min="90" max="800" value="{{.Preset.Height}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="height" title="按当前选项自动计算高度" aria-label="自动计算高度">↕</button></div></div>
       </div>
       <label class="field"><span>标题</span><input type="text" name="title" maxlength="40" value="{{.Preset.Title}}"></label>
       <div class="field-grid two">

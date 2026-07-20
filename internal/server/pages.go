@@ -234,7 +234,7 @@ func (s *Server) adminUpdateSite(w http.ResponseWriter, r *http.Request) {
 		s.redirectWithError(w, r, "/admin/sites/"+siteID, err.Error())
 		return
 	}
-	http.Redirect(w, r, "/admin/sites/"+siteID+"?saved=settings", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/sites/"+siteID+"?saved=settings#settings", http.StatusSeeOther)
 }
 
 func (s *Server) adminUpdatePreset(w http.ResponseWriter, r *http.Request) {
@@ -284,7 +284,7 @@ func (s *Server) adminUpdatePreset(w http.ResponseWriter, r *http.Request) {
 		s.redirectWithError(w, r, "/admin/sites/"+r.PathValue("siteID"), err.Error())
 		return
 	}
-	http.Redirect(w, r, "/admin/sites/"+r.PathValue("siteID")+"?saved=preset", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/sites/"+r.PathValue("siteID")+"?saved=preset#preset", http.StatusSeeOther)
 }
 
 func (s *Server) adminPresetPreview(w http.ResponseWriter, r *http.Request) {
