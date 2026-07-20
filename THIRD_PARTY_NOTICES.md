@@ -2,7 +2,7 @@
 
 ## Natural Earth
 
-VisitorTrace includes a generated world basemap derived from Natural Earth 1:110m Admin 0 Countries vector data.
+VisitorTrace includes a generated world basemap derived from Natural Earth 1:110m Admin 0 Countries vector data, with the Antarctica feature omitted for the compact visitor-map presentation.
 
 - Source repository: <https://github.com/nvkelso/natural-earth-vector>
 - Source commit: `ca96624a56bd078437bca8184e78163e5039ad19`

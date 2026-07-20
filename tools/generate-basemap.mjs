@@ -7,8 +7,11 @@ if (!inputPath || !outputPath) {
 
 const source = JSON.parse(await readFile(inputPath, "utf8"));
 const paths = [];
+const minLatitude = -60;
+const maxLatitude = 90;
 
 for (const feature of source.features || []) {
+  if (isAntarctica(feature.properties || {})) continue;
   const geometry = feature.geometry;
   if (!geometry) continue;
   const polygons = geometry.type === "Polygon"
@@ -33,8 +36,15 @@ await writeFile(outputPath, paths.join(""), "utf8");
 function project([longitude, latitude]) {
   return [
     ((longitude + 180) / 360) * 1000,
-    ((90 - latitude) / 180) * 500,
+    ((maxLatitude - latitude) / (maxLatitude - minLatitude)) * 500,
   ];
+}
+
+function isAntarctica(properties) {
+  return properties.ADM0_A3 === "ATA"
+    || properties.ISO_A3 === "ATA"
+    || properties.ADMIN === "Antarctica"
+    || properties.NAME === "Antarctica";
 }
 
 function simplifyClosed(points, tolerance) {

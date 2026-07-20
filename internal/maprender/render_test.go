@@ -79,3 +79,32 @@ func TestRenderEscapesLabelsAndIncludesMap(t *testing.T) {
 		t.Fatal("provider attribution was drawn inside SVG")
 	}
 }
+
+func TestRenderUsesCenteredNonStretchingTextAndSeparateTitleBand(t *testing.T) {
+	options := DefaultOptions()
+	options.Width = 240
+	options.Height = 168
+	options.Title = "VisitorTrace"
+	options.PVLabel = "A deliberately long Pageview label"
+	options.UVLabel = "A deliberately long Visitor label"
+	data := store.PublicMapData{SiteName: "Demo", Pageviews: 1234, UniqueVisitors: 456}
+	result, err := Render(data, options)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	value := string(result)
+	if strings.Contains(value, "textLength=") || strings.Contains(value, "lengthAdjust=") {
+		t.Fatal("rendered text still uses SVG font stretching")
+	}
+	titleIndex := strings.Index(value, `class="visitortrace-title"`)
+	mapIndex := strings.Index(value, `<g class="visitortrace-map"`)
+	if titleIndex < 0 || mapIndex < 0 || titleIndex > mapIndex {
+		t.Fatal("title is not rendered before the map band")
+	}
+	if !strings.Contains(value, `transform="translate(0 22`) || !strings.Contains(value, `text-anchor="middle"`) {
+		t.Fatal("title/map layout is not separated and centered")
+	}
+	if strings.Count(value, `class="visitortrace-stat"`) != 2 {
+		t.Fatalf("statistics were not split into two centered lines: %d", strings.Count(value, `class="visitortrace-stat"`))
+	}
+}
