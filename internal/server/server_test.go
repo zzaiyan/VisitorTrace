@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
@@ -37,8 +38,8 @@ func TestHealthEndpoints(t *testing.T) {
 
 	ready := httptest.NewRecorder()
 	app.Handler().ServeHTTP(ready, httptest.NewRequest(http.MethodGet, "/health/ready", nil))
-	if ready.Code != http.StatusOK {
-		t.Fatalf("ready status = %d, want %d", ready.Code, http.StatusOK)
+	if ready.Code != http.StatusServiceUnavailable {
+		t.Fatalf("ready status = %d, want %d", ready.Code, http.StatusServiceUnavailable)
 	}
 }
 
@@ -106,6 +107,72 @@ func TestTrackerScript(t *testing.T) {
 	}
 	if compressed.Len() > 2*1024 {
 		t.Fatalf("tracker gzip size = %d bytes, want <= 2048", compressed.Len())
+	}
+}
+
+func TestIntegratedWidgetScript(t *testing.T) {
+	app, _, site := testServer(t)
+	request := httptest.NewRequest(http.MethodGet, "/embed/widget.js?site_id="+site.ID+"&w=640", nil)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("widget status = %d, body = %q", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), "visitortrace-widget") || !strings.Contains(response.Body.String(), "/map.svg") {
+		t.Fatal("widget response does not include integrated map insertion")
+	}
+}
+
+func TestPublicMap(t *testing.T) {
+	app, st, site := testServer(t)
+	latitude := 30.5928
+	longitude := 114.3055
+	_, err := st.RecordPageview(context.Background(), store.PageviewObservation{
+		SiteID:          site.ID,
+		OccurredAt:      time.Date(2026, time.July, 21, 0, 0, 0, 0, time.UTC),
+		Path:            "/",
+		CountryCode:     "CN",
+		RegionCode:      "HB",
+		City:            "Wuhan",
+		Latitude:        &latitude,
+		Longitude:       &longitude,
+		VisitorDigest:   bytes.Repeat([]byte{1}, 32),
+		OriginalIP:      "192.0.2.1",
+		OperatingSystem: "Linux",
+		Browser:         "Firefox",
+	})
+	if err != nil {
+		t.Fatalf("RecordPageview() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/sites/"+site.ID+"/map.svg?w=640&h=360&metric=uv", nil)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("map status = %d, body = %q", response.Code, response.Body.String())
+	}
+	if response.Header().Get("Content-Type") != "image/svg+xml; charset=utf-8" || !strings.Contains(response.Body.String(), "<svg") || !strings.Contains(response.Body.String(), "Wuhan") {
+		t.Fatal("map response is missing SVG content or marker data")
+	}
+	etag := response.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("map response is missing ETag")
+	}
+	conditional := httptest.NewRequest(http.MethodGet, "/api/v1/sites/"+site.ID+"/map.svg?w=640&h=360&metric=uv", nil)
+	conditional.Header.Set("If-None-Match", etag)
+	conditionalResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(conditionalResponse, conditional)
+	if conditionalResponse.Code != http.StatusNotModified {
+		t.Fatalf("conditional map status = %d, want %d", conditionalResponse.Code, http.StatusNotModified)
+	}
+}
+
+func TestPublicMapRejectsUnknownOption(t *testing.T) {
+	app, _, site := testServer(t)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/sites/"+site.ID+"/map.svg?unknown=value", nil)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("map status = %d, want %d", response.Code, http.StatusBadRequest)
 	}
 }
 

@@ -11,12 +11,13 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/clientip"
 	"github.com/zzaiyan/VisitorTrace/internal/config"
+	"github.com/zzaiyan/VisitorTrace/internal/geoip"
+	"github.com/zzaiyan/VisitorTrace/internal/maprender"
 	"github.com/zzaiyan/VisitorTrace/internal/pageview"
 	"github.com/zzaiyan/VisitorTrace/internal/ratelimit"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
@@ -42,6 +43,8 @@ type Server struct {
 	ipLimit   *ratelimit.Limiter
 	siteLimit *ratelimit.Limiter
 	logger    *slog.Logger
+	geoIP     *geoip.Resolver
+	mapCache  *mapCache
 }
 
 func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
@@ -58,6 +61,7 @@ func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
 		ipLimit:   ratelimit.New(120, 30),
 		siteLimit: ratelimit.New(3000, 500),
 		logger:    logger,
+		mapCache:  newMapCache(),
 	}
 }
 
@@ -67,6 +71,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /health/ready", s.ready)
 	mux.HandleFunc("POST /api/v1/sites/{siteID}/pageviews", s.collectPageview)
 	mux.HandleFunc("GET /embed/tracker.js", s.trackerScript)
+	mux.HandleFunc("GET /embed/widget.js", s.widgetScript)
+	mux.HandleFunc("GET /api/v1/sites/{siteID}/map.svg", s.mapSVG)
 	return mux
 }
 
@@ -77,6 +83,10 @@ func (s *Server) HTTPServer() *http.Server {
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
+}
+
+func (s *Server) SetGeoIP(resolver *geoip.Resolver) {
+	s.geoIP = resolver
 }
 
 func (s *Server) live(w http.ResponseWriter, _ *http.Request) {
@@ -91,7 +101,7 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	if err := s.Store.SchemaReady(r.Context()); err == nil {
 		checks["schema"] = true
 	}
-	if info, err := os.Stat(s.Config.GeoIPPath); err == nil && !info.IsDir() && info.Size() > 0 {
+	if s.geoIP != nil {
 		checks["geoip"] = true
 	}
 	status := http.StatusOK
@@ -171,9 +181,18 @@ func (s *Server) collectPageview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid visitor identity", http.StatusBadRequest)
 		return
 	}
+	location := geoip.Location{}
+	if s.geoIP != nil {
+		location = s.geoIP.Lookup(address)
+	}
 	_, err = s.Store.RecordPageview(r.Context(), store.PageviewObservation{
 		SiteID:          siteID,
 		Path:            path,
+		CountryCode:     location.CountryCode,
+		RegionCode:      location.RegionCode,
+		City:            location.City,
+		Latitude:        location.Latitude,
+		Longitude:       location.Longitude,
 		VisitorDigest:   digest,
 		OriginalIP:      address.String(),
 		OperatingSystem: classification.OperatingSystem,
@@ -192,6 +211,14 @@ func (s *Server) collectPageview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) trackerScript(w http.ResponseWriter, r *http.Request) {
+	s.serveEmbedScript(w, r)
+}
+
+func (s *Server) widgetScript(w http.ResponseWriter, r *http.Request) {
+	s.serveEmbedScript(w, r)
+}
+
+func (s *Server) serveEmbedScript(w http.ResponseWriter, r *http.Request) {
 	siteID := strings.TrimSpace(r.URL.Query().Get("site_id"))
 	if siteID == "" {
 		http.Error(w, "site_id is required", http.StatusBadRequest)
@@ -216,6 +243,55 @@ func (s *Server) trackerScript(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	w.Header().Set("ETag", etag)
 	_, _ = io.Copy(w, bytes.NewReader(data))
+}
+
+func (s *Server) mapSVG(w http.ResponseWriter, r *http.Request) {
+	siteID := r.PathValue("siteID")
+	options, err := maprender.ParseOptions(r.URL.Query())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	data, err := s.Store.PublicMapData(r.Context(), siteID)
+	if errors.Is(err, store.ErrPublicationDisabled) {
+		http.Error(w, "public views are disabled", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "unknown Site", http.StatusNotFound)
+		return
+	}
+	key := siteID + "|" + options.CacheKey()
+	if cached, ok := s.mapCache.get(key, time.Now()); ok {
+		s.writeMapResponse(w, r, cached)
+		return
+	}
+	body, err := maprender.Render(data, options)
+	if err != nil {
+		s.logger.Error("render Public Map failed", "site_id", siteID, "error", err)
+		http.Error(w, "could not render Public Map", http.StatusInternalServerError)
+		return
+	}
+	sum := sha256.Sum256(body)
+	cached := mapCacheItem{
+		key:       key,
+		body:      body,
+		etag:      fmt.Sprintf("\"%x\"", sum[:16]),
+		expiresAt: time.Now().Add(mapCacheTTL),
+	}
+	s.mapCache.put(key, cached)
+	s.writeMapResponse(w, r, cached)
+}
+
+func (s *Server) writeMapResponse(w http.ResponseWriter, r *http.Request, cached mapCacheItem) {
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	w.Header().Set("ETag", cached.etag)
+	if r.Header.Get("If-None-Match") == cached.etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
+	_, _ = w.Write(cached.body)
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

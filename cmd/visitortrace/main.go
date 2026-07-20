@@ -17,6 +17,7 @@ import (
 
 	"github.com/zzaiyan/VisitorTrace/internal/buildinfo"
 	"github.com/zzaiyan/VisitorTrace/internal/config"
+	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 	"github.com/zzaiyan/VisitorTrace/internal/password"
 	"github.com/zzaiyan/VisitorTrace/internal/server"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
@@ -144,7 +145,14 @@ func runServe(args []string) int {
 		return 1
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	geoResolver, geoErr := geoip.Open(cfg.GeoIPPath)
+	if geoErr != nil {
+		logger.Warn("GeoIP database is unavailable", "path", cfg.GeoIPPath, "error", geoErr)
+	} else {
+		defer geoResolver.Close()
+	}
 	app := server.New(cfg, st, logger)
+	app.SetGeoIP(geoResolver)
 	httpServer := app.HTTPServer()
 	serverErrors := make(chan error, 1)
 	go func() {
@@ -208,10 +216,12 @@ func runDoctor(args []string) int {
 		return 1
 	}
 	fmt.Println("schema: ok")
-	if info, err := os.Stat(cfg.GeoIPPath); err != nil || info.IsDir() || info.Size() == 0 {
-		fmt.Printf("geoip: failed (database unavailable at %s)\n", cfg.GeoIPPath)
+	geoResolver, err := geoip.Open(cfg.GeoIPPath)
+	if err != nil {
+		fmt.Printf("geoip: failed (%v)\n", err)
 		return 1
 	}
+	_ = geoResolver.Close()
 	fmt.Printf("geoip: ok (%s)\n", cfg.GeoIPPath)
 	return 0
 }

@@ -70,9 +70,24 @@ POST /api/v1/sites/<SITE-ID>/pageviews
 Content-Type: text/plain
 ```
 
+The current Public Map and integrated widget routes are:
+
+```text
+GET /api/v1/sites/<SITE-ID>/map.svg?w=300&h=168
+GET /embed/widget.js?site_id=<SITE-ID>&w=300&h=168
+```
+
+To regenerate the checked-in Natural Earth basemap after obtaining the pinned source file:
+
+```sh
+node tools/generate-basemap.mjs \
+  /path/to/ne_110m_admin_0_countries.geojson \
+  internal/maprender/assets/world.path
+```
+
 The initial HTTP surface is:
 
 - `GET /health/live`
 - `GET /health/ready`
 
-The ready endpoint remains unavailable until SQLite, the schema, and a non-empty GeoIP file are present.
+The ready endpoint remains unavailable until SQLite, the schema, and a valid GeoIP MMDB are loaded.

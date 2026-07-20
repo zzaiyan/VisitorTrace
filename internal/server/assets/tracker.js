@@ -14,6 +14,7 @@
   ).href;
   var state = window.__visitorTraceState || (window.__visitorTraceState = {});
   var siteState = state[siteID] || (state[siteID] = { sent: {}, visitorID: null });
+  var integrated = /\/widget\.js$/.test(scriptURL.pathname);
 
   function getVisitorID() {
     if (siteState.visitorID) return siteState.visitorID;
@@ -65,5 +66,35 @@
 
   window.VisitorTrace = window.VisitorTrace || {};
   window.VisitorTrace.track = send;
+  if (integrated) {
+    var mapURL = new URL(
+      "/api/v1/sites/" + encodeURIComponent(siteID) + "/map.svg",
+      scriptURL.origin
+    );
+    scriptURL.searchParams.forEach(function (value, key) {
+      if (key !== "site_id") mapURL.searchParams.append(key, value);
+    });
+    var wrapper = document.createElement("span");
+    wrapper.className = "visitortrace-widget";
+    var link = document.createElement("a");
+    link.href = new URL(
+      "/public/" + encodeURIComponent(siteID) + "/analytics",
+      scriptURL.origin
+    ).href;
+    link.target = "_blank";
+    link.rel = "noopener";
+    var image = document.createElement("img");
+    image.src = mapURL.href;
+    var width = parseInt(scriptURL.searchParams.get("w"), 10);
+    var height = parseInt(scriptURL.searchParams.get("h"), 10);
+    image.width = width >= 160 && width <= 1200 ? width : 300;
+    image.height = height >= 90 && height <= 800 ? height : 168;
+    image.loading = "eager";
+    image.alt = "Visitor map";
+    image.title = "VisitorTrace Public Map";
+    link.appendChild(image);
+    wrapper.appendChild(link);
+    if (script.parentNode) script.parentNode.insertBefore(wrapper, script.nextSibling);
+  }
   send(window.location.pathname);
 }());

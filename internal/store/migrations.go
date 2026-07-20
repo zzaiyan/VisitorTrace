@@ -70,6 +70,23 @@ var migrations = []migration{
 			) WITHOUT ROWID`,
 		},
 	},
+	{
+		version: 3,
+		statements: []string{
+			`CREATE TABLE geo_locations (
+				site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+				dimension_kind TEXT NOT NULL,
+				dimension_value TEXT NOT NULL,
+				country_code TEXT NOT NULL,
+				region_code TEXT NOT NULL,
+				city TEXT NOT NULL,
+				latitude REAL NOT NULL CHECK (latitude BETWEEN -90 AND 90),
+				longitude REAL NOT NULL CHECK (longitude BETWEEN -180 AND 180),
+				updated_at TEXT NOT NULL,
+				PRIMARY KEY (site_id, dimension_kind, dimension_value)
+			) WITHOUT ROWID`,
+		},
+	},
 }
 
 func (s *Store) initializeBaseSchema(ctx context.Context, passwordHash string) error {

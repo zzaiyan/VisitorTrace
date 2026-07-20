@@ -31,6 +31,10 @@ func TestRecordPageviewUpdatesRawAndAggregateData(t *testing.T) {
 		OperatingSystem: "Linux",
 		Browser:         "Firefox",
 	}
+	latitude := 30.5928
+	longitude := 114.3055
+	observation.Latitude = &latitude
+	observation.Longitude = &longitude
 	first, err := st.RecordPageview(ctx, observation)
 	if err != nil {
 		t.Fatalf("RecordPageview() error = %v", err)
@@ -74,6 +78,13 @@ func TestRecordPageviewUpdatesRawAndAggregateData(t *testing.T) {
 	}
 	if updated.FirstPageviewAt == nil {
 		t.Fatal("Site timezone was not locked by the first Pageview")
+	}
+	mapData, err := st.PublicMapData(ctx, site.ID)
+	if err != nil {
+		t.Fatalf("PublicMapData() error = %v", err)
+	}
+	if mapData.Pageviews != 3 || len(mapData.Points) != 1 || mapData.Points[0].City != "Wuhan" {
+		t.Fatalf("PublicMapData() = %#v", mapData)
 	}
 }
 

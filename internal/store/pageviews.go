@@ -93,6 +93,24 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 	}
 
 	dimensions := aggregateDimensions(observation)
+	if observation.City != "" && observation.Latitude != nil && observation.Longitude != nil {
+		cityValue := observation.CountryCode + "|" + observation.RegionCode + "|" + observation.City
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO geo_locations (
+				site_id, dimension_kind, dimension_value, country_code, region_code, city,
+				latitude, longitude, updated_at
+			) VALUES (?, 'city', ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT (site_id, dimension_kind, dimension_value)
+			DO UPDATE SET
+				latitude = excluded.latitude,
+				longitude = excluded.longitude,
+				updated_at = excluded.updated_at
+		`, observation.SiteID, cityValue, observation.CountryCode, observation.RegionCode, observation.City,
+			*observation.Latitude, *observation.Longitude, observation.OccurredAt.Format(time.RFC3339Nano))
+		if err != nil {
+			return RecordPageviewResult{}, fmt.Errorf("update durable geographic location: %w", err)
+		}
+	}
 	newOverall := false
 	for _, dimension := range dimensions {
 		registration, err := tx.ExecContext(ctx, `
