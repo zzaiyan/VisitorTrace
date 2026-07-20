@@ -9,17 +9,19 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 1
+const schemaVersion = 2
 
 const MinimumSQLiteVersion = "3.51.3"
 
 type Store struct {
-	DB   *sql.DB
-	Path string
+	DB      *sql.DB
+	Path    string
+	writeMu sync.Mutex
 }
 
 func Initialize(ctx context.Context, path, passwordHash string) (*Store, error) {
@@ -42,35 +44,11 @@ func Initialize(ctx context.Context, path, passwordHash string) (*Store, error) 
 			removeDatabaseFiles(path)
 		}
 	}()
-	tx, err := store.DB.BeginTx(ctx, nil)
-	if err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("begin schema transaction: %w", err)
+	if err := store.initializeBaseSchema(ctx, passwordHash); err != nil {
+		return nil, err
 	}
-	statements := []string{
-		`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`,
-		`CREATE TABLE service_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
-		`CREATE TABLE administrators (id INTEGER PRIMARY KEY CHECK (id = 1), password_hash TEXT NOT NULL, created_at TEXT NOT NULL)`,
-		`INSERT INTO service_meta (key, value) VALUES ('schema_version', '1')`,
-		`INSERT INTO schema_migrations (version, applied_at) VALUES (1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
-		`INSERT INTO administrators (id, password_hash, created_at) VALUES (1, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
-	}
-	for i, statement := range statements {
-		var execErr error
-		if i == len(statements)-1 {
-			_, execErr = tx.ExecContext(ctx, statement, passwordHash)
-		} else {
-			_, execErr = tx.ExecContext(ctx, statement)
-		}
-		if execErr != nil {
-			_ = tx.Rollback()
-			_ = store.Close()
-			return nil, fmt.Errorf("apply schema statement %d: %w", i+1, execErr)
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("commit schema: %w", err)
+	if err := store.Migrate(ctx); err != nil {
+		return nil, err
 	}
 	if err := os.Chmod(path, 0o600); err != nil {
 		_ = store.Close()

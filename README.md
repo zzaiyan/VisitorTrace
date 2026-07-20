@@ -48,6 +48,28 @@ Start the loopback-only HTTP server:
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
+Create a Site for local integration testing:
+
+```sh
+./bin/visitortrace site create \
+  --config "$HOME/.config/visitortrace/config.json" \
+  --name "Academic homepage" \
+  --origin "https://example.com"
+```
+
+The current separated integration tracker is available at:
+
+```text
+GET /embed/tracker.js?site_id=<SITE-ID>
+```
+
+It posts Pageviews to:
+
+```text
+POST /api/v1/sites/<SITE-ID>/pageviews
+Content-Type: text/plain
+```
+
 The initial HTTP surface is:
 
 - `GET /health/live`

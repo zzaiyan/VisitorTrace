@@ -10,7 +10,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
+	"text/tabwriter"
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/buildinfo"
@@ -33,6 +35,8 @@ func main() {
 		code = runServe(os.Args[2:])
 	case "doctor":
 		code = runDoctor(os.Args[2:])
+	case "site":
+		code = runSite(os.Args[2:])
 	case "version":
 		fmt.Printf("VisitorTrace %s (commit %s, built %s)\n", buildinfo.Version, buildinfo.Commit, buildinfo.BuildTime)
 	default:
@@ -131,12 +135,16 @@ func runServe(args []string) int {
 		return 1
 	}
 	defer st.Close()
+	if err := st.Migrate(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "serve: migrate database: %v\n", err)
+		return 1
+	}
 	if err := st.SchemaReady(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "serve: %v\n", err)
 		return 1
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	app := server.New(cfg, st)
+	app := server.New(cfg, st, logger)
 	httpServer := app.HTTPServer()
 	serverErrors := make(chan error, 1)
 	go func() {
@@ -208,6 +216,119 @@ func runDoctor(args []string) int {
 	return 0
 }
 
+func runSite(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: visitortrace site <create|list> [flags]")
+		return 2
+	}
+	switch args[0] {
+	case "create":
+		return runSiteCreate(args[1:])
+	case "list":
+		return runSiteList(args[1:])
+	default:
+		fmt.Fprintln(os.Stderr, "usage: visitortrace site <create|list> [flags]")
+		return 2
+	}
+}
+
+func runSiteCreate(args []string) int {
+	fs := flag.NewFlagSet("site create", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	configPath := fs.String("config", config.DefaultConfigPath(), "protected config path")
+	name := fs.String("name", "", "Site display name")
+	timezone := fs.String("timezone", "Asia/Shanghai", "IANA Site timezone")
+	dedupWindow := fs.Int("dedup-window", 1, "Unique Visitor deduplication window in days")
+	retention := fs.Int("retention", 30, "Pageview Record retention in days")
+	var origins stringList
+	fs.Var(&origins, "origin", "Allowed Origin; repeat for multiple origins")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "site create: %v\n", err)
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	st, err := store.OpenExisting(ctx, cfg.DatabasePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "site create: %v\n", err)
+		return 1
+	}
+	defer st.Close()
+	if err := st.Migrate(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "site create: migrate database: %v\n", err)
+		return 1
+	}
+	created, err := st.CreateSite(ctx, store.CreateSiteParams{
+		Name:            *name,
+		Timezone:        *timezone,
+		AllowedOrigins:  origins,
+		DedupWindowDays: *dedupWindow,
+		RetentionDays:   *retention,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "site create: %v\n", err)
+		return 1
+	}
+	fmt.Printf("created Site\nid: %s\nname: %s\ntimezone: %s\n", created.ID, created.Name, created.Timezone)
+	for _, origin := range created.AllowedOrigins {
+		fmt.Printf("origin: %s\n", origin)
+	}
+	return 0
+}
+
+func runSiteList(args []string) int {
+	fs := flag.NewFlagSet("site list", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	configPath := fs.String("config", config.DefaultConfigPath(), "protected config path")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "site list: %v\n", err)
+		return 1
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	st, err := store.OpenExisting(ctx, cfg.DatabasePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "site list: %v\n", err)
+		return 1
+	}
+	defer st.Close()
+	if err := st.Migrate(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "site list: migrate database: %v\n", err)
+		return 1
+	}
+	sites, err := st.ListSites(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "site list: %v\n", err)
+		return 1
+	}
+	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+	_, _ = fmt.Fprintln(w, "ID\tNAME\tTIMEZONE\tORIGINS")
+	for _, item := range sites {
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", item.ID, item.Name, item.Timezone, strings.Join(item.AllowedOrigins, ","))
+	}
+	_ = w.Flush()
+	return 0
+}
+
+type stringList []string
+
+func (s *stringList) String() string {
+	return strings.Join(*s, ",")
+}
+
+func (s *stringList) Set(value string) error {
+	*s = append(*s, value)
+	return nil
+}
+
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: visitortrace <init|serve|doctor|version> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: visitortrace <init|serve|doctor|site|version> [flags]")
 }

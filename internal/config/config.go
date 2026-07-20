@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -126,6 +127,11 @@ func (c Config) Validate() error {
 	}
 	if c.Listen == "" {
 		return errors.New("listen is required")
+	}
+	for _, value := range c.TrustedProxies {
+		if _, err := netip.ParsePrefix(value); err != nil {
+			return fmt.Errorf("invalid trusted proxy CIDR %q", value)
+		}
 	}
 	return nil
 }

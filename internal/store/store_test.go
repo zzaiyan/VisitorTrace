@@ -56,3 +56,26 @@ func TestSQLiteVersionAtLeast(t *testing.T) {
 		}
 	}
 }
+
+func TestMigrateFromSchemaV1(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "visitortrace.sqlite3")
+	ctx := context.Background()
+	st, err := open(ctx, path)
+	if err != nil {
+		t.Fatalf("open() error = %v", err)
+	}
+	defer st.Close()
+	if err := st.initializeBaseSchema(ctx, "test-hash"); err != nil {
+		t.Fatalf("initializeBaseSchema() error = %v", err)
+	}
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatalf("Migrate() error = %v", err)
+	}
+	if err := st.SchemaReady(ctx); err != nil {
+		t.Fatalf("SchemaReady() error = %v", err)
+	}
+	var table string
+	if err := st.DB.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sites'`).Scan(&table); err != nil {
+		t.Fatalf("sites table is unavailable: %v", err)
+	}
+}
