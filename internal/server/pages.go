@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/maprender"
 	"github.com/zzaiyan/VisitorTrace/internal/operations"
 	"github.com/zzaiyan/VisitorTrace/internal/password"
@@ -88,6 +89,8 @@ type adminSettingsData struct {
 	StableExecutable      string
 	UpdateKeyReady        bool
 	RunningFromStablePath bool
+	BaseURL               string
+	EffectiveBaseURL      string
 }
 
 type publicAnalyticsData struct {
@@ -112,12 +115,13 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string,
 	if provider, ok := data.(interface{ PageLanguage() string }); ok && validLanguage(provider.PageLanguage()) {
 		lang = provider.PageLanguage()
 	}
-	rememberRequestedLanguage(w, r)
+	s.rememberRequestedLanguage(w, r)
 	templates, err := template.New("layout.html").Funcs(template.FuncMap{
 		"t":                func(key string) string { return translate(lang, key) },
 		"language":         func() string { return lang },
 		"languageIs":       func(want string) bool { return lang == want },
-		"languageURL":      func(want string) string { return languageURL(r, want) },
+		"languageURL":      func(want string) string { return s.appPath(languageURL(r, want)) },
+		"appPath":          s.appPath,
 		"formatCount":      func(value int64) string { return strconv.FormatInt(value, 10) },
 		"formatTime":       func(value time.Time) string { return value.Local().Format("2006-01-02 15:04:05") },
 		"formatUTC":        formatUTCValue,
@@ -177,7 +181,7 @@ func (s *Server) adminDashboard(w http.ResponseWriter, r *http.Request) {
 			s.renderError(w, r, http.StatusInternalServerError, "无法读取 Map Preset。")
 			return
 		}
-		result.Sites = append(result.Sites, siteSummary{Site: site, Overview: overview, Preset: preset, MapPreviewURL: "/admin/sites/" + site.ID + "/preset-preview.svg"})
+		result.Sites = append(result.Sites, siteSummary{Site: site, Overview: overview, Preset: preset, MapPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview.svg")})
 	}
 	result.Flash = adminFlash(r)
 	s.renderPage(w, r, "dashboard", result)
@@ -193,10 +197,55 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		pageLayout:     s.adminLayout(r, session, "管理员设置", "settings"),
 		CurrentVersion: manager.CurrentVersion, StableExecutable: manager.StableBinaryPath(),
 		UpdateKeyReady: len(manager.PublicKey) > 0, RunningFromStablePath: manager.RunningFromStablePath(),
+		BaseURL: s.Config.BaseURL, EffectiveBaseURL: s.externalBaseURL(r),
 	}
 	data.Flash = adminFlash(r)
 	data.Error = r.URL.Query().Get("error")
 	s.renderPage(w, r, "settings", data)
+}
+
+type baseURLRestartData struct {
+	pageLayout
+	ReconnectURL string
+}
+
+func (s *Server) adminUpdateBaseURL(w http.ResponseWriter, r *http.Request) {
+	session, ok := s.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
+	if !s.validCSRF(r, session) {
+		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		return
+	}
+	if s.ConfigPath == "" {
+		s.redirectWithError(w, r, "/admin/settings", "服务配置路径不可用。")
+		return
+	}
+	baseURL, err := config.NormalizeBaseURL(r.FormValue("base_url"))
+	if err != nil {
+		s.redirectWithError(w, r, "/admin/settings", err.Error())
+		return
+	}
+	updated := s.Config
+	updated.BaseURL = baseURL
+	if err := config.Save(s.ConfigPath, updated); err != nil {
+		s.redirectWithError(w, r, "/admin/settings", "无法保存 Base URL："+err.Error())
+		return
+	}
+	reconnectURL := s.requestOrigin(r) + "/admin/settings"
+	if baseURL != "" {
+		reconnectURL = strings.TrimSuffix(baseURL, "/") + "/admin/settings"
+	}
+	s.renderPage(w, r, "settings-restarting", baseURLRestartData{
+		pageLayout:   s.adminLayout(r, session, "正在重启", "settings"),
+		ReconnectURL: reconnectURL,
+	})
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		s.RequestRestart()
+	}()
 }
 
 func (s *Server) adminChangePassword(w http.ResponseWriter, r *http.Request) {
@@ -237,7 +286,7 @@ func (s *Server) adminChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.clearAdminCookie(w, r)
-	http.Redirect(w, r, "/admin/login?changed=1", http.StatusSeeOther)
+	s.redirect(w, r, "/admin/login?changed=1", http.StatusSeeOther)
 }
 
 func (s *Server) adminNewSite(w http.ResponseWriter, r *http.Request) {
@@ -272,7 +321,7 @@ func (s *Server) adminCreateSite(w http.ResponseWriter, r *http.Request) {
 		s.renderPage(w, r, "new-site", data)
 		return
 	}
-	http.Redirect(w, r, "/admin/sites/"+created.ID+"?saved=site", http.StatusSeeOther)
+	s.redirect(w, r, "/admin/sites/"+created.ID+"?saved=site", http.StatusSeeOther)
 }
 
 func (s *Server) adminSite(w http.ResponseWriter, r *http.Request) {
@@ -304,7 +353,7 @@ func (s *Server) adminSite(w http.ResponseWriter, r *http.Request) {
 	data := adminSiteData{
 		pageLayout: s.adminLayout(r, session, site.Name, "sites"), Site: site, Overview: overview,
 		Preset: preset, Recent: recent, OriginsText: strings.Join(site.AllowedOrigins, "\n"),
-		MapPreviewURL: "/admin/sites/" + site.ID + "/preset-preview.svg", MapAspect: maprender.MapAspect, BaseURL: s.externalBaseURL(r), Saved: adminFlash(r),
+		MapPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview.svg"), MapAspect: maprender.MapAspect, BaseURL: s.externalBaseURL(r), Saved: adminFlash(r),
 	}
 	data.Error = r.URL.Query().Get("error")
 	s.renderPage(w, r, "site", data)
@@ -333,7 +382,7 @@ func (s *Server) adminUpdateSite(w http.ResponseWriter, r *http.Request) {
 		s.redirectWithError(w, r, "/admin/sites/"+siteID, err.Error())
 		return
 	}
-	http.Redirect(w, r, "/admin/sites/"+siteID+"?saved=settings#settings", http.StatusSeeOther)
+	s.redirect(w, r, "/admin/sites/"+siteID+"?saved=settings#settings", http.StatusSeeOther)
 }
 
 func (s *Server) adminUpdatePreset(w http.ResponseWriter, r *http.Request) {
@@ -384,7 +433,7 @@ func (s *Server) adminUpdatePreset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mapCache.deleteSite(r.PathValue("siteID"))
-	http.Redirect(w, r, "/admin/sites/"+r.PathValue("siteID")+"?saved=preset#preset", http.StatusSeeOther)
+	s.redirect(w, r, "/admin/sites/"+r.PathValue("siteID")+"?saved=preset#preset", http.StatusSeeOther)
 }
 
 func (s *Server) adminResetSite(w http.ResponseWriter, r *http.Request) {
@@ -411,7 +460,7 @@ func (s *Server) adminResetSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mapCache.deleteSite(siteID)
-	http.Redirect(w, r, "/admin/sites/"+siteID+"?saved=reset#danger", http.StatusSeeOther)
+	s.redirect(w, r, "/admin/sites/"+siteID+"?saved=reset#danger", http.StatusSeeOther)
 }
 
 func (s *Server) adminDeleteSite(w http.ResponseWriter, r *http.Request) {
@@ -438,7 +487,7 @@ func (s *Server) adminDeleteSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mapCache.deleteSite(siteID)
-	http.Redirect(w, r, "/admin?saved=deleted", http.StatusSeeOther)
+	s.redirect(w, r, "/admin?saved=deleted", http.StatusSeeOther)
 }
 
 func (s *Server) adminPresetPreview(w http.ResponseWriter, r *http.Request) {
@@ -503,7 +552,7 @@ func (s *Server) publicAnalytics(w http.ResponseWriter, r *http.Request) {
 	data := publicAnalyticsData{
 		pageLayout: pageLayout{Title: site.Name + " · Public Analytics", CurrentPath: r.URL.Path, Lang: lang},
 		Site:       site, Analytics: analytics, Range: rangeName,
-		MapURL: "/public/" + site.ID + "/analytics-map.svg?" + mapQuery.Encode(), ChartJSON: chartJSON,
+		MapURL: s.appPath("/public/" + site.ID + "/analytics-map.svg?" + mapQuery.Encode()), ChartJSON: chartJSON,
 	}
 	s.renderPage(w, r, "public-analytics", data)
 }
@@ -648,7 +697,7 @@ func (s *Server) redirectWithError(w http.ResponseWriter, r *http.Request, path,
 		fragment = path[index:]
 		path = path[:index]
 	}
-	http.Redirect(w, r, path+"?"+query.Encode()+fragment, http.StatusSeeOther)
+	s.redirect(w, r, path+"?"+query.Encode()+fragment, http.StatusSeeOther)
 }
 
 func (s *Server) adminAssets(w http.ResponseWriter, r *http.Request) {
@@ -862,6 +911,13 @@ func operationState(value, lang string) string {
 }
 
 func (s *Server) externalBaseURL(r *http.Request) string {
+	if s.Config.BaseURL != "" {
+		return strings.TrimSuffix(s.Config.BaseURL, "/")
+	}
+	return s.requestOrigin(r) + s.basePath
+}
+
+func (s *Server) requestOrigin(r *http.Request) string {
 	scheme := "http"
 	if r.TLS != nil || s.forwardedHTTPS(r) {
 		scheme = "https"

@@ -50,7 +50,7 @@ func (s *Server) adminRunSelfUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if result.Current {
-		http.Redirect(w, r, "/admin/settings?saved=update-current", http.StatusSeeOther)
+		s.redirect(w, r, "/admin/settings?saved=update-current", http.StatusSeeOther)
 		return
 	}
 	s.renderPage(w, r, "update-restarting", updateRestartData{

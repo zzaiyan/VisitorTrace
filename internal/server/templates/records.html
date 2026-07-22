@@ -5,8 +5,8 @@
 </header>
 
 <section class="section-block records-filter-section">
-  <div class="section-heading"><div><p class="eyebrow">FILTERS</p><h2>{{t "filters"}}</h2></div><a class="text-link" href="/admin/records">{{t "clear_filters"}}</a></div>
-  <form method="get" action="/admin/records" class="records-filter">
+  <div class="section-heading"><div><p class="eyebrow">FILTERS</p><h2>{{t "filters"}}</h2></div><a class="text-link" href="{{appPath "/admin/records"}}">{{t "clear_filters"}}</a></div>
+  <form method="get" action="{{appPath "/admin/records"}}" class="records-filter">
     <label class="field"><span>Site</span><select name="site_id"><option value="">{{t "all_sites"}}</option>{{range .Sites}}<option value="{{.ID}}" {{if selected $.Filters.SiteID .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
     <label class="field"><span>{{t "from_utc"}}</span><input type="datetime-local" name="from" value="{{.Filters.From}}"></label>
     <label class="field"><span>{{t "to_utc"}}</span><input type="datetime-local" name="to" value="{{.Filters.To}}"></label>
@@ -35,7 +35,7 @@
 
 <section class="section-block">
   <div class="section-heading"><div><p class="eyebrow">AGGREGATES</p><h2>{{t "export_aggregates"}}</h2></div></div>
-  <form method="get" action="/admin/aggregates.csv" class="aggregate-export">
+  <form method="get" action="{{appPath "/admin/aggregates.csv"}}" class="aggregate-export">
     <label class="field"><span>Site</span><select name="site_id" required><option value="">{{t "choose_site"}}</option>{{range .Sites}}<option value="{{.ID}}" {{if selected $.Filters.SiteID .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
     <label class="field"><span>{{t "dimension"}}</span><select name="dimension"><option value="overall">{{t "overall"}}</option><option value="path">{{t "path"}}</option><option value="country">{{t "country"}}</option><option value="region">{{t "region"}}</option><option value="city">{{t "city"}}</option><option value="browser">{{t "browsers"}}</option><option value="os">{{t "operating_systems"}}</option></select></label>
     <label class="field"><span>{{t "start_date"}}</span><input type="date" name="start"></label>

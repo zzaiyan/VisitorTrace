@@ -99,6 +99,7 @@ func (s *Server) adminRecords(w http.ResponseWriter, r *http.Request) {
 	if csvQuery != "" {
 		recordCSVURL += "?" + csvQuery
 	}
+	recordCSVURL = s.appPath(recordCSVURL)
 	data := recordsPageData{
 		pageLayout: s.adminLayout(r, session, "Pageview Records", "records"),
 		Sites:      sites, Records: page.Records, Filters: values,
@@ -109,17 +110,17 @@ func (s *Server) adminRecords(w http.ResponseWriter, r *http.Request) {
 		last := page.Records[len(page.Records)-1]
 		if direction == "older" {
 			if page.More {
-				data.OlderURL = recordPageURL(values, encodeRecordCursor(last, fingerprint), "older")
+				data.OlderURL = s.appPath(recordPageURL(values, encodeRecordCursor(last, fingerprint), "older"))
 			}
 			if cursor != nil {
-				data.NewerURL = recordPageURL(values, encodeRecordCursor(first, fingerprint), "newer")
+				data.NewerURL = s.appPath(recordPageURL(values, encodeRecordCursor(first, fingerprint), "newer"))
 			}
 		} else {
 			if page.More {
-				data.NewerURL = recordPageURL(values, encodeRecordCursor(first, fingerprint), "newer")
+				data.NewerURL = s.appPath(recordPageURL(values, encodeRecordCursor(first, fingerprint), "newer"))
 			}
 			if cursor != nil {
-				data.OlderURL = recordPageURL(values, encodeRecordCursor(last, fingerprint), "older")
+				data.OlderURL = s.appPath(recordPageURL(values, encodeRecordCursor(last, fingerprint), "older"))
 			}
 		}
 	}

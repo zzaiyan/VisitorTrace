@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -27,6 +28,7 @@ type Config struct {
 	BackupDir         string   `json:"backup_dir,omitempty"`
 	UpdateManifestURL string   `json:"update_manifest_url,omitempty"`
 	Listen            string   `json:"listen"`
+	BaseURL           string   `json:"base_url,omitempty"`
 	TrustedProxies    []string `json:"trusted_proxies,omitempty"`
 }
 
@@ -82,6 +84,9 @@ func Load(path string) (Config, error) {
 		return Config{}, errors.New("decode config: trailing content")
 	}
 	cfg.applyDefaults()
+	if err := cfg.normalize(); err != nil {
+		return Config{}, err
+	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -90,6 +95,9 @@ func Load(path string) (Config, error) {
 
 func Save(path string, cfg Config) error {
 	cfg.applyDefaults()
+	if err := cfg.normalize(); err != nil {
+		return err
+	}
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -141,6 +149,9 @@ func (c Config) Validate() error {
 	if c.Listen == "" {
 		return errors.New("listen is required")
 	}
+	if _, err := NormalizeBaseURL(c.BaseURL); err != nil {
+		return err
+	}
 	for _, value := range c.TrustedProxies {
 		if _, err := netip.ParsePrefix(value); err != nil {
 			return fmt.Errorf("invalid trusted proxy CIDR %q", value)
@@ -166,6 +177,54 @@ func (c Config) Validate() error {
 			return fmt.Errorf("%s must use HTTPS except on loopback", name)
 		}
 	}
+	return nil
+}
+
+// NormalizeBaseURL validates and canonicalizes the public application URL.
+// Its optional path is also the HTTP route prefix used by the server.
+func NormalizeBaseURL(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || parsed.Opaque != "" {
+		return "", errors.New("base_url must be an absolute HTTP or HTTPS URL")
+	}
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", errors.New("base_url must use HTTP or HTTPS")
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return "", errors.New("base_url must not contain credentials, a query, or a fragment")
+	}
+	if strings.ContainsAny(parsed.Path, "\\\x00") {
+		return "", errors.New("base_url contains an invalid path")
+	}
+	cleanPath := path.Clean("/" + strings.TrimPrefix(parsed.Path, "/"))
+	if cleanPath == "/" {
+		cleanPath = ""
+	}
+	parsed.Path = cleanPath
+	parsed.RawPath = ""
+	return strings.TrimSuffix(parsed.String(), "/"), nil
+}
+
+func BasePath(baseURL string) string {
+	normalized, err := NormalizeBaseURL(baseURL)
+	if err != nil || normalized == "" {
+		return ""
+	}
+	parsed, _ := url.Parse(normalized)
+	return parsed.Path
+}
+
+func (c *Config) normalize() error {
+	baseURL, err := NormalizeBaseURL(c.BaseURL)
+	if err != nil {
+		return err
+	}
+	c.BaseURL = baseURL
 	return nil
 }
 

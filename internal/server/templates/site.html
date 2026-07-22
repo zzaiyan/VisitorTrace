@@ -1,7 +1,7 @@
 {{define "content"}}
 <header class="page-header site-heading">
   <div><p class="eyebrow">SITE · {{.Site.ID}}</p><h1>{{.Site.Name}}</h1><p class="subhead">{{.Site.Timezone}} · {{len .Site.AllowedOrigins}} {{t "allowed_origins_count"}}</p></div>
-  <div class="header-actions"><a class="button ghost" href="/admin/sites/{{.Site.ID}}/analytics">{{t "aggregate_analytics"}}</a>{{if .Site.PublishPublic}}<a class="button ghost" href="/public/{{.Site.ID}}/analytics" target="_blank" rel="noopener">{{t "public_analytics"}}</a>{{end}}<a class="button ghost" href="#integration">{{t "integration_code"}}</a></div>
+  <div class="header-actions"><a class="button ghost" href="{{appPath (printf "/admin/sites/%s/analytics" .Site.ID)}}">{{t "aggregate_analytics"}}</a>{{if .Site.PublishPublic}}<a class="button ghost" href="{{appPath (printf "/public/%s/analytics" .Site.ID)}}" target="_blank" rel="noopener">{{t "public_analytics"}}</a>{{end}}<a class="button ghost" href="#integration">{{t "integration_code"}}</a></div>
 </header>
 {{if .Saved}}<div class="notice success" role="status">{{.Saved}}</div>{{end}}
 {{if .Error}}<div class="notice danger" role="alert">{{.Error}}</div>{{end}}
@@ -19,7 +19,7 @@
       <img id="preset-preview" src="{{.MapPreviewURL}}" data-preview-base="{{.MapPreviewURL}}" alt="{{t "preset_preview"}}">
       <a class="attribution" href="https://db-ip.com" target="_blank" rel="noopener">IP geolocation by DB-IP</a>
     </div>
-    <form id="preset-form" method="post" action="/admin/sites/{{.Site.ID}}/preset" class="preset-form" data-map-aspect="{{.MapAspect}}">
+    <form id="preset-form" method="post" action="{{appPath (printf "/admin/sites/%s/preset" .Site.ID)}}" class="preset-form" data-map-aspect="{{.MapAspect}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div class="field-grid two">
         <div class="field"><label for="preset-width">{{t "width"}}</label><div class="input-unit"><input id="preset-width" type="number" name="w" min="160" max="1200" value="{{.Preset.Width}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="width" title="{{t "auto_width"}}" aria-label="{{t "auto_width"}}">↔</button></div></div>
@@ -49,7 +49,7 @@
 
 <section class="section-block" id="settings">
   <div class="section-heading"><div><p class="eyebrow">SETTINGS</p><h2>{{t "site_settings"}}</h2></div></div>
-  <form method="post" action="/admin/sites/{{.Site.ID}}/settings" class="settings-form">
+  <form method="post" action="{{appPath (printf "/admin/sites/%s/settings" .Site.ID)}}" class="settings-form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
     <div class="field-grid two">
       <label class="field"><span>{{t "display_name"}}</span><input type="text" name="name" maxlength="100" value="{{.Site.Name}}" required></label>
@@ -70,13 +70,21 @@
 <section class="section-block" id="integration">
   <div class="section-heading"><div><p class="eyebrow">INTEGRATION</p><h2>{{t "integration_code"}}</h2></div></div>
   <div class="snippet-grid">
-    <div><h3>{{t "combined_widget"}}</h3><pre><code>&lt;script async src="{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre><code class="endpoint">{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}</code></div>
-    <div><h3>{{t "separate_tracker"}}</h3><pre><code>&lt;script async src="{{.BaseURL}}/embed/tracker.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre><code class="endpoint">{{.BaseURL}}/api/v1/sites/{{.Site.ID}}/map.svg</code></div>
+    <div class="snippet-card">
+      <div class="snippet-heading"><h3>{{t "combined_widget"}}</h3><button class="icon-button copy-button" type="button" data-copy-target="combined-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
+      <pre><code id="combined-snippet">&lt;script async src="{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre>
+      <div class="endpoint-row"><code class="endpoint" id="combined-endpoint">{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}</code><button class="icon-button copy-button" type="button" data-copy-target="combined-endpoint" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
+    </div>
+    <div class="snippet-card">
+      <div class="snippet-heading"><h3>{{t "separate_tracker"}}</h3><button class="icon-button copy-button" type="button" data-copy-target="tracker-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
+      <pre><code id="tracker-snippet">&lt;script async src="{{.BaseURL}}/embed/tracker.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre>
+      <div class="endpoint-row"><code class="endpoint" id="map-endpoint">{{.BaseURL}}/api/v1/sites/{{.Site.ID}}/map.svg</code><button class="icon-button copy-button" type="button" data-copy-target="map-endpoint" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
+    </div>
   </div>
 </section>
 
 <section class="section-block" id="records">
-  <div class="section-heading"><div><p class="eyebrow">PAGEVIEW RECORDS</p><h2>{{t "recent_records"}}</h2></div><a class="text-link" href="/admin/records?site_id={{.Site.ID}}">{{t "filter_page_export"}}</a></div>
+    <div class="section-heading"><div><p class="eyebrow">PAGEVIEW RECORDS</p><h2>{{t "recent_records"}}</h2></div><a class="text-link" href="{{appPath (printf "/admin/records?site_id=%s" .Site.ID)}}">{{t "filter_page_export"}}</a></div>
   <div class="table-wrap">
     <table><thead><tr><th>{{t "time"}}</th><th>{{t "path"}}</th><th>{{t "location"}}</th><th>{{t "original_ip"}}</th><th>{{t "system"}}</th><th>{{t "browsers"}}</th><th>Visitor Digest</th></tr></thead>
       <tbody>{{range .Recent}}<tr><td><time datetime="{{formatUTC .OccurredAt}}">{{formatTime .OccurredAt}}</time></td><td><code>{{.Path}}</code></td><td>{{if .City}}{{.City}}{{else if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}}</td><td><code>{{.OriginalIP}}</code></td><td>{{.OperatingSystem}}</td><td>{{.Browser}}</td><td><code class="digest">{{.VisitorDigest}}</code></td></tr>{{else}}<tr><td colspan="7" class="empty-cell">{{t "no_pageview_records"}}</td></tr>{{end}}</tbody>
@@ -87,14 +95,14 @@
 <section class="section-block danger-zone" id="danger">
   <div class="section-heading"><div><p class="eyebrow">DANGER ZONE</p><h2>{{t "danger_zone"}}</h2></div><span class="muted">{{t "irreversible_backup_first"}}</span></div>
   <div class="danger-grid">
-    <form method="post" action="/admin/sites/{{.Site.ID}}/reset" class="danger-form">
+    <form method="post" action="{{appPath (printf "/admin/sites/%s/reset" .Site.ID)}}" class="danger-form">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div><h3>{{t "reset_site_data"}}</h3><p>{{t "reset_site_help"}}</p></div>
       <label class="field"><span>{{t "enter_site_id"}}</span><input type="text" name="site_id" autocomplete="off" required></label>
       <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>
       <button class="button danger" type="submit">{{t "reset_data"}}</button>
     </form>
-    <form method="post" action="/admin/sites/{{.Site.ID}}/delete" class="danger-form">
+    <form method="post" action="{{appPath (printf "/admin/sites/%s/delete" .Site.ID)}}" class="danger-form">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div><h3>{{t "delete_site"}}</h3><p>{{t "delete_site_help"}}</p></div>
       <label class="field"><span>{{t "enter_site_id"}}</span><input type="text" name="site_id" autocomplete="off" required></label>
@@ -143,6 +151,47 @@
   }
   form.querySelectorAll("[data-auto-dimension]").forEach(function (button) {
     button.addEventListener("click", function () { autoDimension(button.dataset.autoDimension); });
+  });
+}());
+</script>
+<script>
+(function () {
+  var copyLabel = "{{t "copy"}}";
+  var copiedLabel = "{{t "copied"}}";
+  function fallbackCopy(value) {
+    var textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    var copied = false;
+    try { copied = document.execCommand("copy"); } catch (_) {}
+    document.body.removeChild(textarea);
+    return copied;
+  }
+  document.querySelectorAll(".copy-button").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var target = document.getElementById(button.dataset.copyTarget);
+      if (!target) return;
+      var value = target.textContent.trim();
+      var done = function () {
+        button.title = copiedLabel;
+        button.setAttribute("aria-label", copiedLabel);
+        button.classList.add("copied");
+        window.setTimeout(function () {
+          button.title = copyLabel;
+          button.setAttribute("aria-label", copyLabel);
+          button.classList.remove("copied");
+        }, 1400);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(value).then(done).catch(function () { if (fallbackCopy(value)) done(); });
+      } else if (fallbackCopy(value)) {
+        done();
+      }
+    });
   });
 }());
 </script>

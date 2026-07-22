@@ -5,12 +5,13 @@
   if (!script) return;
 
   var scriptURL = new URL(script.src, document.baseURI);
+	var appURL = new URL("../", scriptURL);
   var siteID = scriptURL.searchParams.get("site_id");
   if (!siteID) return;
 
   var endpoint = new URL(
-    "/api/v1/sites/" + encodeURIComponent(siteID) + "/pageviews",
-    scriptURL.origin
+		"api/v1/sites/" + encodeURIComponent(siteID) + "/pageviews",
+		appURL
   ).href;
   var state = window.__visitorTraceState || (window.__visitorTraceState = {});
   var siteState = state[siteID] || (state[siteID] = { sent: {}, visitorID: null });
@@ -68,8 +69,8 @@
   window.VisitorTrace.track = send;
   if (integrated) {
     var mapURL = new URL(
-      "/api/v1/sites/" + encodeURIComponent(siteID) + "/map.svg",
-      scriptURL.origin
+			"api/v1/sites/" + encodeURIComponent(siteID) + "/map.svg",
+			appURL
     );
     scriptURL.searchParams.forEach(function (value, key) {
       if (key !== "site_id") mapURL.searchParams.append(key, value);
@@ -78,8 +79,8 @@
     wrapper.className = "visitortrace-widget";
     var link = document.createElement("a");
     link.href = new URL(
-      "/public/" + encodeURIComponent(siteID) + "/analytics",
-      scriptURL.origin
+			"public/" + encodeURIComponent(siteID) + "/analytics",
+			appURL
     ).href;
     link.target = "_blank";
     link.rel = "noopener";

@@ -1,6 +1,6 @@
 {{define "content"}}
 <header class="public-header">
-  <a class="brand" href="/public/{{.Site.ID}}/analytics"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>
+  <a class="brand" href="{{appPath (printf "/public/%s/analytics" .Site.ID)}}"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>
   <div class="public-header-meta"><span class="public-site-id">{{.Site.ID}}</span><nav class="language-nav" aria-label="Language"><a href="{{languageURL "zh-CN"}}" {{if languageIs "zh-CN"}}aria-current="page"{{end}}>中文</a><a href="{{languageURL "en"}}" {{if languageIs "en"}}aria-current="page"{{end}}>EN</a></nav></div>
 </header>
 <main class="public-main">
@@ -38,7 +38,7 @@
 </main>
 <footer class="public-footer"><span>VisitorTrace · 访迹</span><span>{{t "aggregate_only"}}</span></footer>
 <script type="application/json" id="analytics-data">{{.ChartJSON}}</script>
-<script defer src="/assets/analytics.js"></script>
+<script defer src="{{appPath "/assets/analytics.js"}}"></script>
 <script>
 (function () {
   var bars = document.querySelectorAll(".trend-bar");

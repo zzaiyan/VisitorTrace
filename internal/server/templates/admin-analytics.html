@@ -1,7 +1,7 @@
 {{define "content"}}
 <header class="page-header analytics-heading">
   <div><p class="eyebrow">SITE ANALYTICS · {{.Site.ID}}</p><h1>{{.Site.Name}}</h1><p class="subhead">{{.Analytics.StartDate}} {{t "date_to"}} {{.Analytics.EndDate}}</p></div>
-  <div class="header-actions"><a class="button ghost" href="/admin/sites/{{.Site.ID}}">{{t "back_to_site"}}</a>{{if .Site.PublishPublic}}<a class="button ghost" href="/public/{{.Site.ID}}/analytics" target="_blank" rel="noopener">{{t "public_analytics"}}</a>{{end}}</div>
+  <div class="header-actions"><a class="button ghost" href="{{appPath (printf "/admin/sites/%s" .Site.ID)}}">{{t "back_to_site"}}</a>{{if .Site.PublishPublic}}<a class="button ghost" href="{{appPath (printf "/public/%s/analytics" .Site.ID)}}" target="_blank" rel="noopener">{{t "public_analytics"}}</a>{{end}}</div>
 </header>
 <nav class="range-nav admin-range-nav" aria-label="{{t "analytics_range"}}"><a href="?range=today" {{if selected .Range "today"}}aria-current="page"{{end}}>{{t "today"}}</a><a href="?range=7d" {{if selected .Range "7d"}}aria-current="page"{{end}}>7 {{t "days"}}</a><a href="?range=30d" {{if selected .Range "30d"}}aria-current="page"{{end}}>30 {{t "days"}}</a><a href="?range=90d" {{if selected .Range "90d"}}aria-current="page"{{end}}>90 {{t "days"}}</a><a href="?range=all" {{if selected .Range "all"}}aria-current="page"{{end}}>{{t "all"}}</a></nav>
 
@@ -31,6 +31,6 @@
 
 <section class="custom-range"><form method="get"><input type="hidden" name="range" value="custom"><label class="field"><span>{{t "start_date"}}</span><input type="date" name="start" value="{{.Analytics.StartDate}}" required></label><label class="field"><span>{{t "end_date"}}</span><input type="date" name="end" value="{{.Analytics.EndDate}}" required></label><button class="button ghost" type="submit">{{t "query"}}</button></form></section>
 <script type="application/json" id="analytics-data">{{.ChartJSON}}</script>
-<script defer src="/assets/analytics.js"></script>
+<script defer src="{{appPath "/assets/analytics.js"}}"></script>
 <script>(function(){var bars=document.querySelectorAll(".trend-bar"),max=0;bars.forEach(function(bar){max=Math.max(max,Number(bar.dataset.value)||0)});bars.forEach(function(bar){bar.style.height=(max?Math.max(3,Number(bar.dataset.value)/max*100):3)+"%"})}());</script>
 {{end}}

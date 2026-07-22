@@ -4,7 +4,7 @@
     <p class="eyebrow">ERROR {{.Status}}</p>
     <h1>{{t "request_incomplete"}}</h1>
     <p class="muted">{{.Message}}</p>
-    <a class="button primary" href="/admin">{{t "return_admin"}}</a>
+    <a class="button primary" href="{{appPath "/admin"}}">{{t "return_admin"}}</a>
   </section>
 </main>
 {{end}}

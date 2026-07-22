@@ -50,6 +50,7 @@ type Server struct {
 	geoIP       *geoip.Resolver
 	mapCache    *mapCache
 	loginLimit  *ratelimit.Limiter
+	basePath    string
 	restartOnce sync.Once
 	restart     chan struct{}
 }
@@ -70,6 +71,7 @@ func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
 		logger:     logger,
 		mapCache:   newMapCache(),
 		loginLimit: ratelimit.New(10, 5),
+		basePath:   config.BasePath(cfg.BaseURL),
 		restart:    make(chan struct{}),
 	}
 }
@@ -84,6 +86,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /assets/analytics.js", s.analyticsAssets)
 	mux.HandleFunc("GET /admin", s.adminDashboard)
 	mux.HandleFunc("GET /admin/settings", s.adminSettings)
+	mux.HandleFunc("POST /admin/settings/base-url", s.adminUpdateBaseURL)
 	mux.HandleFunc("POST /admin/settings/password", s.adminChangePassword)
 	mux.HandleFunc("POST /admin/settings/update", s.adminRunSelfUpdate)
 	mux.HandleFunc("GET /admin/records", s.adminRecords)
@@ -107,7 +110,46 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /embed/tracker.js", s.trackerScript)
 	mux.HandleFunc("GET /embed/widget.js", s.widgetScript)
 	mux.HandleFunc("GET /api/v1/sites/{siteID}/map.svg", s.mapSVG)
-	return mux
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" || r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		s.redirect(w, r, "/admin", http.StatusSeeOther)
+	})
+	if s.basePath == "" {
+		return mux
+	}
+	outer := http.NewServeMux()
+	outer.Handle(s.basePath+"/", http.StripPrefix(s.basePath, mux))
+	outer.HandleFunc(s.basePath, func(w http.ResponseWriter, r *http.Request) {
+		target := s.basePath + "/"
+		if r.URL.RawQuery != "" {
+			target += "?" + r.URL.RawQuery
+		}
+		http.Redirect(w, r, target, http.StatusPermanentRedirect)
+	})
+	return outer
+}
+
+func (s *Server) appPath(value string) string {
+	if value == "" {
+		value = "/"
+	} else if !strings.HasPrefix(value, "/") {
+		value = "/" + value
+	}
+	return s.basePath + value
+}
+
+func (s *Server) cookiePath() string {
+	if s.basePath == "" {
+		return "/"
+	}
+	return s.basePath + "/"
+}
+
+func (s *Server) redirect(w http.ResponseWriter, r *http.Request, target string, status int) {
+	http.Redirect(w, r, s.appPath(target), status)
 }
 
 func (s *Server) HTTPServer() *http.Server {

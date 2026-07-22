@@ -23,7 +23,7 @@ func (s *Server) adminRunBackup(w http.ResponseWriter, r *http.Request) {
 		s.redirectWithError(w, r, "/admin", "备份失败："+err.Error())
 		return
 	}
-	http.Redirect(w, r, "/admin?saved=backup", http.StatusSeeOther)
+	s.redirect(w, r, "/admin?saved=backup", http.StatusSeeOther)
 }
 
 func (s *Server) adminRunCleanup(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +35,7 @@ func (s *Server) adminRunCleanup(w http.ResponseWriter, r *http.Request) {
 		s.redirectWithError(w, r, "/admin", "清理失败："+err.Error())
 		return
 	}
-	http.Redirect(w, r, "/admin?saved=cleanup", http.StatusSeeOther)
+	s.redirect(w, r, "/admin?saved=cleanup", http.StatusSeeOther)
 }
 
 func (s *Server) adminRunGeoIPUpdate(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +64,7 @@ func (s *Server) adminRunGeoIPUpdate(w http.ResponseWriter, r *http.Request) {
 	if result.Updated {
 		value = "geoip"
 	}
-	http.Redirect(w, r, "/admin?saved="+value, http.StatusSeeOther)
+	s.redirect(w, r, "/admin?saved="+value, http.StatusSeeOther)
 }
 
 func (s *Server) authorizeOperation(w http.ResponseWriter, r *http.Request) bool {

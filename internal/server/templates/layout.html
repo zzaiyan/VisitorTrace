@@ -6,20 +6,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>{{if .Title}}{{.Title}} · {{end}}VisitorTrace · 访迹</title>
-  <link rel="stylesheet" href="/admin/assets/style.css">
+  <link rel="stylesheet" href="{{appPath "/admin/assets/style.css"}}">
 </head>
 <body class="{{if .Admin}}admin-shell{{else}}public-shell{{end}}">
   {{if .Admin}}
   <aside class="sidebar">
-    <a class="brand" href="/admin"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>
+    <a class="brand" href="{{appPath "/admin"}}"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>
     <nav class="side-nav" aria-label="{{t "admin_navigation"}}">
-      <a href="/admin" {{if eq .Active "dashboard"}}aria-current="page"{{end}}>{{t "dashboard"}}</a>
-      <a href="/admin/sites/new" {{if eq .Active "sites"}}aria-current="page"{{end}}>{{t "sites"}}</a>
-      <a href="/admin/records" {{if eq .Active "records"}}aria-current="page"{{end}}>{{t "records"}}</a>
-      <a href="/admin/settings" {{if eq .Active "settings"}}aria-current="page"{{end}}>{{t "settings"}}</a>
+      <a href="{{appPath "/admin"}}" {{if eq .Active "dashboard"}}aria-current="page"{{end}}>{{t "dashboard"}}</a>
+      <a href="{{appPath "/admin/sites/new"}}" {{if eq .Active "sites"}}aria-current="page"{{end}}>{{t "sites"}}</a>
+      <a href="{{appPath "/admin/records"}}" {{if eq .Active "records"}}aria-current="page"{{end}}>{{t "records"}}</a>
+      <a href="{{appPath "/admin/settings"}}" {{if eq .Active "settings"}}aria-current="page"{{end}}>{{t "settings"}}</a>
     </nav>
     <nav class="language-nav admin-language-nav" aria-label="Language"><a href="{{languageURL "zh-CN"}}" {{if languageIs "zh-CN"}}aria-current="page"{{end}}>中文</a><a href="{{languageURL "en"}}" {{if languageIs "en"}}aria-current="page"{{end}}>EN</a></nav>
-    <form class="logout-form" method="post" action="/admin/logout">
+    <form class="logout-form" method="post" action="{{appPath "/admin/logout"}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <button class="button ghost full" type="submit">{{t "logout"}}</button>
     </form>

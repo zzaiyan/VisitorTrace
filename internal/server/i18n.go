@@ -26,6 +26,7 @@ var messages = map[string]map[string]string{
 		"dedup_window": "访客合并周期", "record_retention": "逐条记录保留期", "day": "天", "create_site": "创建 Site",
 		"dedup_change_help": "修改在下一个站点本地午夜生效；已完成聚合不会重算。", "counting_rule_changes": "计数规则变更", "effective_from": "生效于",
 		"credentials_sessions": "凭据与安全会话", "change_password": "修改密码", "current_password": "当前密码", "new_password": "新密码", "password_hint": "8 至 128 个字符",
+		"base_url": "公开 Base URL", "base_url_help": "用于生成接入代码和公开链接；路径部分也会作为应用路由前缀。留空时使用当前请求地址。", "base_url_effective": "当前生效地址：", "save_base_url": "保存并重启服务", "base_url_saved": "Base URL 已保存，服务即将重启。", "copy": "复制", "copied": "已复制",
 		"confirm_new_password": "确认新密码", "update_password": "更新密码", "version_update": "版本更新", "current": "当前", "stable_path": "稳定执行路径",
 		"signature_verification": "签名验证", "configured": "已配置", "not_configured": "未配置", "launch_mode": "启动方式", "stable_launch": "稳定路径", "needs_adjustment": "需要调整",
 		"administrator_password": "管理员密码", "check_and_update": "检查并更新",
@@ -70,6 +71,7 @@ var messages = map[string]map[string]string{
 		"dedup_window": "Visitor merge window", "record_retention": "Record retention", "day": "days", "create_site": "Create Site",
 		"dedup_change_help": "Changes take effect at the next Site-local midnight; completed aggregates are not recalculated.", "counting_rule_changes": "Counting rule changes", "effective_from": "Effective",
 		"credentials_sessions": "Credentials and secure sessions", "change_password": "Change password", "current_password": "Current password", "new_password": "New password", "password_hint": "8 to 128 characters",
+		"base_url": "Public Base URL", "base_url_help": "Used for integration code and public links; its path also becomes the application route prefix. Leave it empty to use the current request URL.", "base_url_effective": "Effective URL:", "save_base_url": "Save and restart service", "base_url_saved": "The Base URL was saved and the service will restart.", "copy": "Copy", "copied": "Copied",
 		"confirm_new_password": "Confirm new password", "update_password": "Update password", "version_update": "Version update", "current": "Current", "stable_path": "Stable executable path",
 		"signature_verification": "Signature verification", "configured": "Configured", "not_configured": "Not configured", "launch_mode": "Launch mode", "stable_launch": "Stable path", "needs_adjustment": "Needs adjustment",
 		"administrator_password": "Administrator password", "check_and_update": "Check and update",
@@ -146,7 +148,7 @@ func publicLanguage(r *http.Request, siteDefault string) string {
 	return "en"
 }
 
-func rememberRequestedLanguage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) rememberRequestedLanguage(w http.ResponseWriter, r *http.Request) {
 	value := r.URL.Query().Get("lang")
 	if !validLanguage(value) {
 		return
@@ -156,8 +158,8 @@ func rememberRequestedLanguage(w http.ResponseWriter, r *http.Request) {
 		cookieName = adminLanguageCookie
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name: cookieName, Value: value, Path: "/", MaxAge: 365 * 24 * 60 * 60,
-		Expires: time.Now().Add(365 * 24 * time.Hour), SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil,
+		Name: cookieName, Value: value, Path: s.cookiePath(), MaxAge: 365 * 24 * 60 * 60,
+		Expires: time.Now().Add(365 * 24 * time.Hour), SameSite: http.SameSiteLaxMode, Secure: r.TLS != nil || s.forwardedHTTPS(r),
 	})
 }
 

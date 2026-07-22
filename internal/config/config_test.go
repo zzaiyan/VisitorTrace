@@ -70,3 +70,42 @@ func TestValidateRejectsInsecureRemoteGeoIPSource(t *testing.T) {
 		t.Fatal("Validate() accepted an insecure remote GeoIP source")
 	}
 }
+
+func TestNormalizeBaseURL(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"", ""},
+		{" https://stats.example.com/visitortrace/ ", "https://stats.example.com/visitortrace"},
+		{"HTTP://localhost", "http://localhost"},
+		{"https://stats.example.com/a/../visitortrace", "https://stats.example.com/visitortrace"},
+	}
+	for _, test := range tests {
+		got, err := NormalizeBaseURL(test.input)
+		if err != nil {
+			t.Errorf("NormalizeBaseURL(%q) error = %v", test.input, err)
+			continue
+		}
+		if got != test.want {
+			t.Errorf("NormalizeBaseURL(%q) = %q, want %q", test.input, got, test.want)
+		}
+	}
+	if got := BasePath("https://stats.example.com/visitortrace"); got != "/visitortrace" {
+		t.Fatalf("BasePath() = %q", got)
+	}
+}
+
+func TestNormalizeBaseURLRejectsUnsupportedComponents(t *testing.T) {
+	for _, input := range []string{
+		"stats.example.com/visitortrace",
+		"ftp://stats.example.com/visitortrace",
+		"https://user:pass@stats.example.com/visitortrace",
+		"https://stats.example.com/visitortrace?debug=1",
+		"https://stats.example.com/visitortrace#section",
+	} {
+		if _, err := NormalizeBaseURL(input); err == nil {
+			t.Errorf("NormalizeBaseURL(%q) accepted an invalid URL", input)
+		}
+	}
+}

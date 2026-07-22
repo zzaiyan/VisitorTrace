@@ -24,7 +24,7 @@ const (
 
 func (s *Server) adminLogin(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.currentAdmin(r); ok {
-		http.Redirect(w, r, safeNext(r.URL.Query().Get("next"), "/admin"), http.StatusSeeOther)
+		s.redirect(w, r, safeNext(r.URL.Query().Get("next"), "/admin"), http.StatusSeeOther)
 		return
 	}
 	if r.Method == http.MethodPost {
@@ -78,19 +78,19 @@ func (s *Server) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     adminSessionCookie,
 		Value:    hex.EncodeToString(token),
-		Path:     "/",
+		Path:     s.cookiePath(),
 		HttpOnly: true,
 		Secure:   s.secureAdminCookie(r),
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   int(adminSessionAge / time.Second),
 	})
-	http.Redirect(w, r, safeNext(r.FormValue("next"), "/admin"), http.StatusSeeOther)
+	s.redirect(w, r, safeNext(r.FormValue("next"), "/admin"), http.StatusSeeOther)
 }
 
 func (s *Server) adminLogout(w http.ResponseWriter, r *http.Request) {
 	session, ok := s.currentAdmin(r)
 	if !ok {
-		http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+		s.redirect(w, r, "/admin/login", http.StatusSeeOther)
 		return
 	}
 	if r.Method != http.MethodPost || !s.validCSRF(r, session) {
@@ -99,7 +99,7 @@ func (s *Server) adminLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = s.Store.DeleteAdministratorSession(r.Context(), session.TokenDigest)
 	s.clearAdminCookie(w, r)
-	http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+	s.redirect(w, r, "/admin/login", http.StatusSeeOther)
 }
 
 func (s *Server) currentAdmin(r *http.Request) (store.AdministratorSession, bool) {
@@ -128,7 +128,7 @@ func (s *Server) requireAdmin(w http.ResponseWriter, r *http.Request) (store.Adm
 		return session, true
 	}
 	next := r.URL.RequestURI()
-	http.Redirect(w, r, "/admin/login?next="+url.QueryEscape(next), http.StatusSeeOther)
+	s.redirect(w, r, "/admin/login?next="+url.QueryEscape(next), http.StatusSeeOther)
 	return store.AdministratorSession{}, false
 }
 
@@ -208,7 +208,7 @@ func (s *Server) administratorPasswordMatches(ctx context.Context, value string)
 }
 
 func (s *Server) clearAdminCookie(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{Name: adminSessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.secureAdminCookie(r), SameSite: http.SameSiteStrictMode})
+	http.SetCookie(w, &http.Cookie{Name: adminSessionCookie, Value: "", Path: s.cookiePath(), MaxAge: -1, HttpOnly: true, Secure: s.secureAdminCookie(r), SameSite: http.SameSiteStrictMode})
 }
 
 func safeNext(value, fallback string) string {

@@ -4,12 +4,20 @@
 </header>
 <section class="form-panel narrow">
   <div class="section-heading"><div><p class="eyebrow">PASSWORD</p><h2>{{t "change_password"}}</h2></div></div>
-  <form method="post" action="/admin/settings/password" class="stack-form">
+  <form method="post" action="{{appPath "/admin/settings/password"}}" class="stack-form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
     <label class="field"><span>{{t "current_password"}}</span><input type="password" name="current_password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
     <label class="field"><span>{{t "new_password"}}</span><input type="password" name="new_password" autocomplete="new-password" minlength="8" maxlength="128" required><small>{{t "password_hint"}}</small></label>
     <label class="field"><span>{{t "confirm_new_password"}}</span><input type="password" name="confirm_password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
     <div class="form-actions"><button class="button primary" type="submit">{{t "update_password"}}</button></div>
+  </form>
+</section>
+<section class="section-block">
+  <div class="section-heading"><div><p class="eyebrow">PUBLIC URL</p><h2>{{t "base_url"}}</h2><p class="subhead">{{t "base_url_help"}}</p></div></div>
+  <form method="post" action="{{appPath "/admin/settings/base-url"}}" class="stack-form">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label class="field"><span>{{t "base_url"}}</span><input type="url" name="base_url" value="{{.BaseURL}}" placeholder="https://stats.example.com/visitortrace" autocomplete="url"><small>{{t "base_url_effective"}} <code>{{.EffectiveBaseURL}}</code></small></label>
+    <div class="form-actions"><button class="button primary" type="submit">{{t "save_base_url"}}</button></div>
   </form>
 </section>
 <section class="section-block">
@@ -19,7 +27,7 @@
     <div><span>{{t "signature_verification"}}</span><strong>{{if .UpdateKeyReady}}{{t "configured"}}{{else}}{{t "not_configured"}}{{end}}</strong></div>
     <div><span>{{t "launch_mode"}}</span><strong>{{if .RunningFromStablePath}}{{t "stable_launch"}}{{else}}{{t "needs_adjustment"}}{{end}}</strong></div>
   </div>
-  <form method="post" action="/admin/settings/update" class="update-form">
+  <form method="post" action="{{appPath "/admin/settings/update"}}" class="update-form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
     <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
     <button class="button primary" type="submit" {{if or (not .UpdateKeyReady) (not .RunningFromStablePath)}}disabled{{end}}>{{t "check_and_update"}}</button>

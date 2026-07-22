@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -124,6 +125,106 @@ func TestIntegratedWidgetScript(t *testing.T) {
 	}
 	if !strings.Contains(response.Body.String(), "visitortrace-widget") || !strings.Contains(response.Body.String(), "/map.svg") {
 		t.Fatal("widget response does not include integrated map insertion")
+	}
+}
+
+func TestSubpathRoutesAndConfiguredBaseURL(t *testing.T) {
+	dir := t.TempDir()
+	cfg := config.Default(dir)
+	cfg.BaseURL = "https://stats.example.com/visitortrace"
+	configPath := filepath.Join(dir, "config.json")
+	if err := config.Save(configPath, cfg); err != nil {
+		t.Fatalf("save config: %v", err)
+	}
+	passwordHash, err := password.Hash([]byte("correct horse"))
+	if err != nil {
+		t.Fatalf("Hash() error = %v", err)
+	}
+	st, err := store.Initialize(context.Background(), cfg.DatabasePath, passwordHash)
+	if err != nil {
+		t.Fatalf("Initialize() error = %v", err)
+	}
+	defer st.Close()
+	site, err := st.CreateSite(context.Background(), store.CreateSiteParams{Name: "Subpath Site", AllowedOrigins: []string{"https://example.com"}})
+	if err != nil {
+		t.Fatalf("CreateSite() error = %v", err)
+	}
+	app := New(cfg, st)
+	app.ConfigPath = configPath
+	handler := app.Handler()
+
+	outside := httptest.NewRecorder()
+	handler.ServeHTTP(outside, httptest.NewRequest(http.MethodGet, "/health/live", nil))
+	if outside.Code != http.StatusNotFound {
+		t.Fatalf("unprefixed health status = %d, want %d", outside.Code, http.StatusNotFound)
+	}
+	live := httptest.NewRecorder()
+	handler.ServeHTTP(live, httptest.NewRequest(http.MethodGet, "/visitortrace/health/live", nil))
+	if live.Code != http.StatusOK {
+		t.Fatalf("prefixed health status = %d, body = %q", live.Code, live.Body.String())
+	}
+
+	login := httptest.NewRequest(http.MethodPost, "/visitortrace/admin/login", strings.NewReader(url.Values{"password": {"correct horse"}}.Encode()))
+	login.Host = "stats.example.com"
+	login.TLS = &tls.ConnectionState{}
+	login.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	loggedIn := httptest.NewRecorder()
+	handler.ServeHTTP(loggedIn, login)
+	if loggedIn.Code != http.StatusSeeOther || loggedIn.Header().Get("Location") != "/visitortrace/admin" {
+		t.Fatalf("subpath login = status %d location %q", loggedIn.Code, loggedIn.Header().Get("Location"))
+	}
+	cookies := loggedIn.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Path != "/visitortrace/" {
+		t.Fatalf("subpath login cookie = %#v", cookies)
+	}
+
+	dashboard := httptest.NewRequest(http.MethodGet, "/visitortrace/admin", nil)
+	dashboard.Host = "stats.example.com"
+	dashboard.TLS = &tls.ConnectionState{}
+	dashboard.AddCookie(cookies[0])
+	dashboardResponse := httptest.NewRecorder()
+	handler.ServeHTTP(dashboardResponse, dashboard)
+	body := dashboardResponse.Body.String()
+	if dashboardResponse.Code != http.StatusOK || !strings.Contains(body, `href="/visitortrace/admin/assets/style.css"`) || !strings.Contains(body, `action="/visitortrace/admin/logout"`) {
+		t.Fatalf("subpath dashboard = status %d, body = %q", dashboardResponse.Code, body)
+	}
+	csrfMatch := regexp.MustCompile(`name="csrf" value="([a-f0-9]{64})"`).FindStringSubmatch(body)
+	if len(csrfMatch) != 2 {
+		t.Fatal("subpath dashboard did not render CSRF")
+	}
+
+	sitePage := httptest.NewRequest(http.MethodGet, "/visitortrace/admin/sites/"+site.ID, nil)
+	sitePage.Host = "stats.example.com"
+	sitePage.TLS = &tls.ConnectionState{}
+	sitePage.AddCookie(cookies[0])
+	siteResponse := httptest.NewRecorder()
+	handler.ServeHTTP(siteResponse, sitePage)
+	siteBody := siteResponse.Body.String()
+	if siteResponse.Code != http.StatusOK || !strings.Contains(siteBody, "https://stats.example.com/visitortrace/embed/widget.js") || !strings.Contains(siteBody, `data-copy-target="combined-snippet"`) {
+		t.Fatalf("subpath Site page = status %d, body = %q", siteResponse.Code, siteBody)
+	}
+
+	tracker := httptest.NewRecorder()
+	handler.ServeHTTP(tracker, httptest.NewRequest(http.MethodGet, "/visitortrace/embed/tracker.js?site_id="+site.ID, nil))
+	trackerBody := tracker.Body.String()
+	if tracker.Code != http.StatusOK || !strings.Contains(trackerBody, `new URL("../", scriptURL)`) || strings.Contains(trackerBody, `new URL("/api/v1`) {
+		t.Fatalf("subpath tracker = status %d, body = %q", tracker.Code, trackerBody)
+	}
+
+	baseForm := url.Values{"csrf": {csrfMatch[1]}, "base_url": {"https://stats.example.com/visitortrace"}}
+	baseRequest := httptest.NewRequest(http.MethodPost, "/visitortrace/admin/settings/base-url", strings.NewReader(baseForm.Encode()))
+	baseRequest.Host = "stats.example.com"
+	baseRequest.TLS = &tls.ConnectionState{}
+	baseRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	baseRequest.AddCookie(cookies[0])
+	baseResponse := httptest.NewRecorder()
+	handler.ServeHTTP(baseResponse, baseRequest)
+	if baseResponse.Code != http.StatusOK || !strings.Contains(baseResponse.Body.String(), "https://stats.example.com/visitortrace/admin/settings") {
+		t.Fatalf("base URL update = status %d, body = %q", baseResponse.Code, baseResponse.Body.String())
+	}
+	loaded, err := config.Load(configPath)
+	if err != nil || loaded.BaseURL != "https://stats.example.com/visitortrace" {
+		t.Fatalf("saved BaseURL = %q, error = %v", loaded.BaseURL, err)
 	}
 }
 
