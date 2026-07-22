@@ -126,6 +126,12 @@ var migrations = []migration{
 			`UPDATE administrator_sessions SET password_verified_at = created_at WHERE password_verified_at = ''`,
 		},
 	},
+	{
+		version: 7,
+		statements: []string{
+			`ALTER TABLE sites ADD COLUMN public_language TEXT NOT NULL DEFAULT 'auto' CHECK (public_language IN ('auto', 'zh-CN', 'en'))`,
+		},
+	},
 }
 
 func (s *Store) initializeBaseSchema(ctx context.Context, passwordHash string) error {

@@ -21,7 +21,7 @@ a { color: inherit; }
 button, input, textarea, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 .muted, small { color: var(--muted); }
-.eyebrow { margin: 0 0 8px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .1em; }
+.eyebrow { margin: 0 0 8px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: 0; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: 8px; font-size: 42px; line-height: 1.04; letter-spacing: 0; }
 h2 { margin-bottom: 0; font-size: 20px; line-height: 1.2; }
@@ -31,7 +31,7 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .admin-shell { display: grid; grid-template-columns: 224px minmax(0, 1fr); min-height: 100vh; }
 .sidebar { display: flex; position: sticky; top: 0; height: 100vh; flex-direction: column; padding: 28px 18px 20px; border-right: 1px solid var(--line); background: #eef2ef; }
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; }
-.brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--green); color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+.brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--green); color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: 0; }
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 14px; }
 .brand small { margin-top: 2px; color: var(--green); font-size: 11px; }
@@ -39,6 +39,7 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .side-nav a { padding: 12px 13px; border-left: 3px solid transparent; color: #526063; font-size: 14px; text-decoration: none; }
 .side-nav a:hover, .side-nav a[aria-current="page"] { border-left-color: var(--coral); background: rgba(255,255,255,.7); color: var(--ink); }
 .logout-form { margin-top: auto; }
+.admin-language-nav { justify-content: center; margin: 18px 0 10px; }
 .workspace { width: min(1280px, 100%); padding: 42px clamp(22px, 5vw, 70px) 80px; }
 .page-header, .analytics-heading, .public-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .page-header { margin-bottom: 34px; }
@@ -79,7 +80,7 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .site-card h2 a:hover { color: var(--green); }
 .site-card code, code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 11px; }
 .status-line { display: flex; flex-wrap: wrap; gap: 6px; }
-.status { padding: 4px 7px; border-radius: 3px; font-size: 10px; font-weight: 800; letter-spacing: .02em; }
+.status { padding: 4px 7px; border-radius: 3px; font-size: 10px; font-weight: 800; letter-spacing: 0; }
 .status.live, .status.public { background: #e2f0e9; color: var(--green-dark); }
 .status.paused, .status.private { background: #f8e9df; color: #95543c; }
 .compact-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin: 30px 0 20px; }
@@ -143,7 +144,7 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .endpoint { color: var(--muted); }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); background: white; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
-th { padding: 12px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .04em; white-space: nowrap; }
+th { padding: 12px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: 0; white-space: nowrap; }
 td { padding: 13px 14px; border-bottom: 1px solid #edf1ef; white-space: nowrap; }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: #f6f9f7; }
@@ -175,6 +176,7 @@ tbody tr:hover { background: #f6f9f7; }
 
 .login-shell { display: grid; min-height: 100vh; place-items: center; padding: 24px; background: #e9efeb; }
 .login-panel { width: min(100%, 410px); padding: 38px; border: 1px solid var(--line); background: white; box-shadow: var(--shadow); }
+.login-language { position: fixed; top: 20px; right: 20px; }
 .login-brand { margin-bottom: 58px; }
 .login-heading { margin-bottom: 28px; }
 .login-heading h1 { font-size: 32px; }
@@ -184,7 +186,11 @@ tbody tr:hover { background: #f6f9f7; }
 .public-shell { min-height: 100vh; background: #f7f8f6; }
 .public-header, .public-main, .public-footer { width: min(1180px, calc(100% - 44px)); margin: 0 auto; }
 .public-header { align-items: center; padding: 28px 0; border-bottom: 1px solid var(--line); }
+.public-header-meta { display: flex; align-items: center; gap: 18px; }
 .public-site-id { color: var(--muted); font-family: monospace; font-size: 11px; }
+.language-nav { display: flex; align-items: center; gap: 2px; }
+.language-nav a { padding: 5px 7px; border-bottom: 2px solid transparent; color: var(--muted); font-size: 10px; text-decoration: none; }
+.language-nav a:hover, .language-nav a[aria-current="page"] { border-color: var(--coral); color: var(--ink); }
 .public-main { padding: 48px 0 80px; }
 .analytics-heading { align-items: end; margin-bottom: 28px; }
 .analytics-heading h1 { font-size: 54px; }
@@ -196,6 +202,16 @@ tbody tr:hover { background: #f6f9f7; }
 .analytics-map, .trend-panel, .data-panel { min-width: 0; padding: 20px; border: 1px solid var(--line); background: white; }
 .analytics-map img { display: block; width: 100%; height: auto; background: #e7edeb; }
 .analytics-map .attribution { display: block; margin-top: 9px; }
+.interactive-chart { display: none; width: 100%; }
+.analytics-enhancing .interactive-chart, .analytics-enhanced .interactive-chart { display: block; }
+.analytics-enhanced .chart-fallback { display: none; }
+.geo-chart { height: 400px; background: #f7f9f8; }
+.trend-chart-interactive { height: 330px; }
+.admin-range-nav { justify-content: flex-end; margin: -18px 0 28px; }
+.admin-chart-visible { display: block; }
+.admin-chart-grid { display: grid; grid-template-columns: 1.4fr repeat(2, minmax(0, .8fr)); gap: 18px; margin-top: 20px; }
+.dimension-chart { height: 260px; }
+.admin-geo-tables { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .trend-chart { display: flex; height: 270px; align-items: end; gap: 3px; padding: 18px 3px 0; border-bottom: 1px solid var(--line); }
 .trend-bar { display: block; flex: 1; min-width: 2px; background: var(--coral); opacity: .78; }
 .trend-bar:hover { opacity: 1; }
@@ -214,10 +230,11 @@ tbody tr:hover { background: #f6f9f7; }
   .admin-shell { display: block; }
   .sidebar { position: static; height: auto; flex-direction: row; align-items: center; gap: 20px; padding: 14px 18px; }
   .side-nav { display: flex; margin: 0 auto 0 12px; }
+  .admin-language-nav { margin: 0; }
   .logout-form { margin: 0; }
   .side-nav a { padding: 9px 8px; border-left: 0; border-bottom: 2px solid transparent; }
   .side-nav a:hover, .side-nav a[aria-current="page"] { border-left: 0; border-bottom-color: var(--coral); }
-  .preset-layout, .analytics-grid { grid-template-columns: 1fr; }
+  .preset-layout, .analytics-grid, .admin-chart-grid { grid-template-columns: 1fr; }
 	.operations-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.operations-grid > div:nth-child(3n) { border-right: 1px solid var(--line); }
 	.operations-grid > div:nth-child(2n) { border-right: 0; }
@@ -229,11 +246,13 @@ tbody tr:hover { background: #f6f9f7; }
 }
 @media (max-width: 620px) {
   .workspace { padding: 28px 16px 58px; }
-  .sidebar { gap: 12px; }
+  .sidebar { display: grid; grid-template-columns: auto 1fr auto; gap: 10px 12px; }
+  .sidebar > .brand { grid-column: 1; grid-row: 1; }
   .sidebar .brand small { display: none; }
-  .side-nav { gap: 0; margin-left: 0; }
-  .side-nav a { font-size: 11px; }
-  .logout-form { width: 70px; }
+  .side-nav { grid-column: 1 / -1; grid-row: 2; gap: 0; width: 100%; margin-left: 0; overflow-x: auto; }
+  .side-nav a { flex: 1 0 auto; min-width: max-content; font-size: 11px; text-align: center; }
+  .admin-language-nav { grid-column: 2; grid-row: 1; justify-self: end; }
+  .logout-form { grid-column: 3; grid-row: 1; width: 70px; }
   .logout-form .button { padding: 0 8px; font-size: 11px; }
   .page-header, .analytics-heading, .public-header { align-items: flex-start; flex-direction: column; }
 	.operations-head { align-items: flex-start; flex-direction: column; }
@@ -246,7 +265,7 @@ tbody tr:hover { background: #f6f9f7; }
 	.update-form { align-items: stretch; flex-direction: column; }
   .page-header .button, .header-actions { width: 100%; }
   .header-actions .button { flex: 1; }
-  .site-grid, .field-grid.two, .field-grid.four, .snippet-grid, .dimension-grid, .danger-grid, .records-filter, .aggregate-export { grid-template-columns: 1fr; }
+  .site-grid, .field-grid.two, .field-grid.four, .snippet-grid, .dimension-grid, .danger-grid, .records-filter, .aggregate-export, .admin-chart-grid { grid-template-columns: 1fr; }
   .site-card { grid-template-columns: 1fr; }
   .site-map { min-height: 160px; }
   .metric-strip { grid-template-columns: repeat(2, 1fr); }

@@ -3,6 +3,7 @@
 /dist/
 /releases/
 /.release-secrets/
+/node_modules/
 coverage.out
 
 # Runtime data and secrets

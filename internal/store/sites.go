@@ -20,6 +20,7 @@ type Site struct {
 	AllowedOrigins  []string
 	AcceptPageviews bool
 	PublishPublic   bool
+	PublicLanguage  string
 	DedupWindowDays int
 	RetentionDays   int
 	FirstPageviewAt *time.Time
@@ -100,6 +101,7 @@ func (s *Store) CreateSite(ctx context.Context, params CreateSiteParams) (Site, 
 		AllowedOrigins:  origins,
 		AcceptPageviews: true,
 		PublishPublic:   true,
+		PublicLanguage:  "auto",
 		DedupWindowDays: dedupWindow,
 		RetentionDays:   retention,
 		HMACKey:         key,
@@ -118,9 +120,9 @@ func (s *Store) GetSite(ctx context.Context, id string) (Site, error) {
 	var key []byte
 	err := s.DB.QueryRowContext(ctx, `
 		SELECT id, name, timezone, allowed_origins, accept_pageviews, publish_public,
-		       dedup_window_days, retention_days, first_pageview_at, hmac_key, map_preset, created_at, updated_at
+		       dedup_window_days, retention_days, first_pageview_at, hmac_key, map_preset, public_language, created_at, updated_at
 		FROM sites WHERE id = ?
-	`, id).Scan(&result.ID, &result.Name, &result.Timezone, &originsJSON, &accept, &publish, &dedup, &retention, &firstPageview, &key, &result.MapPresetJSON, &created, &updated)
+	`, id).Scan(&result.ID, &result.Name, &result.Timezone, &originsJSON, &accept, &publish, &dedup, &retention, &firstPageview, &key, &result.MapPresetJSON, &result.PublicLanguage, &created, &updated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return Site{}, fmt.Errorf("Site %q not found", id)
@@ -159,6 +161,7 @@ type UpdateSiteParams struct {
 	AllowedOrigins  []string
 	AcceptPageviews bool
 	PublishPublic   bool
+	PublicLanguage  string
 	DedupWindowDays int
 	RetentionDays   int
 }
@@ -183,6 +186,12 @@ func (s *Store) UpdateSite(ctx context.Context, id string, params UpdateSitePara
 	}
 	if params.RetentionDays < 1 || params.RetentionDays > 90 {
 		return Site{}, fmt.Errorf("retention period must be between 1 and 90 days")
+	}
+	if params.PublicLanguage == "" {
+		params.PublicLanguage = "auto"
+	}
+	if params.PublicLanguage != "auto" && params.PublicLanguage != "zh-CN" && params.PublicLanguage != "en" {
+		return Site{}, fmt.Errorf("public language must be auto, zh-CN, or en")
 	}
 	originJSON, err := json.Marshal(origins)
 	if err != nil {
@@ -213,9 +222,9 @@ func (s *Store) UpdateSite(ctx context.Context, id string, params UpdateSitePara
 	_, err = tx.ExecContext(ctx, `
 		UPDATE sites
 		SET name = ?, timezone = ?, allowed_origins = ?, accept_pageviews = ?, publish_public = ?,
-		    dedup_window_days = ?, retention_days = ?, updated_at = ?
+		    dedup_window_days = ?, retention_days = ?, public_language = ?, updated_at = ?
 		WHERE id = ?
-	`, name, params.Timezone, string(originJSON), boolInt(params.AcceptPageviews), boolInt(params.PublishPublic), params.DedupWindowDays, params.RetentionDays, now, id)
+	`, name, params.Timezone, string(originJSON), boolInt(params.AcceptPageviews), boolInt(params.PublishPublic), params.DedupWindowDays, params.RetentionDays, params.PublicLanguage, now, id)
 	if err != nil {
 		return Site{}, fmt.Errorf("update Site: %w", err)
 	}

@@ -1,0 +1,35 @@
+{{define "content"}}
+<header class="page-header analytics-heading">
+  <div><p class="eyebrow">SITE ANALYTICS · {{.Site.ID}}</p><h1>{{.Site.Name}}</h1><p class="subhead">{{.Analytics.StartDate}} {{t "date_to"}} {{.Analytics.EndDate}}</p></div>
+  <div class="header-actions"><a class="button ghost" href="/admin/sites/{{.Site.ID}}">{{t "back_to_site"}}</a>{{if .Site.PublishPublic}}<a class="button ghost" href="/public/{{.Site.ID}}/analytics" target="_blank" rel="noopener">{{t "public_analytics"}}</a>{{end}}</div>
+</header>
+<nav class="range-nav admin-range-nav" aria-label="{{t "analytics_range"}}"><a href="?range=today" {{if selected .Range "today"}}aria-current="page"{{end}}>{{t "today"}}</a><a href="?range=7d" {{if selected .Range "7d"}}aria-current="page"{{end}}>7 {{t "days"}}</a><a href="?range=30d" {{if selected .Range "30d"}}aria-current="page"{{end}}>30 {{t "days"}}</a><a href="?range=90d" {{if selected .Range "90d"}}aria-current="page"{{end}}>90 {{t "days"}}</a><a href="?range=all" {{if selected .Range "all"}}aria-current="page"{{end}}>{{t "all"}}</a></nav>
+
+<section class="metric-strip public-metrics" aria-label="{{t "analytics_summary"}}">
+  <div><span>Pageviews</span><strong>{{formatCount .Analytics.Pageviews}}</strong></div>
+  <div><span>Unique Visitors</span><strong>{{formatCount .Analytics.UniqueVisitors}}</strong></div>
+  <div><span>{{t "cities"}}</span><strong>{{len .Analytics.Cities}}</strong></div>
+  <div><span>{{t "path"}}</span><strong>{{len .Analytics.Paths}}</strong></div>
+</section>
+
+<section class="analytics-grid">
+  <div class="analytics-map"><div class="section-heading"><div><p class="eyebrow">GEOGRAPHY</p><h2>{{t "geographic_distribution"}}</h2></div></div><div id="geo-chart" class="interactive-chart geo-chart admin-chart-visible" role="img" aria-label="{{t "geographic_distribution"}}"></div><noscript><p class="muted">{{t "no_data"}}</p></noscript></div>
+  <div class="trend-panel"><div class="section-heading"><div><p class="eyebrow">TREND</p><h2>{{t "visit_trend"}}</h2></div></div><div id="trend-chart-interactive" class="interactive-chart trend-chart-interactive admin-chart-visible" role="img" aria-label="{{t "daily_visit_trend"}}"></div><div class="chart-fallback"><div class="trend-chart" id="trend-chart">{{range .Analytics.Daily}}<span class="trend-bar" data-value="{{.Pageviews}}" title="{{.Date}} · {{.Pageviews}} PV / {{.UniqueVisitors}} UV"></span>{{else}}<p class="muted">{{t "no_data"}}</p>{{end}}</div></div></div>
+</section>
+
+<section class="admin-chart-grid">
+  <div class="data-panel"><div class="section-heading"><h2>{{t "path_performance"}}</h2></div><div id="path-chart" class="interactive-chart dimension-chart" role="img" aria-label="{{t "path_performance"}}"></div><div class="table-wrap"><table><thead><tr><th>{{t "path"}}</th><th>PV</th><th>UV</th></tr></thead><tbody>{{range .Analytics.Paths}}<tr><td><code>{{.Value}}</code></td><td>{{formatCount .Pageviews}}</td><td>{{formatCount .UniqueVisitors}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">{{t "no_data"}}</td></tr>{{end}}</tbody></table></div></div>
+  <div class="data-panel"><div class="section-heading"><h2>{{t "browsers"}}</h2></div><div id="browser-chart" class="interactive-chart dimension-chart" role="img" aria-label="{{t "browsers"}}"></div><table><thead><tr><th>{{t "type"}}</th><th>PV</th><th>{{t "share"}}</th></tr></thead><tbody>{{range .Analytics.Browsers}}<tr><td>{{.Value}}</td><td>{{formatCount .Pageviews}}</td><td>{{metricPercent .Pageviews $.Analytics.Pageviews}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">{{t "no_data"}}</td></tr>{{end}}</tbody></table></div>
+  <div class="data-panel"><div class="section-heading"><h2>{{t "operating_systems"}}</h2></div><div id="os-chart" class="interactive-chart dimension-chart" role="img" aria-label="{{t "operating_systems"}}"></div><table><thead><tr><th>{{t "type"}}</th><th>PV</th><th>{{t "share"}}</th></tr></thead><tbody>{{range .Analytics.OperatingSystems}}<tr><td>{{.Value}}</td><td>{{formatCount .Pageviews}}</td><td>{{metricPercent .Pageviews $.Analytics.Pageviews}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">{{t "no_data"}}</td></tr>{{end}}</tbody></table></div>
+</section>
+
+<section class="dimension-grid admin-geo-tables">
+  <div class="data-panel"><div class="section-heading"><h2>{{t "countries_regions"}}</h2></div><table><thead><tr><th>{{t "code"}}</th><th>PV</th><th>UV</th></tr></thead><tbody>{{range .Analytics.Countries}}<tr><td>{{.Value}}</td><td>{{formatCount .Pageviews}}</td><td>{{formatCount .UniqueVisitors}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">{{t "no_data"}}</td></tr>{{end}}</tbody></table></div>
+  <div class="data-panel"><div class="section-heading"><h2>{{t "cities"}}</h2></div><table><thead><tr><th>{{t "city"}}</th><th>PV</th><th>UV</th></tr></thead><tbody>{{range .Analytics.Cities}}<tr><td>{{geoLabel .Value}}</td><td>{{formatCount .Pageviews}}</td><td>{{formatCount .UniqueVisitors}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">{{t "no_data"}}</td></tr>{{end}}</tbody></table></div>
+</section>
+
+<section class="custom-range"><form method="get"><input type="hidden" name="range" value="custom"><label class="field"><span>{{t "start_date"}}</span><input type="date" name="start" value="{{.Analytics.StartDate}}" required></label><label class="field"><span>{{t "end_date"}}</span><input type="date" name="end" value="{{.Analytics.EndDate}}" required></label><button class="button ghost" type="submit">{{t "query"}}</button></form></section>
+<script type="application/json" id="analytics-data">{{.ChartJSON}}</script>
+<script defer src="/assets/analytics.js"></script>
+<script>(function(){var bars=document.querySelectorAll(".trend-bar"),max=0;bars.forEach(function(bar){max=Math.max(max,Number(bar.dataset.value)||0)});bars.forEach(function(bar){bar.style.height=(max?Math.max(3,Number(bar.dataset.value)/max*100):3)+"%"})}());</script>
+{{end}}

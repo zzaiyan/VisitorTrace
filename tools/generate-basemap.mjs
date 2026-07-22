@@ -1,8 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises";
 
-const [inputPath, outputPath] = process.argv.slice(2);
+const [inputPath, outputPath, geoJSONOutputPath] = process.argv.slice(2);
 if (!inputPath || !outputPath) {
-  throw new Error("usage: node tools/generate-basemap.mjs <countries.geojson> <world.path>");
+  throw new Error("usage: node tools/generate-basemap.mjs <countries.geojson> <world.path> [world.geo.json]");
 }
 
 const source = JSON.parse(await readFile(inputPath, "utf8"));
@@ -36,11 +36,58 @@ for (const feature of source.features || []) {
 
 await writeFile(outputPath, paths.join(""), "utf8");
 
+if (geoJSONOutputPath) {
+  const features = (source.features || [])
+    .filter((feature) => feature.geometry && !isAntarctica(feature.properties || {}))
+    .map(toInteractiveFeature)
+    .filter(Boolean);
+  await writeFile(geoJSONOutputPath, JSON.stringify({ type: "FeatureCollection", features }), "utf8");
+}
+
 function project([longitude, latitude]) {
   const visibleLatitude = Math.max(minLatitude, Math.min(maxLatitude, latitude));
   return [
     ((longitude + 180) / 360) * mapWidth,
     ((maxLatitude - visibleLatitude) / (maxLatitude - minLatitude)) * mapHeight,
+  ];
+}
+
+function toInteractiveFeature(feature) {
+  const polygons = feature.geometry.type === "Polygon"
+    ? [feature.geometry.coordinates]
+    : feature.geometry.type === "MultiPolygon"
+      ? feature.geometry.coordinates
+      : [];
+  const coordinates = polygons
+    .map((polygon) => polygon
+      .map((ring) => closeRing(simplifyClosed(ring.map(shiftCoordinate), 0.15)))
+      .filter((ring) => ring.length >= 3))
+    .filter((polygon) => polygon.length > 0);
+  if (coordinates.length === 0) return null;
+  const properties = feature.properties || {};
+  return {
+    type: "Feature",
+    properties: {
+      name: properties.NAME || properties.ADMIN || properties.ISO_A3 || "Unknown",
+      iso_a2: properties.ISO_A2 || "",
+      iso_a3: properties.ISO_A3 || properties.ADM0_A3 || "",
+    },
+    geometry: {
+      type: coordinates.length === 1 ? "Polygon" : "MultiPolygon",
+      coordinates: coordinates.length === 1 ? coordinates[0] : coordinates,
+    },
+  };
+}
+
+function closeRing(points) {
+  if (points.length < 3) return points;
+  return points.concat([points[0]]);
+}
+
+function shiftCoordinate([longitude, latitude]) {
+  return [
+    longitude < -170 ? longitude + 360 : longitude,
+    Math.max(minLatitude, Math.min(maxLatitude, latitude)),
   ];
 }
 

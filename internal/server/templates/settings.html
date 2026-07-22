@@ -1,28 +1,28 @@
 {{define "content"}}
 <header class="page-header">
-  <div><p class="eyebrow">ADMINISTRATOR</p><h1>管理员设置</h1><p class="subhead">凭据与安全会话</p></div>
+  <div><p class="eyebrow">ADMINISTRATOR</p><h1>{{t "settings"}}</h1><p class="subhead">{{t "credentials_sessions"}}</p></div>
 </header>
 <section class="form-panel narrow">
-  <div class="section-heading"><div><p class="eyebrow">PASSWORD</p><h2>修改密码</h2></div></div>
+  <div class="section-heading"><div><p class="eyebrow">PASSWORD</p><h2>{{t "change_password"}}</h2></div></div>
   <form method="post" action="/admin/settings/password" class="stack-form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
-    <label class="field"><span>当前密码</span><input type="password" name="current_password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
-    <label class="field"><span>新密码</span><input type="password" name="new_password" autocomplete="new-password" minlength="8" maxlength="128" required><small>8 至 128 个字符</small></label>
-    <label class="field"><span>确认新密码</span><input type="password" name="confirm_password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
-    <div class="form-actions"><button class="button primary" type="submit">更新密码</button></div>
+    <label class="field"><span>{{t "current_password"}}</span><input type="password" name="current_password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
+    <label class="field"><span>{{t "new_password"}}</span><input type="password" name="new_password" autocomplete="new-password" minlength="8" maxlength="128" required><small>{{t "password_hint"}}</small></label>
+    <label class="field"><span>{{t "confirm_new_password"}}</span><input type="password" name="confirm_password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
+    <div class="form-actions"><button class="button primary" type="submit">{{t "update_password"}}</button></div>
   </form>
 </section>
 <section class="section-block">
-  <div class="section-heading"><div><p class="eyebrow">SELF UPDATE</p><h2>版本更新</h2></div><span class="muted">当前 {{.CurrentVersion}}</span></div>
+  <div class="section-heading"><div><p class="eyebrow">SELF UPDATE</p><h2>{{t "version_update"}}</h2></div><span class="muted">{{t "current"}} {{.CurrentVersion}}</span></div>
   <div class="update-status">
-    <div><span>稳定执行路径</span><code>{{.StableExecutable}}</code></div>
-    <div><span>签名验证</span><strong>{{if .UpdateKeyReady}}已配置{{else}}未配置{{end}}</strong></div>
-    <div><span>启动方式</span><strong>{{if .RunningFromStablePath}}稳定路径{{else}}需要调整{{end}}</strong></div>
+    <div><span>{{t "stable_path"}}</span><code>{{.StableExecutable}}</code></div>
+    <div><span>{{t "signature_verification"}}</span><strong>{{if .UpdateKeyReady}}{{t "configured"}}{{else}}{{t "not_configured"}}{{end}}</strong></div>
+    <div><span>{{t "launch_mode"}}</span><strong>{{if .RunningFromStablePath}}{{t "stable_launch"}}{{else}}{{t "needs_adjustment"}}{{end}}</strong></div>
   </div>
   <form method="post" action="/admin/settings/update" class="update-form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
-    <label class="field"><span>管理员密码</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
-    <button class="button primary" type="submit" {{if or (not .UpdateKeyReady) (not .RunningFromStablePath)}}disabled{{end}}>检查并更新</button>
+    <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
+    <button class="button primary" type="submit" {{if or (not .UpdateKeyReady) (not .RunningFromStablePath)}}disabled{{end}}>{{t "check_and_update"}}</button>
   </form>
 </section>
 {{end}}

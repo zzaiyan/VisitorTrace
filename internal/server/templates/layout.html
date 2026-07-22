@@ -1,6 +1,6 @@
 {{define "layout"}}
 <!doctype html>
-<html lang="zh-CN">
+<html lang="{{language}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -12,15 +12,16 @@
   {{if .Admin}}
   <aside class="sidebar">
     <a class="brand" href="/admin"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>
-    <nav class="side-nav" aria-label="后台导航">
-      <a href="/admin" {{if eq .Active "dashboard"}}aria-current="page"{{end}}>管理总览</a>
-      <a href="/admin/sites/new" {{if eq .Active "sites"}}aria-current="page"{{end}}>站点管理</a>
-      <a href="/admin/records" {{if eq .Active "records"}}aria-current="page"{{end}}>访问明细</a>
-      <a href="/admin/settings" {{if eq .Active "settings"}}aria-current="page"{{end}}>管理员设置</a>
+    <nav class="side-nav" aria-label="{{t "admin_navigation"}}">
+      <a href="/admin" {{if eq .Active "dashboard"}}aria-current="page"{{end}}>{{t "dashboard"}}</a>
+      <a href="/admin/sites/new" {{if eq .Active "sites"}}aria-current="page"{{end}}>{{t "sites"}}</a>
+      <a href="/admin/records" {{if eq .Active "records"}}aria-current="page"{{end}}>{{t "records"}}</a>
+      <a href="/admin/settings" {{if eq .Active "settings"}}aria-current="page"{{end}}>{{t "settings"}}</a>
     </nav>
+    <nav class="language-nav admin-language-nav" aria-label="Language"><a href="{{languageURL "zh-CN"}}" {{if languageIs "zh-CN"}}aria-current="page"{{end}}>中文</a><a href="{{languageURL "en"}}" {{if languageIs "en"}}aria-current="page"{{end}}>EN</a></nav>
     <form class="logout-form" method="post" action="/admin/logout">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <button class="button ghost full" type="submit">退出登录</button>
+      <button class="button ghost full" type="submit">{{t "logout"}}</button>
     </form>
   </aside>
   <main class="workspace">

@@ -1,104 +1,105 @@
 {{define "content"}}
 <header class="page-header site-heading">
-  <div><p class="eyebrow">SITE · {{.Site.ID}}</p><h1>{{.Site.Name}}</h1><p class="subhead">{{.Site.Timezone}} · {{len .Site.AllowedOrigins}} 个 Allowed Origin</p></div>
-  <div class="header-actions">{{if .Site.PublishPublic}}<a class="button ghost" href="/public/{{.Site.ID}}/analytics" target="_blank" rel="noopener">公开分析</a>{{end}}<a class="button ghost" href="#integration">接入代码</a></div>
+  <div><p class="eyebrow">SITE · {{.Site.ID}}</p><h1>{{.Site.Name}}</h1><p class="subhead">{{.Site.Timezone}} · {{len .Site.AllowedOrigins}} {{t "allowed_origins_count"}}</p></div>
+  <div class="header-actions"><a class="button ghost" href="/admin/sites/{{.Site.ID}}/analytics">{{t "aggregate_analytics"}}</a>{{if .Site.PublishPublic}}<a class="button ghost" href="/public/{{.Site.ID}}/analytics" target="_blank" rel="noopener">{{t "public_analytics"}}</a>{{end}}<a class="button ghost" href="#integration">{{t "integration_code"}}</a></div>
 </header>
 {{if .Saved}}<div class="notice success" role="status">{{.Saved}}</div>{{end}}
 {{if .Error}}<div class="notice danger" role="alert">{{.Error}}</div>{{end}}
-<section class="metric-strip" aria-label="累计统计">
+<section class="metric-strip" aria-label="{{t "cumulative_stats"}}">
   <div><span>Pageviews</span><strong>{{formatCount .Overview.Pageviews}}</strong></div>
   <div><span>Unique Visitors</span><strong>{{formatCount .Overview.UniqueVisitors}}</strong></div>
   <div><span>Pageview Records</span><strong>{{formatCount .Overview.PageviewRecords}}</strong></div>
-  <div><span>Retention</span><strong>{{.Site.RetentionDays}} 天</strong></div>
+  <div><span>{{t "retention"}}</span><strong>{{.Site.RetentionDays}} {{t "day"}}</strong></div>
 </section>
 
 <section class="section-block" id="preset">
-  <div class="section-heading"><div><p class="eyebrow">MAP PRESET</p><h2>地图预设</h2></div><span class="muted">URL 参数可覆写</span></div>
+  <div class="section-heading"><div><p class="eyebrow">MAP PRESET</p><h2>{{t "map_preset"}}</h2></div><span class="muted">{{t "url_overrides"}}</span></div>
   <div class="preset-layout">
     <div class="preview-stage">
-      <img id="preset-preview" src="{{.MapPreviewURL}}" data-preview-base="{{.MapPreviewURL}}" alt="地图预设实时预览">
+      <img id="preset-preview" src="{{.MapPreviewURL}}" data-preview-base="{{.MapPreviewURL}}" alt="{{t "preset_preview"}}">
       <a class="attribution" href="https://db-ip.com" target="_blank" rel="noopener">IP geolocation by DB-IP</a>
     </div>
     <form id="preset-form" method="post" action="/admin/sites/{{.Site.ID}}/preset" class="preset-form" data-map-aspect="{{.MapAspect}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div class="field-grid two">
-        <div class="field"><label for="preset-width">宽度</label><div class="input-unit"><input id="preset-width" type="number" name="w" min="160" max="1200" value="{{.Preset.Width}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="width" title="按当前选项自动计算宽度" aria-label="自动计算宽度">↔</button></div></div>
-        <div class="field"><label for="preset-height">高度</label><div class="input-unit"><input id="preset-height" type="number" name="h" min="90" max="800" value="{{.Preset.Height}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="height" title="按当前选项自动计算高度" aria-label="自动计算高度">↕</button></div></div>
+        <div class="field"><label for="preset-width">{{t "width"}}</label><div class="input-unit"><input id="preset-width" type="number" name="w" min="160" max="1200" value="{{.Preset.Width}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="width" title="{{t "auto_width"}}" aria-label="{{t "auto_width"}}">↔</button></div></div>
+        <div class="field"><label for="preset-height">{{t "height"}}</label><div class="input-unit"><input id="preset-height" type="number" name="h" min="90" max="800" value="{{.Preset.Height}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="height" title="{{t "auto_height"}}" aria-label="{{t "auto_height"}}">↕</button></div></div>
       </div>
-      <label class="field"><span>标题</span><input type="text" name="title" maxlength="40" value="{{.Preset.Title}}"></label>
+      <label class="field"><span>{{t "title"}}</span><input type="text" name="title" maxlength="40" value="{{.Preset.Title}}"></label>
       <div class="field-grid two">
-        <label class="field"><span>PV 标签</span><input type="text" name="pv_label" maxlength="40" value="{{.Preset.PVLabel}}" placeholder="Total Pageviews"></label>
-        <label class="field"><span>UV 标签</span><input type="text" name="uv_label" maxlength="40" value="{{.Preset.UVLabel}}" placeholder="Unique Visitors"></label>
+        <label class="field"><span>{{t "pv_label"}}</span><input type="text" name="pv_label" maxlength="40" value="{{.Preset.PVLabel}}" placeholder="Total Pageviews"></label>
+        <label class="field"><span>{{t "uv_label"}}</span><input type="text" name="uv_label" maxlength="40" value="{{.Preset.UVLabel}}" placeholder="Unique Visitors"></label>
       </div>
       <div class="field-grid two">
-        <label class="field"><span>字体大小</span><div class="input-unit"><input type="number" name="fs" min="8" max="32" value="{{.Preset.FontSize}}" required><span>px</span></div></label>
-        <label class="field"><span>标记指标</span><select name="metric"><option value="pv" {{if selected .Preset.Metric "pv"}}selected{{end}}>Pageviews</option><option value="uv" {{if selected .Preset.Metric "uv"}}selected{{end}}>Unique Visitors</option></select></label>
+        <label class="field"><span>{{t "font_size"}}</span><div class="input-unit"><input type="number" name="fs" min="8" max="32" value="{{.Preset.FontSize}}" required><span>px</span></div></label>
+        <label class="field"><span>{{t "marker_metric"}}</span><select name="metric"><option value="pv" {{if selected .Preset.Metric "pv"}}selected{{end}}>Pageviews</option><option value="uv" {{if selected .Preset.Metric "uv"}}selected{{end}}>Unique Visitors</option></select></label>
       </div>
-      <fieldset class="check-group"><legend>显示内容</legend><label><input type="checkbox" name="show_title" {{if mapShow .Preset "title"}}checked{{end}}>标题</label><label><input type="checkbox" name="show_pv" {{if mapShow .Preset "pv"}}checked{{end}}>PV</label><label><input type="checkbox" name="show_uv" {{if mapShow .Preset "uv"}}checked{{end}}>UV</label><label><input type="checkbox" name="bg_transparent" {{if eq .Preset.BG "transparent"}}checked{{end}}>透明背景</label></fieldset>
+      <fieldset class="check-group"><legend>{{t "display_content"}}</legend><label><input type="checkbox" name="show_title" {{if mapShow .Preset "title"}}checked{{end}}>{{t "title"}}</label><label><input type="checkbox" name="show_pv" {{if mapShow .Preset "pv"}}checked{{end}}>PV</label><label><input type="checkbox" name="show_uv" {{if mapShow .Preset "uv"}}checked{{end}}>UV</label><label><input type="checkbox" name="bg_transparent" {{if eq .Preset.BG "transparent"}}checked{{end}}>{{t "transparent_background"}}</label></fieldset>
       <div class="color-grid">
-        <label class="color-field"><span>背景色</span><input type="color" name="bg_color" value="#{{if eq .Preset.BG "transparent"}}f2f3f3{{else}}{{.Preset.BG}}{{end}}"></label>
-        <label class="color-field"><span>陆地</span><input type="color" name="land" value="#{{.Preset.Land}}"></label>
-        <label class="color-field"><span>边界</span><input type="color" name="border" value="#{{.Preset.Border}}"></label>
-        <label class="color-field"><span>文字</span><input type="color" name="text" value="#{{.Preset.Text}}"></label>
-        <label class="color-field"><span>标记</span><input type="color" name="marker" value="#{{.Preset.Marker}}"></label>
+        <label class="color-field"><span>{{t "background"}}</span><input type="color" name="bg_color" value="#{{if eq .Preset.BG "transparent"}}f2f3f3{{else}}{{.Preset.BG}}{{end}}"></label>
+        <label class="color-field"><span>{{t "land"}}</span><input type="color" name="land" value="#{{.Preset.Land}}"></label>
+        <label class="color-field"><span>{{t "border"}}</span><input type="color" name="border" value="#{{.Preset.Border}}"></label>
+        <label class="color-field"><span>{{t "text"}}</span><input type="color" name="text" value="#{{.Preset.Text}}"></label>
+        <label class="color-field"><span>{{t "marker"}}</span><input type="color" name="marker" value="#{{.Preset.Marker}}"></label>
       </div>
-      <div class="form-actions"><button class="button primary" type="submit">保存预设</button></div>
+      <div class="form-actions"><button class="button primary" type="submit">{{t "save_preset"}}</button></div>
     </form>
   </div>
 </section>
 
 <section class="section-block" id="settings">
-  <div class="section-heading"><div><p class="eyebrow">SETTINGS</p><h2>站点设置</h2></div></div>
+  <div class="section-heading"><div><p class="eyebrow">SETTINGS</p><h2>{{t "site_settings"}}</h2></div></div>
   <form method="post" action="/admin/sites/{{.Site.ID}}/settings" class="settings-form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
     <div class="field-grid two">
-      <label class="field"><span>显示名称</span><input type="text" name="name" maxlength="100" value="{{.Site.Name}}" required></label>
-      <label class="field"><span>IANA 时区</span><input type="text" name="timezone" value="{{.Site.Timezone}}" {{if .Site.FirstPageviewAt}}readonly{{end}} required></label>
+      <label class="field"><span>{{t "display_name"}}</span><input type="text" name="name" maxlength="100" value="{{.Site.Name}}" required></label>
+      <label class="field"><span>{{t "iana_timezone"}}</span><input type="text" name="timezone" value="{{.Site.Timezone}}" {{if .Site.FirstPageviewAt}}readonly{{end}} required></label>
     </div>
     <label class="field"><span>Allowed Origins</span><textarea name="origins" rows="3" spellcheck="false" required>{{.OriginsText}}</textarea></label>
+    <label class="field"><span>{{t "public_language"}}</span><select name="public_language"><option value="auto" {{if selected .Site.PublicLanguage "auto"}}selected{{end}}>{{t "language_auto"}}</option><option value="zh-CN" {{if selected .Site.PublicLanguage "zh-CN"}}selected{{end}}>简体中文</option><option value="en" {{if selected .Site.PublicLanguage "en"}}selected{{end}}>English</option></select></label>
     <div class="field-grid four">
-      <label class="field"><span>访客合并周期</span><div class="input-unit"><input type="number" name="dedup_window_days" min="1" max="30" value="{{.Site.DedupWindowDays}}" required><span>天</span></div></label>
-      <label class="field"><span>逐条记录保留期</span><div class="input-unit"><input type="number" name="retention_days" min="1" max="90" value="{{.Site.RetentionDays}}" required><span>天</span></div></label>
-      <label class="toggle-field"><span><strong>接收 Pageview</strong><small>公开采集端点</small></span><input type="checkbox" name="accept_pageviews" {{if .Site.AcceptPageviews}}checked{{end}}></label>
-      <label class="toggle-field"><span><strong>公开数据</strong><small>地图与分析页</small></span><input type="checkbox" name="publish_public" {{if .Site.PublishPublic}}checked{{end}}></label>
+      <label class="field"><span>{{t "dedup_window"}}</span><div class="input-unit"><input type="number" name="dedup_window_days" min="1" max="30" value="{{.Site.DedupWindowDays}}" required><span>{{t "day"}}</span></div></label>
+      <label class="field"><span>{{t "record_retention"}}</span><div class="input-unit"><input type="number" name="retention_days" min="1" max="90" value="{{.Site.RetentionDays}}" required><span>{{t "day"}}</span></div></label>
+      <label class="toggle-field"><span><strong>{{t "accept_pageviews"}}</strong><small>{{t "public_ingest_endpoint"}}</small></span><input type="checkbox" name="accept_pageviews" {{if .Site.AcceptPageviews}}checked{{end}}></label>
+      <label class="toggle-field"><span><strong>{{t "publish_data"}}</strong><small>{{t "map_and_analytics"}}</small></span><input type="checkbox" name="publish_public" {{if .Site.PublishPublic}}checked{{end}}></label>
     </div>
-    <div class="form-actions"><button class="button primary" type="submit">保存设置</button></div>
+    <div class="form-actions"><button class="button primary" type="submit">{{t "save_settings"}}</button></div>
   </form>
 </section>
 
 <section class="section-block" id="integration">
-  <div class="section-heading"><div><p class="eyebrow">INTEGRATION</p><h2>接入代码</h2></div></div>
+  <div class="section-heading"><div><p class="eyebrow">INTEGRATION</p><h2>{{t "integration_code"}}</h2></div></div>
   <div class="snippet-grid">
-    <div><h3>一体式 Widget</h3><pre><code>&lt;script async src="{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre><code class="endpoint">{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}</code></div>
-    <div><h3>分离式 Tracker</h3><pre><code>&lt;script async src="{{.BaseURL}}/embed/tracker.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre><code class="endpoint">{{.BaseURL}}/api/v1/sites/{{.Site.ID}}/map.svg</code></div>
+    <div><h3>{{t "combined_widget"}}</h3><pre><code>&lt;script async src="{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre><code class="endpoint">{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}</code></div>
+    <div><h3>{{t "separate_tracker"}}</h3><pre><code>&lt;script async src="{{.BaseURL}}/embed/tracker.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre><code class="endpoint">{{.BaseURL}}/api/v1/sites/{{.Site.ID}}/map.svg</code></div>
   </div>
 </section>
 
 <section class="section-block" id="records">
-  <div class="section-heading"><div><p class="eyebrow">PAGEVIEW RECORDS</p><h2>最近记录</h2></div><a class="text-link" href="/admin/records?site_id={{.Site.ID}}">筛选、分页与导出</a></div>
+  <div class="section-heading"><div><p class="eyebrow">PAGEVIEW RECORDS</p><h2>{{t "recent_records"}}</h2></div><a class="text-link" href="/admin/records?site_id={{.Site.ID}}">{{t "filter_page_export"}}</a></div>
   <div class="table-wrap">
-    <table><thead><tr><th>时间</th><th>路径</th><th>位置</th><th>原始 IP</th><th>系统</th><th>浏览器</th><th>Visitor Digest</th></tr></thead>
-      <tbody>{{range .Recent}}<tr><td><time datetime="{{formatUTC .OccurredAt}}">{{formatTime .OccurredAt}}</time></td><td><code>{{.Path}}</code></td><td>{{if .City}}{{.City}}{{else if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}}</td><td><code>{{.OriginalIP}}</code></td><td>{{.OperatingSystem}}</td><td>{{.Browser}}</td><td><code class="digest">{{.VisitorDigest}}</code></td></tr>{{else}}<tr><td colspan="7" class="empty-cell">暂无 Pageview Record</td></tr>{{end}}</tbody>
+    <table><thead><tr><th>{{t "time"}}</th><th>{{t "path"}}</th><th>{{t "location"}}</th><th>{{t "original_ip"}}</th><th>{{t "system"}}</th><th>{{t "browsers"}}</th><th>Visitor Digest</th></tr></thead>
+      <tbody>{{range .Recent}}<tr><td><time datetime="{{formatUTC .OccurredAt}}">{{formatTime .OccurredAt}}</time></td><td><code>{{.Path}}</code></td><td>{{if .City}}{{.City}}{{else if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}}</td><td><code>{{.OriginalIP}}</code></td><td>{{.OperatingSystem}}</td><td>{{.Browser}}</td><td><code class="digest">{{.VisitorDigest}}</code></td></tr>{{else}}<tr><td colspan="7" class="empty-cell">{{t "no_pageview_records"}}</td></tr>{{end}}</tbody>
     </table>
   </div>
 </section>
 
 <section class="section-block danger-zone" id="danger">
-  <div class="section-heading"><div><p class="eyebrow">DANGER ZONE</p><h2>危险操作</h2></div><span class="muted">不可撤销，请先备份</span></div>
+  <div class="section-heading"><div><p class="eyebrow">DANGER ZONE</p><h2>{{t "danger_zone"}}</h2></div><span class="muted">{{t "irreversible_backup_first"}}</span></div>
   <div class="danger-grid">
     <form method="post" action="/admin/sites/{{.Site.ID}}/reset" class="danger-form">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <div><h3>清空 Site 数据</h3><p>删除逐条记录、聚合和地图点，保留 Site 设置；同时关闭采集和公开展示。</p></div>
-      <label class="field"><span>输入 Site ID</span><input type="text" name="site_id" autocomplete="off" required></label>
-      <label class="field"><span>管理员密码</span><input type="password" name="password" autocomplete="current-password" required></label>
-      <button class="button danger" type="submit">清空数据</button>
+      <div><h3>{{t "reset_site_data"}}</h3><p>{{t "reset_site_help"}}</p></div>
+      <label class="field"><span>{{t "enter_site_id"}}</span><input type="text" name="site_id" autocomplete="off" required></label>
+      <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="button danger" type="submit">{{t "reset_data"}}</button>
     </form>
     <form method="post" action="/admin/sites/{{.Site.ID}}/delete" class="danger-form">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <div><h3>永久删除 Site</h3><p>删除 Site 及其全部记录、聚合、地图数据和设置，Site ID 不会再次分配。</p></div>
-      <label class="field"><span>输入 Site ID</span><input type="text" name="site_id" autocomplete="off" required></label>
-      <label class="field"><span>管理员密码</span><input type="password" name="password" autocomplete="current-password" required></label>
-      <button class="button danger" type="submit">永久删除</button>
+      <div><h3>{{t "delete_site"}}</h3><p>{{t "delete_site_help"}}</p></div>
+      <label class="field"><span>{{t "enter_site_id"}}</span><input type="text" name="site_id" autocomplete="off" required></label>
+      <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="button danger" type="submit">{{t "delete_permanently"}}</button>
     </form>
   </div>
 </section>

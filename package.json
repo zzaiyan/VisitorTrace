@@ -1,0 +1,11 @@
+{
+  "name": "visitortrace-assets",
+  "private": true,
+  "scripts": {
+    "build:analytics": "node tools/build-analytics.mjs"
+  },
+  "devDependencies": {
+    "echarts": "6.1.0",
+    "esbuild": "0.28.1"
+  }
+}

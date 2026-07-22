@@ -1,29 +1,29 @@
 {{define "content"}}
 <header class="page-header">
-  <div><p class="eyebrow">ADMIN CONSOLE</p><h1>管理总览</h1><p class="subhead">{{len .Sites}} 个 Site</p></div>
-  <a class="button primary" href="/admin/sites/new">新增 Site</a>
+  <div><p class="eyebrow">ADMIN CONSOLE</p><h1>{{t "dashboard"}}</h1><p class="subhead">{{len .Sites}} {{t "site_count"}}</p></div>
+  <a class="button primary" href="/admin/sites/new">{{t "add_site"}}</a>
 </header>
-{{if .Operations.Warnings}}<div class="notice danger" role="alert">运行状态需要关注：{{range $index, $warning := .Operations.Warnings}}{{if $index}} · {{end}}{{operationWarning $warning}}{{end}}</div>{{end}}
-<section class="operations-band" aria-label="运行状态">
-  <div class="operations-head"><div><p class="eyebrow">OPERATIONS</p><h2>运行状态</h2></div><div class="operation-actions"><form method="post" action="/admin/operations/backup"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">立即备份</button></form><form method="post" action="/admin/operations/cleanup"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">立即清理</button></form><form method="post" action="/admin/operations/geoip"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">检查 GeoIP</button></form></div></div>
+{{if .Operations.Warnings}}<div class="notice danger" role="alert">{{t "operations_attention"}}: {{range $index, $warning := .Operations.Warnings}}{{if $index}} · {{end}}{{operationWarning $warning}}{{end}}</div>{{end}}
+<section class="operations-band" aria-label="{{t "operations"}}">
+  <div class="operations-head"><div><p class="eyebrow">OPERATIONS</p><h2>{{t "operations"}}</h2></div><div class="operation-actions"><form method="post" action="/admin/operations/backup"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">{{t "backup_now"}}</button></form><form method="post" action="/admin/operations/cleanup"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">{{t "cleanup_now"}}</button></form><form method="post" action="/admin/operations/geoip"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">{{t "check_geoip"}}</button></form></div></div>
   <dl class="operations-grid">
-    <div><dt>版本</dt><dd>{{.Operations.Version}}</dd><small>{{.Operations.Commit}}</small></div>
-    <div><dt>运行时长</dt><dd>{{formatDuration .Operations.Uptime}}</dd><small>启动于 {{formatUTC .Operations.StartedAt}}</small></div>
+    <div><dt>{{t "version"}}</dt><dd>{{.Operations.Version}}</dd><small>{{.Operations.Commit}}</small></div>
+    <div><dt>{{t "uptime"}}</dt><dd>{{formatDuration .Operations.Uptime}}</dd><small>{{t "started_at"}} {{formatUTC .Operations.StartedAt}}</small></div>
     <div><dt>SQLite</dt><dd>{{formatBytes .Operations.DatabaseSize}}</dd><small>{{.Operations.SQLiteVersion}} · Schema {{.Operations.SchemaVersion}}</small></div>
-    <div class="{{if .Operations.DiskLow}}operation-alert{{end}}"><dt>可用磁盘</dt><dd>{{formatBytes .Operations.DiskAvailable}}</dd><small>总计 {{formatBytes .Operations.DiskTotal}}</small></div>
-    <div class="{{if or (not .Operations.GeoIP.Exists) .Operations.GeoIP.Stale}}operation-alert{{end}}"><dt>GeoIP</dt><dd>{{if .Operations.GeoIP.Exists}}{{formatBytes .Operations.GeoIP.Size}}{{else}}不可用{{end}}</dd><small>{{if .Operations.GeoIP.Exists}}{{formatUTC .Operations.GeoIP.ModifiedAt}}{{else}}等待下载{{end}}</small></div>
-    <div class="{{if or (not .Operations.Backup.Exists) .Operations.Backup.Stale}}operation-alert{{end}}"><dt>最近备份</dt><dd>{{if .Operations.Backup.Exists}}{{formatBytes .Operations.Backup.Size}}{{else}}尚无备份{{end}}</dd><small>{{if .Operations.Backup.Exists}}{{.Operations.Backup.Name}}{{else}}建议立即创建{{end}}</small></div>
+    <div class="{{if .Operations.DiskLow}}operation-alert{{end}}"><dt>{{t "available_disk"}}</dt><dd>{{formatBytes .Operations.DiskAvailable}}</dd><small>{{t "total"}} {{formatBytes .Operations.DiskTotal}}</small></div>
+    <div class="{{if or (not .Operations.GeoIP.Exists) .Operations.GeoIP.Stale}}operation-alert{{end}}"><dt>GeoIP</dt><dd>{{if .Operations.GeoIP.Exists}}{{formatBytes .Operations.GeoIP.Size}}{{else}}{{t "unavailable"}}{{end}}</dd><small>{{if .Operations.GeoIP.Exists}}{{formatUTC .Operations.GeoIP.ModifiedAt}}{{else}}{{t "awaiting_download"}}{{end}}</small></div>
+    <div class="{{if or (not .Operations.Backup.Exists) .Operations.Backup.Stale}}operation-alert{{end}}"><dt>{{t "latest_backup"}}</dt><dd>{{if .Operations.Backup.Exists}}{{formatBytes .Operations.Backup.Size}}{{else}}{{t "no_backup"}}{{end}}</dd><small>{{if .Operations.Backup.Exists}}{{.Operations.Backup.Name}}{{else}}{{t "create_recommended"}}{{end}}</small></div>
   </dl>
-  <div class="operation-table table-wrap"><table><thead><tr><th>任务</th><th>状态</th><th>完成时间</th><th>摘要</th></tr></thead><tbody>{{range .Operations.Tasks}}<tr><td>{{operationLabel .Operation}}</td><td><span class="status {{.State}}">{{operationState .State}}</span></td><td>{{if .CompletedAt}}{{formatUTC .CompletedAt}}{{else}}运行中{{end}}</td><td><code>{{.Summary}}</code></td></tr>{{else}}<tr><td colspan="4" class="empty-cell">后台任务尚无运行记录</td></tr>{{end}}</tbody></table></div>
+  <div class="operation-table table-wrap"><table><thead><tr><th>{{t "task"}}</th><th>{{t "status"}}</th><th>{{t "completed_at"}}</th><th>{{t "summary"}}</th></tr></thead><tbody>{{range .Operations.Tasks}}<tr><td>{{operationLabel .Operation}}</td><td><span class="status {{.State}}">{{operationState .State}}</span></td><td>{{if .CompletedAt}}{{formatUTC .CompletedAt}}{{else}}{{t "running"}}{{end}}</td><td><code>{{.Summary}}</code></td></tr>{{else}}<tr><td colspan="4" class="empty-cell">{{t "no_task_runs"}}</td></tr>{{end}}</tbody></table></div>
 </section>
 {{if .Sites}}
-<section class="site-grid" aria-label="站点列表">
+<section class="site-grid" aria-label="{{t "site_list"}}">
   {{range .Sites}}
   <article class="site-card">
     <div class="site-card-copy">
       <div class="status-line">
-        {{if .Site.AcceptPageviews}}<span class="status live">接收中</span>{{else}}<span class="status paused">已暂停</span>{{end}}
-        {{if .Site.PublishPublic}}<span class="status public">公开</span>{{else}}<span class="status private">未公开</span>{{end}}
+        {{if .Site.AcceptPageviews}}<span class="status live">{{t "receiving"}}</span>{{else}}<span class="status paused">{{t "paused"}}</span>{{end}}
+        {{if .Site.PublishPublic}}<span class="status public">{{t "public"}}</span>{{else}}<span class="status private">{{t "private"}}</span>{{end}}
       </div>
       <h2><a href="/admin/sites/{{.Site.ID}}">{{.Site.Name}}</a></h2>
       <code>{{.Site.ID}}</code>
@@ -33,15 +33,15 @@
         <div><dt>Records</dt><dd>{{formatCount .Overview.PageviewRecords}}</dd></div>
       </dl>
       <div class="inline-actions">
-        <a class="text-link" href="/admin/sites/{{.Site.ID}}">管理</a>
-        {{if .Site.PublishPublic}}<a class="text-link" href="/public/{{.Site.ID}}/analytics" target="_blank" rel="noopener">公开分析</a>{{end}}
+        <a class="text-link" href="/admin/sites/{{.Site.ID}}">{{t "manage"}}</a>
+        {{if .Site.PublishPublic}}<a class="text-link" href="/public/{{.Site.ID}}/analytics" target="_blank" rel="noopener">{{t "public_analytics"}}</a>{{end}}
       </div>
     </div>
-    <a class="site-map" href="/admin/sites/{{.Site.ID}}" aria-label="管理 {{.Site.Name}}"><img src="{{.MapPreviewURL}}" alt="{{.Site.Name}} 访客地图"></a>
+    <a class="site-map" href="/admin/sites/{{.Site.ID}}" aria-label="{{t "manage_site"}} {{.Site.Name}}"><img src="{{.MapPreviewURL}}" alt="{{.Site.Name}} {{t "visitor_map"}}"></a>
   </article>
   {{end}}
 </section>
 {{else}}
-<section class="empty-state"><p class="eyebrow">NO SITES</p><h2>还没有 Site</h2><a class="button primary" href="/admin/sites/new">创建第一个 Site</a></section>
+<section class="empty-state"><p class="eyebrow">NO SITES</p><h2>{{t "no_sites"}}</h2><a class="button primary" href="/admin/sites/new">{{t "create_first_site"}}</a></section>
 {{end}}
 {{end}}

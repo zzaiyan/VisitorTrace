@@ -1,7 +1,7 @@
 {{define "content"}}
-<header class="page-header"><div><p class="eyebrow">SELF UPDATE</p><h1>正在切换版本</h1><p class="subhead">VisitorTrace {{.Version}} 已通过验证并完成准备</p></div></header>
+<header class="page-header"><div><p class="eyebrow">SELF UPDATE</p><h1>{{t "switching_version"}}</h1><p class="subhead">VisitorTrace {{.Version}} {{t "update_ready"}}</p></div></header>
 <section class="restart-state" role="status">
   <div class="restart-indicator" aria-hidden="true"></div>
-  <div><h2>服务正在重启</h2><p>进程管理器重新拉起稳定执行路径后，后台将恢复可用。</p><a class="button ghost" href="/admin">重新连接</a></div>
+  <div><h2>{{t "service_restarting"}}</h2><p>{{t "restart_help"}}</p><a class="button ghost" href="/admin">{{t "reconnect"}}</a></div>
 </section>
 {{end}}

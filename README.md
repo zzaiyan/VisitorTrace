@@ -13,7 +13,8 @@ VisitorTrace 面向个人主页、博客和其他小型网站，在一个 Go 服
 - Pageview 采集与 Site 隔离
 - SQLite 逐条记录和持久化聚合
 - 本地 GeoIP 查询与 SVG 访客地图
-- Public Analytics
+- 支持日期联动、缩放趋势图、交互地图及无 JavaScript 回退的 Public Analytics
+- 简体中文/英文界面与按 Site 配置的公开页默认语言
 - 密码保护的 Admin Console
 - 可筛选、分页和 CSV 导出的访问明细
 - 备份、清理、GeoIP 与资源状态总览
@@ -60,7 +61,8 @@ VisitorTrace is designed for personal homepages, blogs, and other small websites
 - Site-isolated Pageview ingestion
 - SQLite Pageview Records and durable aggregates
 - Local GeoIP lookup and SVG visitor maps
-- Public Analytics
+- Date-linked Public Analytics with zoomable trends, an interactive map, and a no-JavaScript fallback
+- Simplified Chinese and English interfaces with a per-Site public default
 - A password-protected Admin Console
 - Filterable, cursor-paginated, CSV-exportable Pageview Records
 - Backup, cleanup, GeoIP, and resource health overview

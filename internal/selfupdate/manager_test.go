@@ -155,7 +155,7 @@ func updateFixture(t *testing.T) (*Manager, *store.Store, config.Config, string,
 	if err != nil {
 		t.Fatal(err)
 	}
-	candidate := []byte("#!/bin/sh\ncase \"$1\" in\nversion) printf '%s\\n' '{\"version\":\"1.1.0\",\"commit\":\"test\",\"build_time\":\"2026-07-22T00:00:00Z\",\"schema_version\":6}' ;;\ndoctor) exit 0 ;;\n*) exit 1 ;;\nesac\n")
+	candidate := []byte(fmt.Sprintf("#!/bin/sh\ncase \"$1\" in\nversion) printf '%%s\\n' '{\"version\":\"1.1.0\",\"commit\":\"test\",\"build_time\":\"2026-07-22T00:00:00Z\",\"schema_version\":%d}' ;;\ndoctor) exit 0 ;;\n*) exit 1 ;;\nesac\n", store.SupportedSchemaVersion()))
 	digest := fmt.Sprintf("%x", sha256.Sum256(candidate))
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -163,7 +163,7 @@ func updateFixture(t *testing.T) (*Manager, *store.Store, config.Config, string,
 	}
 	manifest := Manifest{
 		FormatVersion: ManifestFormatVersion, Version: "1.1.0", PublishedAt: time.Date(2026, time.July, 22, 0, 0, 0, 0, time.UTC),
-		SchemaVersion: 6, Assets: map[string]Asset{"test-platform": {URL: "/visitortrace", SHA256: digest, Size: int64(len(candidate))}},
+		SchemaVersion: store.SupportedSchemaVersion(), Assets: map[string]Asset{"test-platform": {URL: "/visitortrace", SHA256: digest, Size: int64(len(candidate))}},
 	}
 	manifest, err = SignManifest(manifest, privateKey)
 	if err != nil {

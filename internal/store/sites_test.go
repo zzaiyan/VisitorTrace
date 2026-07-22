@@ -33,7 +33,7 @@ func TestCreateGetAndListSite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSite() error = %v", err)
 	}
-	if got.Name != want.Name || got.Timezone != "Asia/Shanghai" || got.DedupWindowDays != 1 || got.RetentionDays != 30 {
+	if got.Name != want.Name || got.Timezone != "Asia/Shanghai" || got.DedupWindowDays != 1 || got.RetentionDays != 30 || got.PublicLanguage != "auto" {
 		t.Fatalf("GetSite() = %#v", got)
 	}
 	if len(got.HMACKey) != 32 {
@@ -87,9 +87,13 @@ func TestResetAndDeleteSite(t *testing.T) {
 		}
 	}
 	if _, err := st.UpdateSite(ctx, created.ID, UpdateSiteParams{
-		Name: "Reset", Timezone: "UTC", AllowedOrigins: []string{"https://example.com"}, DedupWindowDays: 1, RetentionDays: 30,
+		Name: "Reset", Timezone: "UTC", AllowedOrigins: []string{"https://example.com"}, DedupWindowDays: 1, RetentionDays: 30, PublicLanguage: "en",
 	}); err != nil {
 		t.Fatalf("timezone remained locked after reset: %v", err)
+	}
+	updated, err := st.GetSite(ctx, created.ID)
+	if err != nil || updated.PublicLanguage != "en" {
+		t.Fatalf("PublicLanguage = %q, %v", updated.PublicLanguage, err)
 	}
 	if err := st.DeleteSite(ctx, created.ID); err != nil {
 		t.Fatalf("DeleteSite() error = %v", err)

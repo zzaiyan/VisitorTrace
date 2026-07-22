@@ -8,15 +8,15 @@ import (
 )
 
 type AnalyticsMetric struct {
-	Value          string
-	Pageviews      int64
-	UniqueVisitors int64
+	Value          string `json:"value"`
+	Pageviews      int64  `json:"pageviews"`
+	UniqueVisitors int64  `json:"unique_visitors"`
 }
 
 type DailyMetric struct {
-	Date           string
-	Pageviews      int64
-	UniqueVisitors int64
+	Date           string `json:"date"`
+	Pageviews      int64  `json:"pageviews"`
+	UniqueVisitors int64  `json:"unique_visitors"`
 }
 
 type PublicAnalyticsData struct {
@@ -31,6 +31,8 @@ type PublicAnalyticsData struct {
 	Cities           []AnalyticsMetric
 	Browsers         []AnalyticsMetric
 	OperatingSystems []AnalyticsMetric
+	Paths            []AnalyticsMetric
+	MapPoints        []MapPoint
 }
 
 type SiteOverview struct {
@@ -77,6 +79,20 @@ func (s *Store) PublicAnalytics(ctx context.Context, siteID, startDate, endDate 
 	if !site.PublishPublic {
 		return PublicAnalyticsData{}, ErrPublicationDisabled
 	}
+	return s.analyticsData(ctx, site, startDate, endDate, false)
+}
+
+func (s *Store) AdminAnalytics(ctx context.Context, siteID, startDate, endDate string) (PublicAnalyticsData, error) {
+	site, err := s.GetSite(ctx, siteID)
+	if err != nil {
+		return PublicAnalyticsData{}, err
+	}
+	return s.analyticsData(ctx, site, startDate, endDate, true)
+}
+
+func (s *Store) analyticsData(ctx context.Context, site Site, startDate, endDate string, includePaths bool) (PublicAnalyticsData, error) {
+	siteID := site.ID
+	var err error
 	startDate, endDate, err = analyticsDates(site.Timezone, startDate, endDate)
 	if err != nil {
 		return PublicAnalyticsData{}, err
@@ -111,6 +127,47 @@ func (s *Store) PublicAnalytics(ctx context.Context, siteID, startDate, endDate 
 	result.Cities, err = s.readCityMetrics(ctx, siteID, startDate, endDate)
 	if err != nil {
 		return PublicAnalyticsData{}, err
+	}
+	result.MapPoints, err = s.readRangeMapPoints(ctx, siteID, startDate, endDate)
+	if err != nil {
+		return PublicAnalyticsData{}, err
+	}
+	if includePaths {
+		result.Paths, err = s.readDimensionMetrics(ctx, siteID, startDate, endDate, "path")
+		if err != nil {
+			return PublicAnalyticsData{}, err
+		}
+	}
+	return result, nil
+}
+
+func (s *Store) readRangeMapPoints(ctx context.Context, siteID, startDate, endDate string) ([]MapPoint, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT g.country_code, g.region_code, g.city, g.latitude, g.longitude,
+		       SUM(a.pageviews), SUM(a.unique_visitors)
+		FROM daily_aggregates AS a
+		JOIN geo_locations AS g
+		  ON g.site_id = a.site_id
+		 AND g.dimension_kind = a.dimension_kind
+		 AND g.dimension_value = a.dimension_value
+		WHERE a.site_id = ? AND a.local_date BETWEEN ? AND ? AND a.dimension_kind = 'city'
+		GROUP BY g.dimension_value, g.country_code, g.region_code, g.city, g.latitude, g.longitude
+		ORDER BY SUM(a.pageviews) DESC, g.dimension_value
+	`, siteID, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("read date-range map points: %w", err)
+	}
+	defer rows.Close()
+	var result []MapPoint
+	for rows.Next() {
+		var point MapPoint
+		if err := rows.Scan(&point.CountryCode, &point.RegionCode, &point.City, &point.Latitude, &point.Longitude, &point.Pageviews, &point.UniqueVisitors); err != nil {
+			return nil, fmt.Errorf("scan date-range map point: %w", err)
+		}
+		result = append(result, point)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate date-range map points: %w", err)
 	}
 	return result, nil
 }

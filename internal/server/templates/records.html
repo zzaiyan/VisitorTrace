@@ -1,46 +1,46 @@
 {{define "content"}}
 <header class="page-header">
-  <div><p class="eyebrow">PAGEVIEW RECORDS</p><h1>访问明细</h1><p class="subhead">敏感数据，仅管理员可见</p></div>
-  <a class="button ghost" href="{{.RecordCSVURL}}">导出当前筛选 CSV</a>
+  <div><p class="eyebrow">PAGEVIEW RECORDS</p><h1>{{t "records"}}</h1><p class="subhead">{{t "sensitive_admin_only"}}</p></div>
+  <a class="button ghost" href="{{.RecordCSVURL}}">{{t "export_filtered_csv"}}</a>
 </header>
 
 <section class="section-block records-filter-section">
-  <div class="section-heading"><div><p class="eyebrow">FILTERS</p><h2>筛选条件</h2></div><a class="text-link" href="/admin/records">清除筛选</a></div>
+  <div class="section-heading"><div><p class="eyebrow">FILTERS</p><h2>{{t "filters"}}</h2></div><a class="text-link" href="/admin/records">{{t "clear_filters"}}</a></div>
   <form method="get" action="/admin/records" class="records-filter">
-    <label class="field"><span>Site</span><select name="site_id"><option value="">全部 Site</option>{{range .Sites}}<option value="{{.ID}}" {{if selected $.Filters.SiteID .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
-    <label class="field"><span>起始时间（UTC）</span><input type="datetime-local" name="from" value="{{.Filters.From}}"></label>
-    <label class="field"><span>结束时间（UTC）</span><input type="datetime-local" name="to" value="{{.Filters.To}}"></label>
-    <label class="field"><span>路径</span><input type="text" name="path" value="{{.Filters.Path}}" placeholder="/research"></label>
-    <label class="field"><span>原始 IP</span><input type="text" name="ip" value="{{.Filters.IP}}" spellcheck="false"></label>
+    <label class="field"><span>Site</span><select name="site_id"><option value="">{{t "all_sites"}}</option>{{range .Sites}}<option value="{{.ID}}" {{if selected $.Filters.SiteID .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+    <label class="field"><span>{{t "from_utc"}}</span><input type="datetime-local" name="from" value="{{.Filters.From}}"></label>
+    <label class="field"><span>{{t "to_utc"}}</span><input type="datetime-local" name="to" value="{{.Filters.To}}"></label>
+    <label class="field"><span>{{t "path"}}</span><input type="text" name="path" value="{{.Filters.Path}}" placeholder="/research"></label>
+    <label class="field"><span>{{t "original_ip"}}</span><input type="text" name="ip" value="{{.Filters.IP}}" spellcheck="false"></label>
     <label class="field"><span>Visitor Digest</span><input type="text" name="digest" value="{{.Filters.Digest}}" spellcheck="false"></label>
-    <label class="field"><span>国家代码</span><input type="text" name="country" value="{{.Filters.Country}}"></label>
-    <label class="field"><span>地区代码</span><input type="text" name="region" value="{{.Filters.Region}}"></label>
-    <label class="field"><span>城市</span><input type="text" name="city" value="{{.Filters.City}}"></label>
-    <label class="field"><span>浏览器</span><input type="text" name="browser" value="{{.Filters.Browser}}"></label>
-    <label class="field"><span>操作系统</span><input type="text" name="os" value="{{.Filters.OS}}"></label>
-    <label class="field"><span>每页</span><select name="limit"><option value="50" {{if eq .Filters.Limit 50}}selected{{end}}>50</option><option value="100" {{if eq .Filters.Limit 100}}selected{{end}}>100</option><option value="200" {{if eq .Filters.Limit 200}}selected{{end}}>200</option></select></label>
-    <div class="form-actions"><button class="button primary" type="submit">应用筛选</button></div>
+    <label class="field"><span>{{t "country_code"}}</span><input type="text" name="country" value="{{.Filters.Country}}"></label>
+    <label class="field"><span>{{t "region_code"}}</span><input type="text" name="region" value="{{.Filters.Region}}"></label>
+    <label class="field"><span>{{t "city"}}</span><input type="text" name="city" value="{{.Filters.City}}"></label>
+    <label class="field"><span>{{t "browsers"}}</span><input type="text" name="browser" value="{{.Filters.Browser}}"></label>
+    <label class="field"><span>{{t "operating_systems"}}</span><input type="text" name="os" value="{{.Filters.OS}}"></label>
+    <label class="field"><span>{{t "per_page"}}</span><select name="limit"><option value="50" {{if eq .Filters.Limit 50}}selected{{end}}>50</option><option value="100" {{if eq .Filters.Limit 100}}selected{{end}}>100</option><option value="200" {{if eq .Filters.Limit 200}}selected{{end}}>200</option></select></label>
+    <div class="form-actions"><button class="button primary" type="submit">{{t "apply_filters"}}</button></div>
   </form>
 </section>
 
 <section class="section-block">
-  <div class="section-heading"><div><p class="eyebrow">RESULTS</p><h2>逐条记录</h2></div><span class="muted">本页 {{len .Records}} 条</span></div>
+  <div class="section-heading"><div><p class="eyebrow">RESULTS</p><h2>{{t "row_records"}}</h2></div><span class="muted">{{t "this_page"}} {{len .Records}} {{t "items"}}</span></div>
   <div class="table-wrap">
-    <table><thead><tr><th>Site</th><th>时间</th><th>路径</th><th>国家 / 地区 / 城市</th><th>原始 IP</th><th>系统</th><th>浏览器</th><th>Visitor Digest</th></tr></thead>
-      <tbody>{{range .Records}}<tr><td>{{.SiteName}}<br><code>{{.SiteID}}</code></td><td><time datetime="{{formatUTC .OccurredAt}}" title="{{formatUTC .OccurredAt}}">{{formatRecordTime .}}</time></td><td><code>{{.Path}}</code></td><td>{{if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}} / {{if .RegionCode}}{{.RegionCode}}{{else}}-{{end}} / {{if .City}}{{.City}}{{else}}-{{end}}</td><td><code>{{.OriginalIP}}</code></td><td>{{.OperatingSystem}}</td><td>{{.Browser}}</td><td><code class="digest">{{.VisitorDigest}}</code></td></tr>{{else}}<tr><td colspan="8" class="empty-cell">没有符合条件的 Pageview Record</td></tr>{{end}}</tbody>
+    <table><thead><tr><th>Site</th><th>{{t "time"}}</th><th>{{t "path"}}</th><th>{{t "country"}} / {{t "region"}} / {{t "city"}}</th><th>{{t "original_ip"}}</th><th>{{t "system"}}</th><th>{{t "browsers"}}</th><th>Visitor Digest</th></tr></thead>
+      <tbody>{{range .Records}}<tr><td>{{.SiteName}}<br><code>{{.SiteID}}</code></td><td><time datetime="{{formatUTC .OccurredAt}}" title="{{formatUTC .OccurredAt}}">{{formatRecordTime .}}</time></td><td><code>{{.Path}}</code></td><td>{{if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}} / {{if .RegionCode}}{{.RegionCode}}{{else}}-{{end}} / {{if .City}}{{.City}}{{else}}-{{end}}</td><td><code>{{.OriginalIP}}</code></td><td>{{.OperatingSystem}}</td><td>{{.Browser}}</td><td><code class="digest">{{.VisitorDigest}}</code></td></tr>{{else}}<tr><td colspan="8" class="empty-cell">{{t "no_matching_records"}}</td></tr>{{end}}</tbody>
     </table>
   </div>
-  <nav class="pagination" aria-label="访问明细分页"><span>{{if .NewerURL}}<a class="button ghost" href="{{.NewerURL}}">较新记录</a>{{end}}</span><span>{{if .OlderURL}}<a class="button ghost" href="{{.OlderURL}}">较早记录</a>{{end}}</span></nav>
+  <nav class="pagination" aria-label="{{t "records"}}"><span>{{if .NewerURL}}<a class="button ghost" href="{{.NewerURL}}">{{t "newer_records"}}</a>{{end}}</span><span>{{if .OlderURL}}<a class="button ghost" href="{{.OlderURL}}">{{t "older_records"}}</a>{{end}}</span></nav>
 </section>
 
 <section class="section-block">
-  <div class="section-heading"><div><p class="eyebrow">AGGREGATES</p><h2>导出聚合</h2></div></div>
+  <div class="section-heading"><div><p class="eyebrow">AGGREGATES</p><h2>{{t "export_aggregates"}}</h2></div></div>
   <form method="get" action="/admin/aggregates.csv" class="aggregate-export">
-    <label class="field"><span>Site</span><select name="site_id" required><option value="">选择 Site</option>{{range .Sites}}<option value="{{.ID}}" {{if selected $.Filters.SiteID .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
-    <label class="field"><span>维度</span><select name="dimension"><option value="overall">整体</option><option value="path">路径</option><option value="country">国家</option><option value="region">地区</option><option value="city">城市</option><option value="browser">浏览器</option><option value="os">操作系统</option></select></label>
-    <label class="field"><span>起始日期</span><input type="date" name="start"></label>
-    <label class="field"><span>结束日期</span><input type="date" name="end"></label>
-    <button class="button ghost" type="submit">下载聚合 CSV</button>
+    <label class="field"><span>Site</span><select name="site_id" required><option value="">{{t "choose_site"}}</option>{{range .Sites}}<option value="{{.ID}}" {{if selected $.Filters.SiteID .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+    <label class="field"><span>{{t "dimension"}}</span><select name="dimension"><option value="overall">{{t "overall"}}</option><option value="path">{{t "path"}}</option><option value="country">{{t "country"}}</option><option value="region">{{t "region"}}</option><option value="city">{{t "city"}}</option><option value="browser">{{t "browsers"}}</option><option value="os">{{t "operating_systems"}}</option></select></label>
+    <label class="field"><span>{{t "start_date"}}</span><input type="date" name="start"></label>
+    <label class="field"><span>{{t "end_date"}}</span><input type="date" name="end"></label>
+    <button class="button ghost" type="submit">{{t "download_aggregate_csv"}}</button>
   </form>
 </section>
 {{end}}

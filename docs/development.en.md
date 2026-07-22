@@ -33,11 +33,21 @@ go mod verify
 
 `make check` runs the regular tests and static analysis. `tools/preview-demo.sh` provides a local manual-preview environment with generated data.
 
+Node.js is needed only when changing the Public Analytics interaction bundle or basemap. `web/analytics-entry.js` imports selected ECharts modules, while `web/assets/world.geo.json` and the SVG basemap come from the same pinned Natural Earth source. Run:
+
+```sh
+make frontend
+```
+
+This installs the locked dependencies from `package-lock.json` and regenerates the committed `internal/server/assets/analytics.js`, `.br`, and `.gz` files. Go embeds those artifacts, so production does not require Node.js and does not spend request-time CPU compressing the bundle. If enhancement fails, server-rendered statistics, the date-linked SVG map, and the basic trend must remain usable.
+
 ## Database Evolution
 
 Migrations are embedded in `internal/store/migrations.go` and applied in version order inside transactions. Startup performs forward migrations; downward migrations are not supported. Create a verified snapshot with `visitortrace backup` before a destructive upgrade.
 
 The Pageview ingestion transaction stores the individual record, visitor-window registrations, and durable aggregates together. Expiring an individual record must not reverse its durable aggregate contributions.
+
+Public and administrative aggregate queries share Site-local date boundaries. Public queries first enforce publication state and never read the path family; authenticated administrative queries can read path aggregates even when publication is disabled. Browser JSON is generated only from the already-authorized aggregate result and contains no individual records, original IPs, or Visitor Digests.
 
 `serve` starts a lightweight maintenance loop that runs on startup and hourly. `visitortrace maintenance` exposes the same cleanup flow for diagnostics and external schedulers. Every deletion transaction has a bounded batch size; `operation_status` retains the latest maintenance outcome for the operational dashboard.
 

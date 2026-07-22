@@ -4,15 +4,16 @@
     <a class="brand login-brand" href="/admin"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>
     <div class="login-heading">
       <p class="eyebrow">ADMIN CONSOLE</p>
-      <h1>管理员登录</h1>
+      <h1>{{t "admin_login"}}</h1>
     </div>
     {{if .Flash}}<div class="notice success" role="status">{{.Flash}}</div>{{end}}
     {{if .Error}}<div class="notice danger" role="alert">{{.Error}}</div>{{end}}
     <form method="post" action="/admin/login" class="stack-form">
       <input type="hidden" name="next" value="{{.Next}}">
-      <label class="field"><span>管理员密码</span><input type="password" name="password" minlength="8" maxlength="128" autocomplete="current-password" autofocus required></label>
-      <button class="button primary full" type="submit">登录后台</button>
+      <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" minlength="8" maxlength="128" autocomplete="current-password" autofocus required></label>
+      <button class="button primary full" type="submit">{{t "login_console"}}</button>
     </form>
   </section>
 </main>
+<nav class="login-language language-nav" aria-label="Language"><a href="{{languageURL "zh-CN"}}" {{if languageIs "zh-CN"}}aria-current="page"{{end}}>中文</a><a href="{{languageURL "en"}}" {{if languageIs "en"}}aria-current="page"{{end}}>EN</a></nav>
 {{end}}

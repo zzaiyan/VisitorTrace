@@ -433,14 +433,18 @@ func TestAdminSelfUpdateRequiresEmbeddedKey(t *testing.T) {
 func TestPublicAnalyticsHidesSensitiveFields(t *testing.T) {
 	app, st, site := testServer(t)
 	now := time.Now().UTC()
+	latitude := 30.5928
+	longitude := 114.3055
 	_, err := st.RecordPageview(context.Background(), store.PageviewObservation{
 		SiteID: site.ID, OccurredAt: now, Path: "/private-page-path", CountryCode: "CN", RegionCode: "HB", City: "Wuhan",
+		Latitude: &latitude, Longitude: &longitude,
 		VisitorDigest: bytes.Repeat([]byte{7}, 32), OriginalIP: "203.0.113.7", OperatingSystem: "Linux", Browser: "Firefox",
 	})
 	if err != nil {
 		t.Fatalf("RecordPageview() error = %v", err)
 	}
 	request := httptest.NewRequest(http.MethodGet, "/public/"+site.ID+"/analytics?range=30d", nil)
+	request.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
@@ -456,8 +460,78 @@ func TestPublicAnalyticsHidesSensitiveFields(t *testing.T) {
 	if strings.Contains(body, "/private-page-path") {
 		t.Fatal("Public Analytics exposed a page path")
 	}
-	if !strings.Contains(body, "Firefox") || !strings.Contains(body, "Wuhan") {
+	if !strings.Contains(body, "Firefox") || !strings.Contains(body, "Wuhan") || !strings.Contains(body, "Countries or regions") {
 		t.Fatalf("Public Analytics is missing aggregate data: %q", body)
+	}
+	if !strings.Contains(body, `/assets/analytics.js`) || !strings.Contains(body, `"date"`) || !strings.Contains(body, `analytics-map.svg?`) {
+		t.Fatalf("Public Analytics enhancement or range map fallback is missing: %q", body)
+	}
+}
+
+func TestAdminAnalyticsIncludesPathsForPrivateSite(t *testing.T) {
+	app, st, site := testAdminServer(t)
+	if _, err := st.DB.ExecContext(context.Background(), `UPDATE sites SET publish_public = 0 WHERE id = ?`, site.ID); err != nil {
+		t.Fatal(err)
+	}
+	latitude, longitude := 31.2304, 121.4737
+	if _, err := st.RecordPageview(context.Background(), store.PageviewObservation{
+		SiteID: site.ID, OccurredAt: time.Now(), Path: "/admin-only-path", CountryCode: "CN", RegionCode: "SH", City: "Shanghai",
+		Latitude: &latitude, Longitude: &longitude, VisitorDigest: bytes.Repeat([]byte{10}, 32), OriginalIP: "203.0.113.10", OperatingSystem: "Linux", Browser: "Firefox",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cookie, _ := loginAdmin(t, app)
+	request := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID+"/analytics?range=today&lang=en", nil)
+	request.Host = "127.0.0.1:8790"
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	body := response.Body.String()
+	if response.Code != http.StatusOK || !strings.Contains(body, "/admin-only-path") || !strings.Contains(body, "Path performance") || !strings.Contains(body, `id="path-chart"`) {
+		t.Fatalf("Admin Analytics = status %d body %q", response.Code, body)
+	}
+	public := httptest.NewRecorder()
+	app.Handler().ServeHTTP(public, httptest.NewRequest(http.MethodGet, "/public/"+site.ID+"/analytics", nil))
+	if public.Code != http.StatusNotFound {
+		t.Fatalf("private Public Analytics status = %d", public.Code)
+	}
+}
+
+func TestPublicAnalyticsMapHonorsDateRange(t *testing.T) {
+	app, st, site := testServer(t)
+	recentLat, recentLon := 30.5928, 114.3055
+	oldLat, oldLon := 48.8566, 2.3522
+	now := time.Now().UTC()
+	observations := []store.PageviewObservation{
+		{SiteID: site.ID, OccurredAt: now, Path: "/recent", CountryCode: "CN", RegionCode: "HB", City: "Wuhan", Latitude: &recentLat, Longitude: &recentLon, VisitorDigest: bytes.Repeat([]byte{8}, 32), OriginalIP: "203.0.113.8", OperatingSystem: "Linux", Browser: "Firefox"},
+		{SiteID: site.ID, OccurredAt: now.AddDate(0, 0, -40), Path: "/old", CountryCode: "FR", RegionCode: "IDF", City: "Paris", Latitude: &oldLat, Longitude: &oldLon, VisitorDigest: bytes.Repeat([]byte{9}, 32), OriginalIP: "203.0.113.9", OperatingSystem: "Linux", Browser: "Firefox"},
+	}
+	for _, observation := range observations {
+		if _, err := st.RecordPageview(context.Background(), observation); err != nil {
+			t.Fatal(err)
+		}
+	}
+	location, _ := time.LoadLocation(site.Timezone)
+	today := now.In(location).Format(time.DateOnly)
+	request := httptest.NewRequest(http.MethodGet, "/public/"+site.ID+"/analytics-map.svg?start="+today+"&end="+today, nil)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Wuhan") || strings.Contains(response.Body.String(), "Paris") {
+		t.Fatalf("date-range analytics map = status %d body %q", response.Code, response.Body.String())
+	}
+}
+
+func TestAnalyticsAssetServesPrecompressedBundle(t *testing.T) {
+	app, _, _ := testServer(t)
+	request := httptest.NewRequest(http.MethodGet, "/assets/analytics.js", nil)
+	request.Header.Set("Accept-Encoding", "br, gzip")
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK || response.Header().Get("Content-Encoding") != "br" || response.Header().Get("Vary") != "Accept-Encoding" {
+		t.Fatalf("analytics asset headers = status %d encoding %q vary %q", response.Code, response.Header().Get("Content-Encoding"), response.Header().Get("Vary"))
+	}
+	if response.Body.Len() > 250*1024 {
+		t.Fatalf("Brotli analytics asset = %d bytes, want <= 250 KiB", response.Body.Len())
 	}
 }
 

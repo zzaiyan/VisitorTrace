@@ -35,6 +35,34 @@ func (s *Store) AdminMapData(ctx context.Context, siteID string) (PublicMapData,
 	return s.mapData(ctx, siteID, false)
 }
 
+func (s *Store) PublicMapDataRange(ctx context.Context, siteID, startDate, endDate string) (PublicMapData, error) {
+	site, err := s.GetSite(ctx, siteID)
+	if err != nil {
+		return PublicMapData{}, err
+	}
+	if !site.PublishPublic {
+		return PublicMapData{}, ErrPublicationDisabled
+	}
+	startDate, endDate, err = analyticsDates(site.Timezone, startDate, endDate)
+	if err != nil {
+		return PublicMapData{}, err
+	}
+	result := PublicMapData{SiteID: site.ID, SiteName: site.Name}
+	if err := s.DB.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(pageviews), 0), COALESCE(SUM(unique_visitors), 0)
+		FROM daily_aggregates
+		WHERE site_id = ? AND local_date BETWEEN ? AND ?
+		  AND dimension_kind = 'overall' AND dimension_value = '*'
+	`, siteID, startDate, endDate).Scan(&result.Pageviews, &result.UniqueVisitors); err != nil {
+		return PublicMapData{}, fmt.Errorf("read date-range map totals: %w", err)
+	}
+	result.Points, err = s.readRangeMapPoints(ctx, siteID, startDate, endDate)
+	if err != nil {
+		return PublicMapData{}, err
+	}
+	return result, nil
+}
+
 func (s *Store) mapData(ctx context.Context, siteID string, requirePublished bool) (PublicMapData, error) {
 	var result PublicMapData
 	var published int

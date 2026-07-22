@@ -33,11 +33,21 @@ go mod verify
 
 `make check` 执行常规测试和静态检查，`tools/preview-demo.sh` 提供带伪数据的本地人工预览环境。
 
+只有修改 Public Analytics 交互前端或底图时才需要 Node.js。`web/analytics-entry.js` 使用 ECharts 的按需模块，`web/assets/world.geo.json` 与 SVG 底图来自同一锁定版本的 Natural Earth 数据。执行：
+
+```sh
+make frontend
+```
+
+该命令使用 `package-lock.json` 安装依赖，生成并提交 `internal/server/assets/analytics.js` 及预压缩的 `.br`、`.gz` 文件。Go 构建直接嵌入这些产物，生产服务器不需要 Node.js，也不会在请求时消耗 CPU 压缩脚本。交互增强失败时必须保留服务端统计、同日期范围 SVG 和基础趋势图。
+
 ## 数据库演进
 
 迁移按版本顺序嵌入 `internal/store/migrations.go`，必须在事务内完成。服务启动会运行正向迁移，不提供向下迁移。涉及破坏性升级时，应先使用 `visitortrace backup` 创建可验证快照。
 
 Pageview 写入事务同时保存逐条记录、访客窗口登记和持久化聚合。过期逐条记录不得反向修改已经形成的聚合。
+
+公开和后台聚合查询共用 Site 本地日期边界。公开查询必须先检查发布状态，且不读取 Path 维度；后台查询要求管理员认证，可在 Site 未公开时读取 Path 聚合。前端 JSON 只由服务端已经裁定的聚合结果生成，不包含逐条记录、原始 IP 或 Visitor Digest。
 
 `serve` 启动一个轻量级维护循环，启动时和每小时调用同一套清理逻辑。`visitortrace maintenance` 为人工诊断和外部调度提供等价入口。每个删除事务限制批量大小；`operation_status` 保存最近一次维护状态，供运行状态页面读取。
 
