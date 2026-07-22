@@ -221,6 +221,44 @@ GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/he
 
 两项操作都不可撤销，执行前应先创建备份。
 
+## 一键自更新
+
+自更新使用并列版本目录和稳定符号链接，不覆盖正在运行的文件。首次启用时运行：
+
+```sh
+./bin/visitortrace update bootstrap \
+  --config "$HOME/.config/visitortrace/config.json"
+```
+
+命令会输出类似以下稳定执行路径：
+
+```text
+$HOME/.local/share/visitortrace/releases/current/visitortrace
+```
+
+将宝塔或其他进程管理器的启动命令改为该稳定路径，并保持“进程退出后自动重启”。这只是通用进程管理契约，VisitorTrace 不依赖宝塔 API。
+
+随后可在服务器检查或应用更新：
+
+```sh
+visitortrace update check --config "$HOME/.config/visitortrace/config.json"
+visitortrace update apply --config "$HOME/.config/visitortrace/config.json"
+```
+
+也可在“管理员设置”输入当前密码后点击“检查并更新”。后台方式要求密码在本次请求中重新验证；候选版本准备完成后，当前进程会优雅退出，由进程管理器从稳定路径拉起新版本。
+
+更新流程会依次验证 Ed25519 清单签名、平台资产大小和 SHA-256、候选版本/Schema 身份，并运行候选二进制的 `doctor --upgrade-check`。全部通过后才创建升级前数据库快照、写入 pending 状态并原子切换 `current`。新版本达到 ready 后确认更新并保留最近两个旧版本；连续三次未能达到 ready 时，会恢复升级前数据库并切回旧版本。
+
+正式发布构建必须嵌入项目发布公钥。未嵌入公钥的开发构建会禁用更新按钮。更新清单地址默认为 GitHub Release，也可在受保护配置中改为国内镜像：
+
+```json
+{
+  "update_manifest_url": "https://mirror.example.com/visitortrace/manifest.json"
+}
+```
+
+镜像不能替换签名信任根；无论下载地址如何配置，清单都必须通过二进制内嵌公钥验证。
+
 ## 当前状态
 
-当前版本已经实现 Pageview 采集、聚合统计、自动记录清理、GeoIP 自动更新、SVG 地图、Public Analytics、管理员认证与密码管理、Site 清空/删除、Map Preset，以及带校验和完整性检查的备份恢复。一键自更新仍在后续里程碑中。
+当前版本已经实现此前确定的首版功能，包括 Pageview 采集与聚合、自动清理、GeoIP 自动更新、SVG 地图、Public Analytics、管理员数据与运行状态、密码和 Site 生命周期、备份恢复，以及签名验证的一键自更新。

@@ -92,6 +92,22 @@ func (s *Store) TouchAdministratorSession(ctx context.Context, tokenDigest []byt
 	return nil
 }
 
+func (s *Store) MarkAdministratorPasswordVerified(ctx context.Context, tokenDigest []byte, at time.Time) error {
+	if len(tokenDigest) != sha256.Size {
+		return fmt.Errorf("administrator session token must contain 32 bytes")
+	}
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	result, err := s.DB.ExecContext(ctx, `UPDATE administrator_sessions SET password_verified_at = ? WHERE token_digest = ?`, at.UTC().Format(time.RFC3339Nano), tokenDigest)
+	if err != nil {
+		return fmt.Errorf("mark administrator password verification: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows != 1 {
+		return fmt.Errorf("administrator session is unavailable")
+	}
+	return nil
+}
+
 func (s *Store) DeleteAdministratorSession(ctx context.Context, tokenDigest []byte) error {
 	if len(tokenDigest) != sha256.Size {
 		return nil

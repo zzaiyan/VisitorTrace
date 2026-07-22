@@ -126,6 +126,21 @@ func (s *Store) SchemaVersion(ctx context.Context) (int, error) {
 	return s.currentSchemaVersion(ctx)
 }
 
+func SupportedSchemaVersion() int {
+	return schemaVersion
+}
+
+func (s *Store) SchemaCompatible(ctx context.Context) error {
+	version, err := s.currentSchemaVersion(ctx)
+	if err != nil {
+		return err
+	}
+	if version < 1 || version > schemaVersion {
+		return fmt.Errorf("database schema %d is incompatible with supported schema %d", version, schemaVersion)
+	}
+	return nil
+}
+
 // OnlineBackup creates a transactionally consistent SQLite snapshot while the
 // source database remains available to readers and writers.
 func (s *Store) OnlineBackup(ctx context.Context, destination string) error {

@@ -2,6 +2,7 @@
 /bin/
 /dist/
 /releases/
+/.release-secrets/
 coverage.out
 
 # Runtime data and secrets

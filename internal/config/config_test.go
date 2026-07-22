@@ -58,6 +58,9 @@ func TestLoadDefaultsBackupDirectoryForExistingConfig(t *testing.T) {
 	if got.GeoIPUpdate != "monthly" || !strings.Contains(got.GeoIPUpdateURL, "{YYYY-MM}") {
 		t.Fatalf("GeoIP update defaults = %q, %q", got.GeoIPUpdate, got.GeoIPUpdateURL)
 	}
+	if !strings.Contains(got.UpdateManifestURL, "VisitorTrace/releases/latest") {
+		t.Fatalf("UpdateManifestURL = %q", got.UpdateManifestURL)
+	}
 }
 
 func TestValidateRejectsInsecureRemoteGeoIPSource(t *testing.T) {

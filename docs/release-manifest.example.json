@@ -1,0 +1,19 @@
+{
+  "format_version": 1,
+  "version": "0.2.0",
+  "published_at": "2026-07-22T00:00:00Z",
+  "schema_version": 6,
+  "assets": {
+    "linux-amd64": {
+      "url": "visitortrace-linux-amd64",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "size": 1
+    },
+    "linux-arm64": {
+      "url": "visitortrace-linux-arm64",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "size": 1
+    }
+  },
+  "signature": ""
+}

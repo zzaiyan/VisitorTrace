@@ -144,6 +144,14 @@ func Create(ctx context.Context, st *store.Store, configPath, outputDir string, 
 }
 
 func Restore(ctx context.Context, archivePath, databasePath string) (Manifest, error) {
+	return restore(ctx, archivePath, databasePath, true)
+}
+
+func RestoreForRollback(ctx context.Context, archivePath, databasePath string) (Manifest, error) {
+	return restore(ctx, archivePath, databasePath, false)
+}
+
+func restore(ctx context.Context, archivePath, databasePath string, migrate bool) (Manifest, error) {
 	if err := VerifyArchiveChecksum(archivePath); err != nil {
 		return Manifest{}, err
 	}
@@ -168,9 +176,11 @@ func Restore(ctx context.Context, archivePath, databasePath string) (Manifest, e
 	if err != nil {
 		return Manifest{}, fmt.Errorf("open restored database: %w", err)
 	}
-	if err := restored.Migrate(ctx); err != nil {
-		_ = restored.Close()
-		return Manifest{}, fmt.Errorf("migrate restored database: %w", err)
+	if migrate {
+		if err := restored.Migrate(ctx); err != nil {
+			_ = restored.Close()
+			return Manifest{}, fmt.Errorf("migrate restored database: %w", err)
+		}
 	}
 	if err := restored.RevokeAdministratorSessions(ctx); err != nil {
 		_ = restored.Close()

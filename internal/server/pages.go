@@ -15,6 +15,7 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/maprender"
 	"github.com/zzaiyan/VisitorTrace/internal/operations"
 	"github.com/zzaiyan/VisitorTrace/internal/password"
+	"github.com/zzaiyan/VisitorTrace/internal/selfupdate"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
@@ -79,6 +80,10 @@ type newSiteData struct {
 
 type adminSettingsData struct {
 	pageLayout
+	CurrentVersion        string
+	StableExecutable      string
+	UpdateKeyReady        bool
+	RunningFromStablePath bool
 }
 
 type publicAnalyticsData struct {
@@ -161,7 +166,12 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	data := adminSettingsData{pageLayout: s.adminLayout(r, session, "管理员设置", "settings")}
+	manager := selfupdate.New(s.Config, s.ConfigPath, s.Store)
+	data := adminSettingsData{
+		pageLayout:     s.adminLayout(r, session, "管理员设置", "settings"),
+		CurrentVersion: manager.CurrentVersion, StableExecutable: manager.StableBinaryPath(),
+		UpdateKeyReady: len(manager.PublicKey) > 0, RunningFromStablePath: manager.RunningFromStablePath(),
+	}
 	data.Flash = adminFlash(r)
 	data.Error = r.URL.Query().Get("error")
 	s.renderPage(w, r, "settings", data)
@@ -548,6 +558,8 @@ func adminFlash(r *http.Request) string {
 		return "GeoIP 数据库已更新并热加载。"
 	case "geoip-current":
 		return "GeoIP 数据库已是当月版本。"
+	case "update-current":
+		return "VisitorTrace 已是最新版本。"
 	default:
 		return ""
 	}
@@ -645,7 +657,7 @@ func operationWarning(value string) string {
 	labels := map[string]string{
 		"disk_low": "可用磁盘空间不足", "geoip_missing": "GeoIP 数据库不可用", "geoip_stale": "GeoIP 数据库超过 35 天未更新",
 		"backup_missing": "尚未创建备份", "backup_stale": "最近备份超过 48 小时", "cleanup_stale": "自动清理超过 2 小时未成功完成",
-		"backup_failed": "最近备份失败", "cleanup_failed": "最近清理失败", "geoip_update_failed": "最近 GeoIP 更新失败",
+		"backup_failed": "最近备份失败", "cleanup_failed": "最近清理失败", "geoip_update_failed": "最近 GeoIP 更新失败", "self_update_failed": "最近自更新失败",
 	}
 	if label := labels[value]; label != "" {
 		return label
@@ -654,7 +666,7 @@ func operationWarning(value string) string {
 }
 
 func operationLabel(value string) string {
-	if label := map[string]string{"backup": "备份", "cleanup": "维护清理", "geoip_update": "GeoIP 更新"}[value]; label != "" {
+	if label := map[string]string{"backup": "备份", "cleanup": "维护清理", "geoip_update": "GeoIP 更新", "self_update": "版本更新"}[value]; label != "" {
 		return label
 	}
 	return value

@@ -18,6 +18,7 @@ Package responsibilities:
 - `internal/maintenance`: in-process scheduling and bounded cleanup;
 - `internal/geoip`: local MMDB lookup.
 - `internal/geoipupdate`: monthly download, verification, atomic activation, hot reload, and rollback.
+- `internal/selfupdate`: signed manifests, candidate checks, release switching, readiness confirmation, and rollback.
 
 ## Development Checks
 
@@ -49,6 +50,37 @@ The GeoIP updater runs at startup and every 24 hours. `{YYYY-MM}` expands using 
 Pageview Record lists use a compound `(occurred_at, id)` cursor with server-controlled ordering. Each cursor carries a fingerprint of normalized filters and cannot be reused across a changed filter set. Responses contain no more than 200 rows. Record and aggregate exports iterate SQLite rows directly into `encoding/csv` without temporary export files; sensitive exports exist only on authenticated Administrator routes and send `Cache-Control: no-store`.
 
 `internal/operations` collects read-only runtime information: build metadata, process uptime, combined SQLite/WAL/SHM size, filesystem capacity, GeoIP and local-backup state, and task outcomes from `operation_status`. Linux uses `statfs`; other platforms report unavailable data rather than inventing values. Manual Admin operations reuse the same backup, maintenance, and GeoIP implementations as the CLI and require an Administrator session plus CSRF validation. GeoIP and maintenance runners use process-wide exclusion to prevent duplicate runs.
+
+## Release Signing and Self-Update
+
+Generate the project release key once:
+
+```sh
+go run ./tools/release-manifest keygen \
+  --private-key .release-secrets/update.ed25519 \
+  --public-key .release-secrets/update.pub
+```
+
+Git ignores `.release-secrets`. Keep the private key in protected storage outside the repository and never publish it or place it on the download server. Production builds embed only the Base64 public key printed by the command:
+
+```sh
+make build \
+  VERSION=0.2.0 \
+  UPDATE_PUBLIC_KEY="BASE64_RAW_ED25519_PUBLIC_KEY"
+```
+
+Build `linux-amd64` and `linux-arm64` executables and calculate their sizes and SHA-256 values, using [release-manifest.example.json](./release-manifest.example.json) as a template. `version` must exactly match the build's `VERSION`; `schema_version` must equal that binary's `visitortrace version --json` output. Sign with:
+
+```sh
+go run ./tools/release-manifest sign \
+  --private-key .release-secrets/update.ed25519 \
+  --manifest manifest.unsigned.json \
+  --output manifest.json
+```
+
+The signature payload is the fixed Go structure serialized without `signature`; `encoding/json` sorts Asset map keys. Never modify a published manifest or executable in place.
+
+The updater places a candidate at `data_dir/releases/v<version>/visitortrace` and switches the relative `releases/current` symbolic link. `data_dir/.update-pending.json` records old/new targets, the pre-update snapshot, and startup attempts. `serve` registers an attempt before opening SQLite; the third failure restores the snapshot without forward migration. Pending state completes only after HTTP SQLite, schema, and GeoIP readiness. An Admin-triggered update re-verifies the password in the current request and asks the process to exit gracefully after sending the response.
 
 ## Backup Format
 

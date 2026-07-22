@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"embed"
 	"encoding/json"
@@ -37,18 +38,20 @@ type pageviewPayload struct {
 }
 
 type Server struct {
-	Config     config.Config
-	ConfigPath string
-	Store      *store.Store
-	Started    time.Time
-	clientIP   *clientip.Resolver
-	ipLimit    *ratelimit.Limiter
-	siteLimit  *ratelimit.Limiter
-	logger     *slog.Logger
-	geoMu      sync.RWMutex
-	geoIP      *geoip.Resolver
-	mapCache   *mapCache
-	loginLimit *ratelimit.Limiter
+	Config      config.Config
+	ConfigPath  string
+	Store       *store.Store
+	Started     time.Time
+	clientIP    *clientip.Resolver
+	ipLimit     *ratelimit.Limiter
+	siteLimit   *ratelimit.Limiter
+	logger      *slog.Logger
+	geoMu       sync.RWMutex
+	geoIP       *geoip.Resolver
+	mapCache    *mapCache
+	loginLimit  *ratelimit.Limiter
+	restartOnce sync.Once
+	restart     chan struct{}
 }
 
 func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
@@ -67,6 +70,7 @@ func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
 		logger:     logger,
 		mapCache:   newMapCache(),
 		loginLimit: ratelimit.New(10, 5),
+		restart:    make(chan struct{}),
 	}
 }
 
@@ -80,6 +84,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin", s.adminDashboard)
 	mux.HandleFunc("GET /admin/settings", s.adminSettings)
 	mux.HandleFunc("POST /admin/settings/password", s.adminChangePassword)
+	mux.HandleFunc("POST /admin/settings/update", s.adminRunSelfUpdate)
 	mux.HandleFunc("GET /admin/records", s.adminRecords)
 	mux.HandleFunc("GET /admin/records.csv", s.adminRecordsCSV)
 	mux.HandleFunc("GET /admin/aggregates.csv", s.adminAggregatesCSV)
@@ -123,6 +128,26 @@ func (s *Server) SetGeoIP(resolver *geoip.Resolver) {
 
 func (s *Server) CloseGeoIP() {
 	s.SetGeoIP(nil)
+}
+
+func (s *Server) Ready(ctx context.Context) bool {
+	if err := s.Store.DB.PingContext(ctx); err != nil {
+		return false
+	}
+	if err := s.Store.SchemaReady(ctx); err != nil {
+		return false
+	}
+	s.geoMu.RLock()
+	defer s.geoMu.RUnlock()
+	return s.geoIP != nil
+}
+
+func (s *Server) RequestRestart() {
+	s.restartOnce.Do(func() { close(s.restart) })
+}
+
+func (s *Server) RestartRequested() <-chan struct{} {
+	return s.restart
 }
 
 func (s *Server) live(w http.ResponseWriter, _ *http.Request) {

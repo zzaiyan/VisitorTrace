@@ -407,6 +407,29 @@ func TestAdminOperationalActions(t *testing.T) {
 	}
 }
 
+func TestAdminSelfUpdateRequiresEmbeddedKey(t *testing.T) {
+	app, _, _ := testAdminServer(t)
+	cookie, csrf := loginAdmin(t, app)
+	settings := httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	settings.Host = "127.0.0.1:8790"
+	settings.AddCookie(cookie)
+	settingsResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(settingsResponse, settings)
+	if settingsResponse.Code != http.StatusOK || !strings.Contains(settingsResponse.Body.String(), "版本更新") || !strings.Contains(settingsResponse.Body.String(), "未配置") || !strings.Contains(settingsResponse.Body.String(), "disabled") {
+		t.Fatalf("settings update section = status %d body %q", settingsResponse.Code, settingsResponse.Body.String())
+	}
+	form := url.Values{"csrf": {csrf}, "password": {"correct horse"}}
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/update", strings.NewReader(form.Encode()))
+	request.Host = "127.0.0.1:8790"
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") {
+		t.Fatalf("self-update without key = status %d location %q", response.Code, response.Header().Get("Location"))
+	}
+}
+
 func TestPublicAnalyticsHidesSensitiveFields(t *testing.T) {
 	app, st, site := testServer(t)
 	now := time.Now().UTC()

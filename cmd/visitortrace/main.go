@@ -22,6 +22,7 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/maintenance"
 	"github.com/zzaiyan/VisitorTrace/internal/operations"
 	"github.com/zzaiyan/VisitorTrace/internal/password"
+	"github.com/zzaiyan/VisitorTrace/internal/selfupdate"
 	"github.com/zzaiyan/VisitorTrace/internal/server"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
@@ -49,10 +50,12 @@ func main() {
 		code = runPassword(os.Args[2:])
 	case "geoip":
 		code = runGeoIP(os.Args[2:])
+	case "update":
+		code = runUpdate(os.Args[2:])
 	case "site":
 		code = runSite(os.Args[2:])
 	case "version":
-		fmt.Printf("VisitorTrace %s (commit %s, built %s)\n", buildinfo.Version, buildinfo.Commit, buildinfo.BuildTime)
+		code = runVersion(os.Args[2:])
 	default:
 		usage()
 		code = 2
@@ -157,6 +160,17 @@ func runServe(args []string) int {
 	if *listen != "" {
 		cfg.Listen = *listen
 	}
+	recoveryCtx, recoveryCancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	rolledBack, recoveryErr := selfupdate.RegisterStartup(recoveryCtx, cfg)
+	recoveryCancel()
+	if recoveryErr != nil {
+		fmt.Fprintf(os.Stderr, "serve: self-update recovery: %v\n", recoveryErr)
+		return 1
+	}
+	if rolledBack {
+		fmt.Fprintln(os.Stderr, "serve: self-update rolled back; restart the supervised stable executable")
+		return 1
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	st, err := store.OpenExisting(ctx, cfg.DatabasePath)
@@ -196,6 +210,7 @@ func runServe(args []string) int {
 		return nil
 	}
 	geoIPDone := geoUpdater.Start(stopCtx)
+	updateReadyDone := watchPendingUpdate(stopCtx, cfg, st, app, logger)
 	serverErrors := make(chan error, 1)
 	go func() {
 		logger.Info("server starting", "listen", cfg.Listen, "version", buildinfo.Version, "commit", buildinfo.Commit)
@@ -204,33 +219,72 @@ func runServe(args []string) int {
 		}
 	}()
 
-	select {
-	case <-stopCtx.Done():
+	shutdown := func() error {
+		stop()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
 		shutdownErr := httpServer.Shutdown(shutdownCtx)
-		stop()
 		<-maintenanceDone
 		<-geoIPDone
-		if shutdownErr != nil {
+		<-updateReadyDone
+		return shutdownErr
+	}
+	select {
+	case <-stopCtx.Done():
+		if shutdownErr := shutdown(); shutdownErr != nil {
 			logger.Error("server shutdown failed", "error", shutdownErr)
 			return 1
 		}
 		logger.Info("server stopped")
 		return 0
+	case <-app.RestartRequested():
+		if shutdownErr := shutdown(); shutdownErr != nil {
+			logger.Error("server shutdown for update failed", "error", shutdownErr)
+			return 1
+		}
+		logger.Info("server stopped for self-update restart")
+		return 0
 	case err := <-serverErrors:
-		stop()
-		<-maintenanceDone
-		<-geoIPDone
+		_ = shutdown()
 		logger.Error("server stopped unexpectedly", "error", err)
 		return 1
 	}
+}
+
+func watchPendingUpdate(ctx context.Context, cfg config.Config, st *store.Store, app *server.Server, logger *slog.Logger) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if !selfupdate.HasPending(cfg.DataDir) {
+			return
+		}
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if !app.Ready(ctx) {
+					continue
+				}
+				if err := selfupdate.CompletePending(ctx, cfg, st, time.Now()); err != nil {
+					logger.Error("complete pending self-update failed", "error", err)
+					continue
+				}
+				logger.Info("self-update activation confirmed", "version", buildinfo.Version)
+				return
+			}
+		}
+	}()
+	return done
 }
 
 func runDoctor(args []string) int {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	configPath := fs.String("config", config.DefaultConfigPath(), "protected config path")
+	upgradeCheck := fs.Bool("upgrade-check", false, "accept an older schema that this binary can migrate")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -258,7 +312,12 @@ func runDoctor(args []string) int {
 		return 1
 	}
 	fmt.Printf("sqlite: ok (%s)\n", version)
-	if err := st.SchemaReady(ctx); err != nil {
+	if *upgradeCheck {
+		err = st.SchemaCompatible(ctx)
+	} else {
+		err = st.SchemaReady(ctx)
+	}
+	if err != nil {
 		fmt.Printf("schema: failed (%v)\n", err)
 		return 1
 	}
@@ -423,5 +482,5 @@ func (s *stringList) Set(value string) error {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: visitortrace <init|serve|doctor|backup|restore|maintenance|password|geoip|site|version> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: visitortrace <init|serve|doctor|backup|restore|maintenance|password|geoip|update|site|version> [flags]")
 }

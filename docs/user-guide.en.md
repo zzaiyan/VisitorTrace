@@ -221,6 +221,44 @@ The bottom of each Site page contains two dangerous operations. Both require the
 
 Both operations are irreversible. Create a backup first.
 
+## One-Click Self-Update
+
+Self-update uses side-by-side version directories and a stable symbolic link; it never overwrites the running executable. Bootstrap the layout once:
+
+```sh
+./bin/visitortrace update bootstrap \
+  --config "$HOME/.config/visitortrace/config.json"
+```
+
+The command prints a stable executable path similar to:
+
+```text
+$HOME/.local/share/visitortrace/releases/current/visitortrace
+```
+
+Configure aaPanel or another process supervisor to run that stable path and restart the process after it exits. This is a generic process-supervision contract; VisitorTrace does not depend on an aaPanel API.
+
+You can then check or apply releases on the server:
+
+```sh
+visitortrace update check --config "$HOME/.config/visitortrace/config.json"
+visitortrace update apply --config "$HOME/.config/visitortrace/config.json"
+```
+
+Alternatively, enter the current password under Administrator Settings and select Check and update. The Admin workflow re-verifies the password in that request. Once the candidate is prepared, the current process exits gracefully and the supervisor starts the new version through the stable path.
+
+The updater verifies the Ed25519 manifest signature, platform asset size and SHA-256, candidate version/schema identity, and the candidate's `doctor --upgrade-check`. Only then does it create a pre-update database snapshot, persist pending state, and atomically switch `current`. Readiness confirms the new release and retains the two latest prior versions. Three failed readiness startups restore the pre-update database and switch back to the prior release.
+
+Production release builds must embed the project's release public key. Development builds without a key disable the update button. The manifest defaults to GitHub Releases and can point to a domestic mirror through protected configuration:
+
+```json
+{
+  "update_manifest_url": "https://mirror.example.com/visitortrace/manifest.json"
+}
+```
+
+A mirror cannot replace the trust root. The manifest must verify against the public key embedded in the executable regardless of its download location.
+
 ## Current Status
 
-The current milestone implements Pageview ingestion, aggregate statistics, automatic record cleanup, automatic GeoIP updates, SVG maps, Public Analytics, Administrator authentication and password management, Site reset/deletion, Map Presets, and checksum-verified backup and restore. One-click self-update remains follow-up work.
+The current milestone implements the agreed first-version scope, including Pageview ingestion and aggregates, automatic cleanup, automatic GeoIP updates, SVG maps, Public Analytics, administrative data and health views, password and Site lifecycles, backup/restore, and signature-verified one-click self-update.

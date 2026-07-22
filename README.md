@@ -17,6 +17,7 @@ VisitorTrace 面向个人主页、博客和其他小型网站，在一个 Go 服
 - 密码保护的 Admin Console
 - 可筛选、分页和 CSV 导出的访问明细
 - 备份、清理、GeoIP 与资源状态总览
+- Ed25519 签名验证、自动备份和失败回滚的一键自更新
 - 可实时预览的 Map Preset
 - 一体式 Widget 和分离式 Tracker
 
@@ -63,6 +64,7 @@ VisitorTrace is designed for personal homepages, blogs, and other small websites
 - A password-protected Admin Console
 - Filterable, cursor-paginated, CSV-exportable Pageview Records
 - Backup, cleanup, GeoIP, and resource health overview
+- One-click self-update with Ed25519 verification, automatic backup, and rollback
 - Live Map Preset previews
 - Integrated Widget and separated Tracker modes
 

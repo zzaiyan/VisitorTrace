@@ -160,6 +160,18 @@ tbody tr:hover { background: #f6f9f7; }
 .danger-form h3 { margin-bottom: 7px; color: var(--danger); }
 .danger-form p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .danger-form .button { justify-self: start; }
+.update-status { display: grid; grid-template-columns: 2fr 1fr 1fr; border: 1px solid var(--line); background: white; }
+.update-status > div { min-width: 0; padding: 15px; border-right: 1px solid var(--line); }
+.update-status > div:last-child { border-right: 0; }
+.update-status span { display: block; margin-bottom: 7px; color: var(--muted); font-size: 10px; }
+.update-status code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.update-form { display: flex; max-width: 620px; align-items: end; gap: 12px; margin-top: 17px; }
+.update-form .field { flex: 1; }
+.button:disabled { cursor: not-allowed; opacity: .45; }
+.restart-state { display: flex; max-width: 700px; align-items: center; gap: 24px; padding: 30px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.restart-state p { margin: 8px 0 18px; color: var(--muted); }
+.restart-indicator { width: 38px; height: 38px; flex: 0 0 38px; border: 3px solid var(--line); border-top-color: var(--green); border-radius: 50%; animation: restart-spin 1s linear infinite; }
+@keyframes restart-spin { to { transform: rotate(360deg); } }
 
 .login-shell { display: grid; min-height: 100vh; place-items: center; padding: 24px; background: #e9efeb; }
 .login-panel { width: min(100%, 410px); padding: 38px; border: 1px solid var(--line); background: white; box-shadow: var(--shadow); }
@@ -228,6 +240,10 @@ tbody tr:hover { background: #f6f9f7; }
 	.operations-grid { grid-template-columns: 1fr; }
 	.operations-grid > div, .operations-grid > div:nth-child(2n), .operations-grid > div:nth-child(3n), .operations-grid > div:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--line); }
 	.operations-grid > div:last-child { border-bottom: 0; }
+	.update-status { grid-template-columns: 1fr; }
+	.update-status > div { border-right: 0; border-bottom: 1px solid var(--line); }
+	.update-status > div:last-child { border-bottom: 0; }
+	.update-form { align-items: stretch; flex-direction: column; }
   .page-header .button, .header-actions { width: 100%; }
   .header-actions .button { flex: 1; }
   .site-grid, .field-grid.two, .field-grid.four, .snippet-grid, .dimension-grid, .danger-grid, .records-filter, .aggregate-export { grid-template-columns: 1fr; }
