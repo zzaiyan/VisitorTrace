@@ -6,6 +6,7 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+- Added `visitortrace geoip query` and `scripts/query-mmdb.sh` to print formatted raw MMDB metadata and records for one IP, including the matched network and explicit no-record status.
 - Added `scripts/update-systemd-binary.sh` for verified manual updates from an already-downloaded local binary, including a pre-update backup, atomic release switch, service restart, and automatic executable rollback.
 - Added tracker hostname capture and hostname-scoped UV counting for Sites deployed on multiple domains. Hostnames are available in Pageview Records, filters, CSV exports, Public Analytics, Admin Analytics, and aggregate exports.
 - Added DB-IP Chinese city-label normalization to remove district/subdistrict qualifiers where the City Lite record provides enough hierarchy information.

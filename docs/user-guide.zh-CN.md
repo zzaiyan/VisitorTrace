@@ -188,6 +188,22 @@ https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz
 
 使用 `--force` 可忽略当月文件状态重新下载。命令行更新发生在另一个进程中，若服务正在运行，更新后需要通过 systemd 重启服务；服务内置的自动更新会直接热加载。
 
+需要诊断某个 IP 为什么显示成特定城市时，可以查询原始 MMDB 记录：
+
+```sh
+# 使用配置文件中的 geoip_path。
+./scripts/query-mmdb.sh --binary ./bin/visitortrace \
+  --config "$HOME/.config/visitortrace/config.json" \
+  1.2.3.4
+
+# 或直接指定 MMDB，绕过配置文件。
+./scripts/query-mmdb.sh --binary ./bin/visitortrace \
+  --mmdb /path/to/geoip.mmdb \
+  1.2.3.4
+```
+
+命令输出格式化 JSON，包括数据库元数据、命中的 CIDR、`found` 状态和未修改的 MMDB `record` 字段树。它不会应用 VisitorTrace 的城市级标签规范化。地址未命中时返回 `found: false` 和 `null` 的 `record`。在已部署的服务器上，也可以直接使用已安装的可执行文件，例如 `sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip query --config /etc/visitortrace/config.json 1.2.3.4`。
+
 国内镜像可在配置文件中设置：
 
 ```json

@@ -483,4 +483,5 @@ func (s *stringList) Set(value string) error {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, "usage: visitortrace <init|serve|doctor|backup|restore|maintenance|password|geoip|update|site|version> [flags]")
+	fmt.Fprintln(os.Stderr, "       visitortrace geoip query [--config PATH] [--mmdb PATH] IP")
 }

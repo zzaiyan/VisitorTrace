@@ -188,6 +188,22 @@ Check and update manually with:
 
 Use `--force` to download again despite a current-month file. A command-line update runs in a separate process, so restart a running systemd service afterward. The built-in automatic update hot-loads the new database directly.
 
+Inspect the raw MMDB record for one IP when diagnosing a city-level result:
+
+```sh
+# Use the configured geoip_path.
+./scripts/query-mmdb.sh --binary ./bin/visitortrace \
+  --config "$HOME/.config/visitortrace/config.json" \
+  1.2.3.4
+
+# Or bypass the configuration and select an MMDB explicitly.
+./scripts/query-mmdb.sh --binary ./bin/visitortrace \
+  --mmdb /path/to/geoip.mmdb \
+  1.2.3.4
+```
+
+The command prints formatted JSON containing the database metadata, the matched CIDR, a `found` flag, and the unmodified MMDB `record` tree. It does not apply VisitorTrace's city-level label normalization. A missing address returns `found: false` and a `null` record. On a deployed system, the same operation can be run directly with the installed executable, for example `sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip query --config /etc/visitortrace/config.json 1.2.3.4`.
+
 Configure a domestic mirror in the configuration file:
 
 ```json
