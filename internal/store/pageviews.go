@@ -74,7 +74,9 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 	}
 	local := observation.OccurredAt.In(location)
 	localDate := local.Format(time.DateOnly)
-	windowStart := deduplicationWindowStart(local, windowDays).Format(time.DateOnly)
+	windowStartTime := deduplicationWindowStart(local, windowDays)
+	windowStart := windowStartTime.Format(time.DateOnly)
+	windowEnd := windowStartTime.AddDate(0, 0, windowDays).Format(time.DateOnly)
 
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO pageviews (
@@ -115,10 +117,10 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 	for _, dimension := range dimensions {
 		registration, err := tx.ExecContext(ctx, `
 			INSERT INTO visitor_registrations (
-				site_id, window_start, dimension_kind, dimension_value, visitor_digest, created_at
-			) VALUES (?, ?, ?, ?, ?, ?)
+				site_id, window_start, dimension_kind, dimension_value, visitor_digest, created_at, window_end
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT DO NOTHING
-		`, observation.SiteID, windowStart, dimension.kind, dimension.value, observation.VisitorDigest, observation.OccurredAt.Format(time.RFC3339Nano))
+		`, observation.SiteID, windowStart, dimension.kind, dimension.value, observation.VisitorDigest, observation.OccurredAt.Format(time.RFC3339Nano), windowEnd)
 		if err != nil {
 			return RecordPageviewResult{}, fmt.Errorf("register Unique Visitor: %w", err)
 		}

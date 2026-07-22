@@ -15,6 +15,7 @@ Package responsibilities:
 - `internal/server`: HTTP APIs, embed scripts, and administrative/public pages;
 - `internal/maprender`: SVG map rendering without an external runtime dependency;
 - `internal/backup`: consistent snapshots, archive verification, and restoration;
+- `internal/maintenance`: in-process scheduling and bounded cleanup;
 - `internal/geoip`: local MMDB lookup.
 
 ## Development Checks
@@ -35,6 +36,8 @@ go mod verify
 Migrations are embedded in `internal/store/migrations.go` and applied in version order inside transactions. Startup performs forward migrations; downward migrations are not supported. Create a verified snapshot with `visitortrace backup` before a destructive upgrade.
 
 The Pageview ingestion transaction stores the individual record, visitor-window registrations, and durable aggregates together. Expiring an individual record must not reverse its durable aggregate contributions.
+
+`serve` starts a lightweight maintenance loop that runs on startup and hourly. `visitortrace maintenance` exposes the same cleanup flow for diagnostics and external schedulers. Every deletion transaction has a bounded batch size; `operation_status` retains the latest maintenance outcome for the operational dashboard.
 
 ## Backup Format
 

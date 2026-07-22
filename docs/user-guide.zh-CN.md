@@ -140,6 +140,23 @@ URL 参数只覆写当前请求，不会改变保存的 Map Preset。
 
 如需定时备份，可由系统计划任务每天调用 `visitortrace backup`；服务本身不依赖特定面板或定时任务实现。
 
+## 自动维护与保留期
+
+服务启动后会立即执行一次维护，此后每小时检查一次。维护任务按 Site 删除：
+
+- 实际年龄超过“逐条记录保留期”的 Pageview Record；
+- 已经结束的访客合并窗口登记；
+- 过期或超过 12 小时未活动的管理员 Session。
+
+删除采用有上限的小批次事务，避免长时间阻塞采集。每日聚合和地图统计不会随逐条记录过期而删除。缩短保留期会让新超出范围的记录在下一轮维护中被清理，延长保留期不能恢复已经删除的记录。
+
+可人工运行同一维护流程：
+
+```sh
+./bin/visitortrace maintenance \
+  --config "$HOME/.config/visitortrace/config.json"
+```
+
 ## 当前状态
 
-当前版本已经实现 Pageview 采集、聚合统计、SVG 地图、Public Analytics、管理员认证、Map Preset，以及带校验和完整性检查的备份恢复。自动记录清理、GeoIP 自动更新、密码重置和一键自更新仍在后续里程碑中。
+当前版本已经实现 Pageview 采集、聚合统计、自动记录清理、SVG 地图、Public Analytics、管理员认证、Map Preset，以及带校验和完整性检查的备份恢复。GeoIP 自动更新、密码重置和一键自更新仍在后续里程碑中。

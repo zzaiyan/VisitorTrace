@@ -100,6 +100,25 @@ var migrations = []migration{
 			`CREATE INDEX administrator_sessions_expiry ON administrator_sessions (expires_at)`,
 		},
 	},
+	{
+		version: 5,
+		statements: []string{
+			`ALTER TABLE visitor_registrations ADD COLUMN window_end TEXT NOT NULL DEFAULT ''`,
+			`UPDATE visitor_registrations
+			 SET window_end = date(window_start, '+' || COALESCE((
+			     SELECT dedup_window_days FROM sites WHERE sites.id = visitor_registrations.site_id
+			 ), 1) || ' days')
+			 WHERE window_end = ''`,
+			`CREATE INDEX visitor_registrations_end ON visitor_registrations (site_id, window_end)`,
+			`CREATE TABLE operation_status (
+				operation TEXT PRIMARY KEY,
+				started_at TEXT NOT NULL,
+				completed_at TEXT,
+				succeeded INTEGER CHECK (succeeded IN (0, 1)),
+				summary TEXT NOT NULL DEFAULT ''
+			) WITHOUT ROWID`,
+		},
+	},
 }
 
 func (s *Store) initializeBaseSchema(ctx context.Context, passwordHash string) error {

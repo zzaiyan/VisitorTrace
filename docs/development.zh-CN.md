@@ -15,6 +15,7 @@ VisitorTrace 是一个单进程 Go 服务。生产运行只依赖可执行文件
 - `internal/server`：HTTP API、嵌入脚本与管理/公开页面；
 - `internal/maprender`：无外部运行时依赖的 SVG 地图渲染；
 - `internal/backup`：一致性快照、归档校验与恢复；
+- `internal/maintenance`：进程内定期维护和有界清理调度；
 - `internal/geoip`：本地 MMDB 查询。
 
 ## 开发校验
@@ -35,6 +36,8 @@ go mod verify
 迁移按版本顺序嵌入 `internal/store/migrations.go`，必须在事务内完成。服务启动会运行正向迁移，不提供向下迁移。涉及破坏性升级时，应先使用 `visitortrace backup` 创建可验证快照。
 
 Pageview 写入事务同时保存逐条记录、访客窗口登记和持久化聚合。过期逐条记录不得反向修改已经形成的聚合。
+
+`serve` 启动一个轻量级维护循环，启动时和每小时调用同一套清理逻辑。`visitortrace maintenance` 为人工诊断和外部调度提供等价入口。每个删除事务限制批量大小；`operation_status` 保存最近一次维护状态，供运行状态页面读取。
 
 ## 备份格式
 

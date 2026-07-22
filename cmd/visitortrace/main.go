@@ -18,6 +18,7 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/buildinfo"
 	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
+	"github.com/zzaiyan/VisitorTrace/internal/maintenance"
 	"github.com/zzaiyan/VisitorTrace/internal/password"
 	"github.com/zzaiyan/VisitorTrace/internal/server"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
@@ -40,6 +41,8 @@ func main() {
 		code = runBackup(os.Args[2:])
 	case "restore":
 		code = runRestore(os.Args[2:])
+	case "maintenance":
+		code = runMaintenance(os.Args[2:])
 	case "site":
 		code = runSite(os.Args[2:])
 	case "version":
@@ -162,6 +165,9 @@ func runServe(args []string) int {
 	app := server.New(cfg, st, logger)
 	app.SetGeoIP(geoResolver)
 	httpServer := app.HTTPServer()
+	stopCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	maintenance.New(st, logger).Start(stopCtx)
 	serverErrors := make(chan error, 1)
 	go func() {
 		logger.Info("server starting", "listen", cfg.Listen, "version", buildinfo.Version, "commit", buildinfo.Commit)
@@ -170,8 +176,6 @@ func runServe(args []string) int {
 		}
 	}()
 
-	stopCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 	select {
 	case <-stopCtx.Done():
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -348,5 +352,5 @@ func (s *stringList) Set(value string) error {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: visitortrace <init|serve|doctor|backup|restore|site|version> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: visitortrace <init|serve|doctor|backup|restore|maintenance|site|version> [flags]")
 }

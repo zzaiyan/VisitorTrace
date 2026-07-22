@@ -140,6 +140,23 @@ The restore command first creates a safety snapshot in `backup_dir/pre-restore`,
 
 For scheduled backups, configure the operating system to run `visitortrace backup` daily. The service does not depend on a specific control panel or scheduler.
 
+## Automatic Maintenance and Retention
+
+The service runs maintenance once at startup and then every hour. Maintenance removes, per Site:
+
+- Pageview Records whose actual age exceeds the configured retention period;
+- visitor registrations for completed deduplication windows;
+- expired Administrator sessions and sessions idle for at least 12 hours.
+
+Deletion uses bounded transactional batches to avoid blocking ingestion for an extended period. Daily aggregates and map statistics remain after individual records expire. Reducing the retention period makes newly out-of-range records eligible at the next run; extending it cannot recover records already deleted.
+
+Run the same maintenance flow manually with:
+
+```sh
+./bin/visitortrace maintenance \
+  --config "$HOME/.config/visitortrace/config.json"
+```
+
 ## Current Status
 
-The current milestone implements Pageview ingestion, aggregate statistics, SVG maps, Public Analytics, Administrator authentication, Map Presets, and checksum-verified backup and restore. Automatic record cleanup, automatic GeoIP updates, password reset, and one-click self-update remain follow-up work.
+The current milestone implements Pageview ingestion, aggregate statistics, automatic record cleanup, SVG maps, Public Analytics, Administrator authentication, Map Presets, and checksum-verified backup and restore. Automatic GeoIP updates, password reset, and one-click self-update remain follow-up work.
