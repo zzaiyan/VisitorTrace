@@ -46,6 +46,8 @@ Site 数据清空会在一个事务中先关闭采集和公开展示，再删除
 
 GeoIP 更新器在启动时和每 24 小时运行，`{YYYY-MM}` 使用 UTC 月份展开。压缩输入限制为 1 GiB，展开后的 MMDB 限制为 2 GiB。配置 SHA-256 sidecar 时先校验下载容器；随后始终调用 MMDB 完整验证。候选文件与目标位于同一文件系统，通过重命名激活，上一版保留为 `.previous`。服务通过互斥保护的 Resolver 热交换，避免关闭仍在查询的旧句柄。
 
+Pageview Record 列表使用 `(occurred_at, id)` 复合游标，查询顺序由服务端固定，游标携带规范化筛选指纹，不能跨筛选复用。每页最多 200 条。明细和聚合导出直接遍历 SQLite Rows 并写入 `encoding/csv`，不生成临时导出文件；敏感导出只挂载在管理员认证路由并设置 `Cache-Control: no-store`。
+
 ## 备份格式
 
 `.vtbackup` 是 ZIP 容器，包含：

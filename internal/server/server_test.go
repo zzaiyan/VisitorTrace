@@ -319,6 +319,54 @@ func TestAdminSiteResetAndDelete(t *testing.T) {
 	}
 }
 
+func TestAdminRecordFilteringAndCSVExports(t *testing.T) {
+	app, st, site := testAdminServer(t)
+	cookie, _ := loginAdmin(t, app)
+	_, err := st.RecordPageview(context.Background(), store.PageviewObservation{
+		SiteID: site.ID, OccurredAt: time.Date(2026, time.July, 22, 8, 0, 0, 0, time.UTC), Path: "/records",
+		CountryCode: "CN", RegionCode: "HB", City: "Wuhan", VisitorDigest: bytes.Repeat([]byte{6}, 32),
+		OriginalIP: "203.0.113.6", OperatingSystem: "Linux", Browser: "Firefox",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	get := func(path string) *httptest.ResponseRecorder {
+		t.Helper()
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.Host = "127.0.0.1:8790"
+		request.AddCookie(cookie)
+		response := httptest.NewRecorder()
+		app.Handler().ServeHTTP(response, request)
+		return response
+	}
+	page := get("/admin/records?site_id=" + site.ID + "&ip=203.0.113.6")
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "203.0.113.6") || !strings.Contains(page.Body.String(), "/records") || !strings.Contains(page.Body.String(), "导出当前筛选 CSV") {
+		t.Fatalf("record page = status %d body %q", page.Code, page.Body.String())
+	}
+	recordCSV := get("/admin/records.csv?site_id=" + site.ID + "&ip=203.0.113.6")
+	if recordCSV.Code != http.StatusOK || recordCSV.Header().Get("Content-Type") != "text/csv; charset=utf-8" || !strings.Contains(recordCSV.Body.String(), "occurred_at_site_time") || !strings.Contains(recordCSV.Body.String(), "203.0.113.6") {
+		t.Fatalf("record CSV = status %d body %q", recordCSV.Code, recordCSV.Body.String())
+	}
+	aggregateCSV := get("/admin/aggregates.csv?site_id=" + site.ID + "&dimension=overall&start=2026-07-22&end=2026-07-22")
+	if aggregateCSV.Code != http.StatusOK || !strings.Contains(aggregateCSV.Body.String(), "dimension_kind") || !strings.Contains(aggregateCSV.Body.String(), "overall") {
+		t.Fatalf("Aggregate CSV = status %d body %q", aggregateCSV.Code, aggregateCSV.Body.String())
+	}
+	invalid := get("/admin/records?digest=not-a-digest")
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid filter status = %d", invalid.Code)
+	}
+}
+
+func TestRecordCursorRejectsChangedFilters(t *testing.T) {
+	record := store.PageviewRecord{ID: 12, OccurredAt: time.Date(2026, time.July, 22, 8, 0, 0, 0, time.UTC)}
+	first := store.PageviewFilters{SiteID: "one"}
+	second := store.PageviewFilters{SiteID: "two"}
+	token := encodeRecordCursor(record, recordFilterFingerprint(first, 100))
+	if _, err := decodeRecordCursor(token, recordFilterFingerprint(second, 100)); err == nil {
+		t.Fatal("cursor was accepted with changed filters")
+	}
+}
+
 func TestPublicAnalyticsHidesSensitiveFields(t *testing.T) {
 	app, st, site := testServer(t)
 	now := time.Now().UTC()

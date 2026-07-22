@@ -223,6 +223,7 @@ type PageviewRecord struct {
 	ID              int64
 	SiteID          string
 	SiteName        string
+	SiteTimezone    string
 	OccurredAt      time.Time
 	LocalDate       string
 	Path            string
@@ -241,38 +242,9 @@ func (s *Store) RecentPageviewRecords(ctx context.Context, siteID string, limit 
 	if limit < 1 || limit > 200 {
 		limit = 50
 	}
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT p.id, p.site_id, s.name, p.occurred_at, p.local_date, p.path,
-		       p.country_code, p.region_code, p.city, p.latitude, p.longitude,
-		       p.visitor_digest, p.original_ip, p.operating_system, p.browser
-		FROM pageviews AS p
-		JOIN sites AS s ON s.id = p.site_id
-		WHERE p.site_id = ?
-		ORDER BY p.occurred_at DESC, p.id DESC
-		LIMIT ?
-	`, siteID, limit)
+	page, err := s.PageviewRecords(ctx, PageviewFilters{SiteID: siteID}, nil, "older", limit)
 	if err != nil {
-		return nil, fmt.Errorf("read Pageview Records: %w", err)
+		return nil, err
 	}
-	defer rows.Close()
-	result := make([]PageviewRecord, 0, limit)
-	for rows.Next() {
-		var item PageviewRecord
-		var occurred string
-		var digest []byte
-		if err := rows.Scan(&item.ID, &item.SiteID, &item.SiteName, &occurred, &item.LocalDate, &item.Path, &item.CountryCode, &item.RegionCode, &item.City, &item.Latitude, &item.Longitude, &digest, &item.OriginalIP, &item.OperatingSystem, &item.Browser); err != nil {
-			return nil, fmt.Errorf("scan Pageview Record: %w", err)
-		}
-		var err error
-		item.OccurredAt, err = time.Parse(time.RFC3339Nano, occurred)
-		if err != nil {
-			return nil, fmt.Errorf("parse Pageview timestamp: %w", err)
-		}
-		item.VisitorDigest = fmt.Sprintf("%x", digest)
-		result = append(result, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate Pageview Records: %w", err)
-	}
-	return result, nil
+	return page.Records, nil
 }

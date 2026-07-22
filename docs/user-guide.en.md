@@ -70,6 +70,16 @@ The default listener is `127.0.0.1:8790`. In production, terminate HTTPS at a re
 
 The Admin Console manages Site settings, collection and publication state, Map Presets, and sensitive Pageview Record fields such as original IP, path, browser, operating system, and Visitor Digest. Public Analytics exposes aggregate data only.
 
+### Pageview Records and Exports
+
+The Admin Console's Pageview Records view covers every Site. It shows 100 rows by default, with 50 and 200 row options. Filter-bound cursors move toward older or newer records without the drift of offset page numbers while ingestion continues.
+
+Exact filters can be combined for Site, UTC start/end time, normalized path, original IP, Visitor Digest, country code, region code, city, browser, and operating system. On-screen timestamps use each record's Site timezone; hovering reveals UTC.
+
+Export current filters streams every matching record to CSV and is not limited by the current page size. The file contains UTC and Site-local timestamps plus every detailed field, including coordinates, original IP, and Visitor Digest. Text beginning with `=`, `+`, `-`, or `@` receives a leading apostrophe so spreadsheet software does not interpret external data as a formula.
+
+Aggregate export requires one Site and separately exports overall, path, country, region, city, browser, or operating-system families, optionally bounded by Site-local dates.
+
 ## Website Integration
 
 The integrated Widget records a Pageview and inserts the map:

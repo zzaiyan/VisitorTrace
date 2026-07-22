@@ -46,6 +46,8 @@ A Site-data reset first disables ingestion and publication in the same transacti
 
 The GeoIP updater runs at startup and every 24 hours. `{YYYY-MM}` expands using the UTC month. Compressed input is limited to 1 GiB and the expanded MMDB to 2 GiB. A configured SHA-256 sidecar verifies the downloaded container first; full MMDB verification always follows. The candidate is created on the target filesystem and activated by rename, preserving the prior file as `.previous`. The service swaps resolvers behind a mutex so an old reader is not closed during an active lookup.
 
+Pageview Record lists use a compound `(occurred_at, id)` cursor with server-controlled ordering. Each cursor carries a fingerprint of normalized filters and cannot be reused across a changed filter set. Responses contain no more than 200 rows. Record and aggregate exports iterate SQLite rows directly into `encoding/csv` without temporary export files; sensitive exports exist only on authenticated Administrator routes and send `Cache-Control: no-store`.
+
 ## Backup Format
 
 A `.vtbackup` file is a ZIP container with:

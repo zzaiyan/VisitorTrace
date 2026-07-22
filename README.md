@@ -15,6 +15,7 @@ VisitorTrace 面向个人主页、博客和其他小型网站，在一个 Go 服
 - 本地 GeoIP 查询与 SVG 访客地图
 - Public Analytics
 - 密码保护的 Admin Console
+- 可筛选、分页和 CSV 导出的访问明细
 - 可实时预览的 Map Preset
 - 一体式 Widget 和分离式 Tracker
 
@@ -59,6 +60,7 @@ VisitorTrace is designed for personal homepages, blogs, and other small websites
 - Local GeoIP lookup and SVG visitor maps
 - Public Analytics
 - A password-protected Admin Console
+- Filterable, cursor-paginated, CSV-exportable Pageview Records
 - Live Map Preset previews
 - Integrated Widget and separated Tracker modes
 

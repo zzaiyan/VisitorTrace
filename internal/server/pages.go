@@ -89,10 +89,11 @@ type publicAnalyticsData struct {
 
 func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string, data any) {
 	templates, err := template.New("layout.html").Funcs(template.FuncMap{
-		"formatCount": func(value int64) string { return strconv.FormatInt(value, 10) },
-		"formatTime":  func(value time.Time) string { return value.Local().Format("2006-01-02 15:04:05") },
-		"formatUTC":   func(value time.Time) string { return value.UTC().Format(time.RFC3339) },
-		"geoLabel":    geoLabel,
+		"formatCount":      func(value int64) string { return strconv.FormatInt(value, 10) },
+		"formatTime":       func(value time.Time) string { return value.Local().Format("2006-01-02 15:04:05") },
+		"formatUTC":        func(value time.Time) string { return value.UTC().Format(time.RFC3339) },
+		"formatRecordTime": formatRecordTime,
+		"geoLabel":         geoLabel,
 		"metricPercent": func(value, total int64) string {
 			if total <= 0 {
 				return "0%"
