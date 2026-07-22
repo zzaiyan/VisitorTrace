@@ -271,4 +271,4 @@ A mirror cannot replace the trust root. The manifest must verify against the pub
 
 ## Current Status
 
-The current milestone implements the agreed first-version scope, including Pageview ingestion and aggregates, automatic cleanup, automatic GeoIP updates, SVG maps, Public Analytics, administrative data and health views, password and Site lifecycles, backup/restore, and signature-verified one-click self-update.
+The current milestone implements the agreed first-version scope, including Pageview ingestion and aggregates, counting-rule history, automatic cleanup, automatic GeoIP updates, bounded SVG-map caching, bilingual interactive analytics, administrative data and health views, password and Site lifecycles, backup/restore, and signature-verified one-click self-update.

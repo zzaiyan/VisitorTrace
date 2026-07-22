@@ -271,4 +271,4 @@ visitortrace update apply --config "$HOME/.config/visitortrace/config.json"
 
 ## 当前状态
 
-当前版本已经实现此前确定的首版功能，包括 Pageview 采集与聚合、自动清理、GeoIP 自动更新、SVG 地图、Public Analytics、管理员数据与运行状态、密码和 Site 生命周期、备份恢复，以及签名验证的一键自更新。
+当前版本已经实现此前确定的首版功能，包括 Pageview 采集与聚合、规则生效历史、自动清理、GeoIP 自动更新、带有界缓存的 SVG 地图、双语交互分析、管理员数据与运行状态、密码和 Site 生命周期、备份恢复，以及签名验证的一键自更新。
