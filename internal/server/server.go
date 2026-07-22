@@ -332,34 +332,30 @@ func (s *Server) mapSVG(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	data, err := s.Store.PublicMapData(r.Context(), siteID)
+	key := siteID + "|" + options.CacheKey()
+	cached, err := s.mapCache.getOrRender(r.Context(), key, siteID, time.Now(), func() (mapCacheItem, error) {
+		data, err := s.Store.PublicMapData(r.Context(), siteID)
+		if err != nil {
+			return mapCacheItem{}, err
+		}
+		body, err := maprender.Render(data, options)
+		if err != nil {
+			return mapCacheItem{}, err
+		}
+		sum := sha256.Sum256(body)
+		return mapCacheItem{
+			body: body, etag: fmt.Sprintf("\"%x\"", sum[:16]), expiresAt: time.Now().Add(mapCacheTTL),
+		}, nil
+	})
 	if errors.Is(err, store.ErrPublicationDisabled) {
 		http.Error(w, "public views are disabled", http.StatusNotFound)
 		return
 	}
 	if err != nil {
-		http.Error(w, "unknown Site", http.StatusNotFound)
-		return
-	}
-	key := siteID + "|" + options.CacheKey()
-	if cached, ok := s.mapCache.get(key, time.Now()); ok {
-		s.writeMapResponse(w, r, cached)
-		return
-	}
-	body, err := maprender.Render(data, options)
-	if err != nil {
 		s.logger.Error("render Public Map failed", "site_id", siteID, "error", err)
 		http.Error(w, "could not render Public Map", http.StatusInternalServerError)
 		return
 	}
-	sum := sha256.Sum256(body)
-	cached := mapCacheItem{
-		key:       key,
-		body:      body,
-		etag:      fmt.Sprintf("\"%x\"", sum[:16]),
-		expiresAt: time.Now().Add(mapCacheTTL),
-	}
-	s.mapCache.put(key, cached)
 	s.writeMapResponse(w, r, cached)
 }
 

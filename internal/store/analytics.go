@@ -19,20 +19,26 @@ type DailyMetric struct {
 	UniqueVisitors int64  `json:"unique_visitors"`
 }
 
+type DeduplicationRuleChange struct {
+	EffectiveDate string `json:"effective_date"`
+	WindowDays    int    `json:"window_days"`
+}
+
 type PublicAnalyticsData struct {
-	SiteID           string
-	SiteName         string
-	StartDate        string
-	EndDate          string
-	Pageviews        int64
-	UniqueVisitors   int64
-	Daily            []DailyMetric
-	Countries        []AnalyticsMetric
-	Cities           []AnalyticsMetric
-	Browsers         []AnalyticsMetric
-	OperatingSystems []AnalyticsMetric
-	Paths            []AnalyticsMetric
-	MapPoints        []MapPoint
+	SiteID             string
+	SiteName           string
+	StartDate          string
+	EndDate            string
+	Pageviews          int64
+	UniqueVisitors     int64
+	Daily              []DailyMetric
+	Countries          []AnalyticsMetric
+	Cities             []AnalyticsMetric
+	Browsers           []AnalyticsMetric
+	OperatingSystems   []AnalyticsMetric
+	Paths              []AnalyticsMetric
+	MapPoints          []MapPoint
+	DeduplicationRules []DeduplicationRuleChange
 }
 
 type SiteOverview struct {
@@ -137,6 +143,35 @@ func (s *Store) analyticsData(ctx context.Context, site Site, startDate, endDate
 		if err != nil {
 			return PublicAnalyticsData{}, err
 		}
+		result.DeduplicationRules, err = s.readDeduplicationRuleChanges(ctx, siteID, startDate, endDate)
+		if err != nil {
+			return PublicAnalyticsData{}, err
+		}
+	}
+	return result, nil
+}
+
+func (s *Store) readDeduplicationRuleChanges(ctx context.Context, siteID, startDate, endDate string) ([]DeduplicationRuleChange, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+		SELECT effective_date, window_days
+		FROM site_deduplication_rules
+		WHERE site_id = ? AND effective_date != '1970-01-01' AND effective_date BETWEEN ? AND ?
+		ORDER BY effective_date
+	`, siteID, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("read deduplication rule changes: %w", err)
+	}
+	defer rows.Close()
+	var result []DeduplicationRuleChange
+	for rows.Next() {
+		var change DeduplicationRuleChange
+		if err := rows.Scan(&change.EffectiveDate, &change.WindowDays); err != nil {
+			return nil, fmt.Errorf("scan deduplication rule change: %w", err)
+		}
+		result = append(result, change)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate deduplication rule changes: %w", err)
 	}
 	return result, nil
 }

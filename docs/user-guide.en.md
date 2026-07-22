@@ -53,6 +53,8 @@ Initialization asks for an Administrator password containing at least eight char
 
 Each Site has an independent Site ID, Allowed Origins, statistics timezone, visitor deduplication window, Pageview Record retention period, and Map Preset.
 
+Changing the visitor deduplication window schedules a new rule for the next midnight in the Site timezone and anchors the new sequence at that date. Saving does not alter the current window immediately, and completed aggregates are never recalculated. Administrative aggregate trends mark each effective date.
+
 ## Start the Service
 
 ```sh
@@ -130,6 +132,8 @@ bg=transparent
 ```
 
 URL parameters override one response without changing the saved Map Preset.
+
+Equivalent parameters normalize to one SVG cache entry. Public maps return an `ETag` and remain cached for five minutes, so a new Pageview can take up to about five minutes to appear at an existing map URL. The service keeps at most 256 variants per Site and 32 MiB globally and coalesces concurrent first renders of the same variant.
 
 ## GeoIP
 

@@ -212,6 +212,11 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 		"land": {"#6f808f"}, "border": {"#ffffff"}, "text": {"#54606a"}, "marker": {"#e34949"},
 		"metric": {"pv"}, "show_title": {"on"}, "show_pv": {"on"}, "bg_transparent": {"on"},
 	}
+	initialMap := httptest.NewRecorder()
+	app.Handler().ServeHTTP(initialMap, httptest.NewRequest(http.MethodGet, "/api/v1/sites/"+site.ID+"/map.svg", nil))
+	if initialMap.Code != http.StatusOK || !strings.Contains(initialMap.Body.String(), `width="300"`) {
+		t.Fatalf("initial cached map = status %d body %q", initialMap.Code, initialMap.Body.String())
+	}
 	presetRequest := httptest.NewRequest(http.MethodPost, "/admin/sites/"+site.ID+"/preset", strings.NewReader(presetForm.Encode()))
 	presetRequest.Host = "127.0.0.1:8790"
 	presetRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -220,6 +225,11 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	app.Handler().ServeHTTP(presetResponse, presetRequest)
 	if presetResponse.Code != http.StatusSeeOther || presetResponse.Header().Get("Location") != "/admin/sites/"+site.ID+"?saved=preset#preset" {
 		t.Fatalf("preset update status = %d, body = %q", presetResponse.Code, presetResponse.Body.String())
+	}
+	updatedMap := httptest.NewRecorder()
+	app.Handler().ServeHTTP(updatedMap, httptest.NewRequest(http.MethodGet, "/api/v1/sites/"+site.ID+"/map.svg", nil))
+	if updatedMap.Code != http.StatusOK || !strings.Contains(updatedMap.Body.String(), `width="640"`) {
+		t.Fatalf("invalidated map = status %d body %q", updatedMap.Code, updatedMap.Body.String())
 	}
 	settingsForm := url.Values{
 		"csrf": {csrfMatch[1]}, "name": {site.Name}, "timezone": {site.Timezone},
@@ -480,6 +490,14 @@ func TestAdminAnalyticsIncludesPathsForPrivateSite(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	location, _ := time.LoadLocation(site.Timezone)
+	today := time.Now().In(location).Format(time.DateOnly)
+	if _, err := st.DB.ExecContext(context.Background(), `
+		INSERT INTO site_deduplication_rules (site_id, effective_date, window_days, created_at)
+		VALUES (?, ?, 5, ?)
+	`, site.ID, today, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		t.Fatal(err)
+	}
 	cookie, _ := loginAdmin(t, app)
 	request := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID+"/analytics?range=today&lang=en", nil)
 	request.Host = "127.0.0.1:8790"
@@ -487,7 +505,7 @@ func TestAdminAnalyticsIncludesPathsForPrivateSite(t *testing.T) {
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
 	body := response.Body.String()
-	if response.Code != http.StatusOK || !strings.Contains(body, "/admin-only-path") || !strings.Contains(body, "Path performance") || !strings.Contains(body, `id="path-chart"`) {
+	if response.Code != http.StatusOK || !strings.Contains(body, "/admin-only-path") || !strings.Contains(body, "Path performance") || !strings.Contains(body, `id="path-chart"`) || !strings.Contains(body, "Counting rule changes") || !strings.Contains(body, `"window_days":5`) {
 		t.Fatalf("Admin Analytics = status %d body %q", response.Code, body)
 	}
 	public := httptest.NewRecorder()

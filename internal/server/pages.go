@@ -383,6 +383,7 @@ func (s *Server) adminUpdatePreset(w http.ResponseWriter, r *http.Request) {
 		s.redirectWithError(w, r, "/admin/sites/"+r.PathValue("siteID"), err.Error())
 		return
 	}
+	s.mapCache.deleteSite(r.PathValue("siteID"))
 	http.Redirect(w, r, "/admin/sites/"+r.PathValue("siteID")+"?saved=preset#preset", http.StatusSeeOther)
 }
 
@@ -578,17 +579,18 @@ func analyticsChartJSON(analytics store.PublicAnalyticsData, lang string) (templ
 		UV   int64   `json:"uv"`
 	}
 	payload := struct {
-		Daily    []store.DailyMetric     `json:"daily"`
-		Points   []chartPoint            `json:"points"`
-		Paths    []store.AnalyticsMetric `json:"paths,omitempty"`
-		Browsers []store.AnalyticsMetric `json:"browsers,omitempty"`
-		OS       []store.AnalyticsMetric `json:"operating_systems,omitempty"`
-		Labels   map[string]string       `json:"labels"`
+		Daily    []store.DailyMetric             `json:"daily"`
+		Points   []chartPoint                    `json:"points"`
+		Paths    []store.AnalyticsMetric         `json:"paths,omitempty"`
+		Browsers []store.AnalyticsMetric         `json:"browsers,omitempty"`
+		OS       []store.AnalyticsMetric         `json:"operating_systems,omitempty"`
+		Rules    []store.DeduplicationRuleChange `json:"rules,omitempty"`
+		Labels   map[string]string               `json:"labels"`
 	}{Daily: analytics.Daily, Labels: map[string]string{
 		"pageviews": translate(lang, "pageviews"), "uniqueVisitors": translate(lang, "unique_visitors"),
 		"visitors": translate(lang, "visitors"), "unknown": translate(lang, "unknown"),
-		"path": translate(lang, "path"), "share": translate(lang, "share"),
-	}, Paths: analytics.Paths, Browsers: analytics.Browsers, OS: analytics.OperatingSystems}
+		"path": translate(lang, "path"), "share": translate(lang, "share"), "days": translate(lang, "days"),
+	}, Paths: analytics.Paths, Browsers: analytics.Browsers, OS: analytics.OperatingSystems, Rules: analytics.DeduplicationRules}
 	for _, point := range analytics.MapPoints {
 		name := point.City
 		if name == "" {

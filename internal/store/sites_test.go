@@ -86,6 +86,11 @@ func TestResetAndDeleteSite(t *testing.T) {
 			t.Fatalf("%s retained %d rows", table, count)
 		}
 	}
+	var ruleDate string
+	var ruleDays int
+	if err := st.DB.QueryRowContext(ctx, `SELECT effective_date, window_days FROM site_deduplication_rules WHERE site_id = ?`, created.ID).Scan(&ruleDate, &ruleDays); err != nil || ruleDate != "1970-01-01" || ruleDays != created.DedupWindowDays {
+		t.Fatalf("reset deduplication rule = %q/%d, %v", ruleDate, ruleDays, err)
+	}
 	if _, err := st.UpdateSite(ctx, created.ID, UpdateSiteParams{
 		Name: "Reset", Timezone: "UTC", AllowedOrigins: []string{"https://example.com"}, DedupWindowDays: 1, RetentionDays: 30, PublicLanguage: "en",
 	}); err != nil {

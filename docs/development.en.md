@@ -47,6 +47,8 @@ Migrations are embedded in `internal/store/migrations.go` and applied in version
 
 The Pageview ingestion transaction stores the individual record, visitor-window registrations, and durable aggregates together. Expiring an individual record must not reverse its durable aggregate contributions.
 
+`site_deduplication_rules` stores counting-rule history as Site-local dates. A window change upserts a rule for the next local date. Ingestion selects the latest rule effective on the Pageview's local date and calculates windows from that rule's effective-date anchor. Existing `visitor_registrations.window_end` values remain unchanged; they can only delay cleanup of temporary registrations and cannot affect counting under the new rule.
+
 Public and administrative aggregate queries share Site-local date boundaries. Public queries first enforce publication state and never read the path family; authenticated administrative queries can read path aggregates even when publication is disabled. Browser JSON is generated only from the already-authorized aggregate result and contains no individual records, original IPs, or Visitor Digests.
 
 `serve` starts a lightweight maintenance loop that runs on startup and hourly. `visitortrace maintenance` exposes the same cleanup flow for diagnostics and external schedulers. Every deletion transaction has a bounded batch size; `operation_status` retains the latest maintenance outcome for the operational dashboard.
@@ -60,6 +62,8 @@ The GeoIP updater runs at startup and every 24 hours. `{YYYY-MM}` expands using 
 Pageview Record lists use a compound `(occurred_at, id)` cursor with server-controlled ordering. Each cursor carries a fingerprint of normalized filters and cannot be reused across a changed filter set. Responses contain no more than 200 rows. Record and aggregate exports iterate SQLite rows directly into `encoding/csv` without temporary export files; sensitive exports exist only on authenticated Administrator routes and send `Cache-Control: no-store`.
 
 `internal/operations` collects read-only runtime information: build metadata, process uptime, combined SQLite/WAL/SHM size, filesystem capacity, GeoIP and local-backup state, and task outcomes from `operation_status`. Linux uses `statfs`; other platforms report unavailable data rather than inventing values. Manual Admin operations reuse the same backup, maintenance, and GeoIP implementations as the CLI and require an Administrator session plus CSRF validation. GeoIP and maintenance runners use process-wide exclusion to prevent duplicate runs.
+
+The effective Public Map Options `CacheKey` is namespaced by Site ID. The in-memory LRU has a five-minute TTL, at most 256 variants per Site, and a 32 MiB global SVG-body budget; an in-process flight coalesces misses for one key. Map Preset updates, Site resets, and deletions advance the Site cache generation so a stale in-flight render cannot repopulate invalidated data.
 
 ## Release Signing and Self-Update
 

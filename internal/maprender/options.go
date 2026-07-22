@@ -2,6 +2,7 @@ package maprender
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -267,7 +268,18 @@ func (o Options) CacheKey() string {
 		}
 	}
 	sort.Strings(show)
-	return fmt.Sprintf("%d,%d,%s,%s,%s,%d,%s,%s,%s,%s,%s,%s", o.Width, o.Height, o.Title, o.PVLabel, o.UVLabel, o.FontSize, o.BG, o.Land, o.Border, o.Text, o.Marker, o.Metric+":"+strings.Join(show, ","))
+	canonical, _ := json.Marshal(struct {
+		Width, Height, FontSize                int
+		Title, PVLabel, UVLabel                string
+		BG, Land, Border, Text, Marker, Metric string
+		Show                                   []string
+	}{
+		Width: o.Width, Height: o.Height, FontSize: o.FontSize,
+		Title: o.Title, PVLabel: o.PVLabel, UVLabel: o.UVLabel,
+		BG: o.BG, Land: o.Land, Border: o.Border, Text: o.Text, Marker: o.Marker, Metric: o.Metric, Show: show,
+	})
+	digest := sha256.Sum256(canonical)
+	return fmt.Sprintf("%x", digest)
 }
 
 func integerOverride(values url.Values, key string, fallback, minimum, maximum int) (int, error) {

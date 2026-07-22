@@ -57,8 +57,7 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 
 	var timezone string
 	var collectionEnabled int
-	var windowDays int
-	err = tx.QueryRowContext(ctx, `SELECT timezone, accept_pageviews, dedup_window_days FROM sites WHERE id = ?`, observation.SiteID).Scan(&timezone, &collectionEnabled, &windowDays)
+	err = tx.QueryRowContext(ctx, `SELECT timezone, accept_pageviews FROM sites WHERE id = ?`, observation.SiteID).Scan(&timezone, &collectionEnabled)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return RecordPageviewResult{}, fmt.Errorf("Site %q not found", observation.SiteID)
@@ -74,7 +73,22 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 	}
 	local := observation.OccurredAt.In(location)
 	localDate := local.Format(time.DateOnly)
-	windowStartTime := deduplicationWindowStart(local, windowDays)
+	var ruleEffectiveDate string
+	var windowDays int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT effective_date, window_days
+		FROM site_deduplication_rules
+		WHERE site_id = ? AND effective_date <= ?
+		ORDER BY effective_date DESC
+		LIMIT 1
+	`, observation.SiteID, localDate).Scan(&ruleEffectiveDate, &windowDays); err != nil {
+		return RecordPageviewResult{}, fmt.Errorf("read active deduplication rule: %w", err)
+	}
+	ruleAnchor, err := time.ParseInLocation(time.DateOnly, ruleEffectiveDate, location)
+	if err != nil {
+		return RecordPageviewResult{}, fmt.Errorf("parse deduplication rule effective date: %w", err)
+	}
+	windowStartTime := deduplicationWindowStart(local, ruleAnchor, windowDays)
 	windowStart := windowStartTime.Format(time.DateOnly)
 	windowEnd := windowStartTime.AddDate(0, 0, windowDays).Format(time.DateOnly)
 
@@ -186,11 +200,11 @@ func fallbackDimension(value string) string {
 	return value
 }
 
-func deduplicationWindowStart(local time.Time, days int) time.Time {
+func deduplicationWindowStart(local, anchor time.Time, days int) time.Time {
 	dateUTC := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
-	anchor := time.Date(1970, time.January, 1, 0, 0, 0, 0, time.UTC)
-	daysSinceAnchor := int(dateUTC.Sub(anchor) / (24 * time.Hour))
+	anchorUTC := time.Date(anchor.Year(), anchor.Month(), anchor.Day(), 0, 0, 0, 0, time.UTC)
+	daysSinceAnchor := int(dateUTC.Sub(anchorUTC) / (24 * time.Hour))
 	windowDay := daysSinceAnchor - daysSinceAnchor%days
-	startUTC := anchor.AddDate(0, 0, windowDay)
+	startUTC := anchorUTC.AddDate(0, 0, windowDay)
 	return time.Date(startUTC.Year(), startUTC.Month(), startUTC.Day(), 0, 0, 0, 0, local.Location())
 }

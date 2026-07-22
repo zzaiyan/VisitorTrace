@@ -111,3 +111,54 @@ func TestRecordPageviewRejectsInvalidDigestAtomically(t *testing.T) {
 		t.Fatalf("invalid Pageview created %d records", records)
 	}
 }
+
+func TestDeduplicationWindowChangeStartsAtNextLocalMidnight(t *testing.T) {
+	ctx := context.Background()
+	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	site, err := st.CreateSite(ctx, CreateSiteParams{Name: "Schedule", Timezone: "Asia/Shanghai", AllowedOrigins: []string{"https://example.com"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	location, _ := time.LoadLocation(site.Timezone)
+	localNow := time.Now().In(location)
+	todayNoon := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 12, 0, 0, 0, location)
+	digest := bytes.Repeat([]byte{5}, 32)
+	observation := PageviewObservation{SiteID: site.ID, OccurredAt: todayNoon, Path: "/", VisitorDigest: digest, OriginalIP: "192.0.2.5", OperatingSystem: "Linux", Browser: "Firefox"}
+	first, err := st.RecordPageview(ctx, observation)
+	if err != nil || !first.NewOverallVisitor {
+		t.Fatalf("first Pageview = %#v, %v", first, err)
+	}
+	if _, err := st.UpdateSite(ctx, site.ID, UpdateSiteParams{
+		Name: site.Name, Timezone: site.Timezone, AllowedOrigins: site.AllowedOrigins, AcceptPageviews: true, PublishPublic: true,
+		PublicLanguage: "auto", DedupWindowDays: 7, RetentionDays: site.RetentionDays,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	sameDay, err := st.RecordPageview(ctx, observation)
+	if err != nil || sameDay.NewOverallVisitor || sameDay.DeduplicationWindow != first.DeduplicationWindow {
+		t.Fatalf("same-day Pageview = %#v, %v; first = %#v", sameDay, err, first)
+	}
+	tomorrowDate := todayNoon.AddDate(0, 0, 1)
+	observation.OccurredAt = tomorrowDate
+	tomorrow, err := st.RecordPageview(ctx, observation)
+	if err != nil || !tomorrow.NewOverallVisitor || tomorrow.DeduplicationWindow != tomorrowDate.Format(time.DateOnly) {
+		t.Fatalf("next-day Pageview = %#v, %v", tomorrow, err)
+	}
+	observation.OccurredAt = tomorrowDate.AddDate(0, 0, 1)
+	dayAfter, err := st.RecordPageview(ctx, observation)
+	if err != nil || dayAfter.NewOverallVisitor || dayAfter.DeduplicationWindow != tomorrow.DeduplicationWindow {
+		t.Fatalf("new seven-day window Pageview = %#v, %v", dayAfter, err)
+	}
+	var rules int
+	if err := st.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM site_deduplication_rules WHERE site_id = ?`, site.ID).Scan(&rules); err != nil || rules != 2 {
+		t.Fatalf("deduplication rules = %d, %v", rules, err)
+	}
+	analytics, err := st.AdminAnalytics(ctx, site.ID, todayNoon.Format(time.DateOnly), tomorrowDate.AddDate(0, 0, 1).Format(time.DateOnly))
+	if err != nil || len(analytics.DeduplicationRules) != 1 || analytics.DeduplicationRules[0].EffectiveDate != tomorrowDate.Format(time.DateOnly) || analytics.DeduplicationRules[0].WindowDays != 7 {
+		t.Fatalf("AdminAnalytics deduplication rules = %#v, %v", analytics.DeduplicationRules, err)
+	}
+}

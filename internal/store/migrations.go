@@ -132,6 +132,20 @@ var migrations = []migration{
 			`ALTER TABLE sites ADD COLUMN public_language TEXT NOT NULL DEFAULT 'auto' CHECK (public_language IN ('auto', 'zh-CN', 'en'))`,
 		},
 	},
+	{
+		version: 8,
+		statements: []string{
+			`CREATE TABLE site_deduplication_rules (
+				site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+				effective_date TEXT NOT NULL,
+				window_days INTEGER NOT NULL CHECK (window_days BETWEEN 1 AND 30),
+				created_at TEXT NOT NULL,
+				PRIMARY KEY (site_id, effective_date)
+			) WITHOUT ROWID`,
+			`INSERT INTO site_deduplication_rules (site_id, effective_date, window_days, created_at)
+			 SELECT id, '1970-01-01', dedup_window_days, updated_at FROM sites`,
+		},
+	},
 }
 
 func (s *Store) initializeBaseSchema(ctx context.Context, passwordHash string) error {

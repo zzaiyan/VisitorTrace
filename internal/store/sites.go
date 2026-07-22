@@ -85,7 +85,12 @@ func (s *Store) CreateSite(ctx context.Context, params CreateSiteParams) (Site, 
 		return Site{}, fmt.Errorf("encode allowed origins: %w", err)
 	}
 	now := time.Now().UTC()
-	_, err = s.DB.ExecContext(ctx, `
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return Site{}, fmt.Errorf("begin create Site transaction: %w", err)
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx, `
 		INSERT INTO sites (
 			id, name, timezone, allowed_origins, accept_pageviews, publish_public,
 			dedup_window_days, retention_days, hmac_key, created_at, updated_at
@@ -93,6 +98,15 @@ func (s *Store) CreateSite(ctx context.Context, params CreateSiteParams) (Site, 
 	`, id, name, timezone, string(originJSON), dedupWindow, retention, key, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 	if err != nil {
 		return Site{}, fmt.Errorf("create Site: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO site_deduplication_rules (site_id, effective_date, window_days, created_at)
+		VALUES (?, '1970-01-01', ?, ?)
+	`, id, dedupWindow, now.Format(time.RFC3339Nano)); err != nil {
+		return Site{}, fmt.Errorf("create Site deduplication rule: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return Site{}, fmt.Errorf("commit create Site transaction: %w", err)
 	}
 	return Site{
 		ID:              id,
@@ -197,26 +211,40 @@ func (s *Store) UpdateSite(ctx context.Context, id string, params UpdateSitePara
 	if err != nil {
 		return Site{}, fmt.Errorf("encode allowed origins: %w", err)
 	}
-	now := time.Now().UTC().Format(time.RFC3339Nano)
+	nowTime := time.Now()
+	now := nowTime.UTC().Format(time.RFC3339Nano)
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return Site{}, fmt.Errorf("begin update Site transaction: %w", err)
 	}
 	defer tx.Rollback()
 	var firstPageview sql.NullString
-	if err := tx.QueryRowContext(ctx, `SELECT first_pageview_at FROM sites WHERE id = ?`, id).Scan(&firstPageview); err != nil {
+	var currentTimezone string
+	var currentWindowDays int
+	if err := tx.QueryRowContext(ctx, `SELECT first_pageview_at, timezone, dedup_window_days FROM sites WHERE id = ?`, id).Scan(&firstPageview, &currentTimezone, &currentWindowDays); err != nil {
 		if err == sql.ErrNoRows {
 			return Site{}, fmt.Errorf("Site %q not found", id)
 		}
 		return Site{}, fmt.Errorf("read Site state: %w", err)
 	}
 	if firstPageview.Valid {
-		var currentTimezone string
-		if err := tx.QueryRowContext(ctx, `SELECT timezone FROM sites WHERE id = ?`, id).Scan(&currentTimezone); err != nil {
-			return Site{}, fmt.Errorf("read Site timezone: %w", err)
-		}
 		if params.Timezone != currentTimezone {
 			return Site{}, fmt.Errorf("Site timezone is locked after the first Pageview")
+		}
+	}
+	if params.DedupWindowDays != currentWindowDays {
+		location, err := time.LoadLocation(params.Timezone)
+		if err != nil {
+			return Site{}, fmt.Errorf("load Site timezone for deduplication rule: %w", err)
+		}
+		effectiveDate := nowTime.In(location).AddDate(0, 0, 1).Format(time.DateOnly)
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO site_deduplication_rules (site_id, effective_date, window_days, created_at)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT (site_id, effective_date)
+			DO UPDATE SET window_days = excluded.window_days, created_at = excluded.created_at
+		`, id, effectiveDate, params.DedupWindowDays, now); err != nil {
+			return Site{}, fmt.Errorf("schedule Site deduplication rule: %w", err)
 		}
 	}
 	_, err = tx.ExecContext(ctx, `
@@ -270,6 +298,15 @@ func (s *Store) ResetSiteData(ctx context.Context, id string) error {
 	`, key, time.Now().UTC().Format(time.RFC3339Nano), id)
 	if err != nil {
 		return fmt.Errorf("disable Site before data reset: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM site_deduplication_rules WHERE site_id = ?`, id); err != nil {
+		return fmt.Errorf("delete Site deduplication rules: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO site_deduplication_rules (site_id, effective_date, window_days, created_at)
+		SELECT id, '1970-01-01', dedup_window_days, ? FROM sites WHERE id = ?
+	`, time.Now().UTC().Format(time.RFC3339Nano), id); err != nil {
+		return fmt.Errorf("reset Site deduplication rule: %w", err)
 	}
 	if rows, _ := result.RowsAffected(); rows != 1 {
 		return fmt.Errorf("Site %q not found", id)

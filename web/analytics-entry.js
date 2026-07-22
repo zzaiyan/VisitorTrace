@@ -5,6 +5,7 @@ import {
   GeoComponent,
   GridComponent,
   LegendComponent,
+  MarkLineComponent,
   TooltipComponent,
 } from "echarts/components";
 import { SVGRenderer } from "echarts/renderers";
@@ -19,6 +20,7 @@ echarts.use([
   GeoComponent,
   GridComponent,
   LegendComponent,
+  MarkLineComponent,
   TooltipComponent,
   SVGRenderer,
 ]);
@@ -37,7 +39,7 @@ if (dataElement && trendElement && mapElement) {
     const map = echarts.init(mapElement, null, { renderer: "svg" });
     const charts = [trend, map];
 
-    trend.setOption(trendOptions(payload.daily || [], labels));
+    trend.setOption(trendOptions(payload.daily || [], labels, payload.rules || []));
     map.setOption(mapOptions(payload.points || [], labels));
     addDimensionChart(charts, "path-chart", barOptions(payload.paths || [], labels));
     addDimensionChart(charts, "browser-chart", pieOptions(payload.browsers || [], labels));
@@ -69,10 +71,11 @@ function addDimensionChart(charts, id, options) {
   charts.push(chart);
 }
 
-function trendOptions(daily, labels) {
-  const dates = daily.map((item) => item.date);
-  const pageviews = daily.map((item) => item.pageviews);
-  const visitors = daily.map((item) => item.unique_visitors);
+function trendOptions(daily, labels, rules) {
+  const byDate = new Map(daily.map((item) => [item.date, item]));
+  const dates = [...new Set(daily.map((item) => item.date).concat(rules.map((rule) => rule.effective_date)))].sort();
+  const pageviews = dates.map((date) => byDate.get(date)?.pageviews || 0);
+  const visitors = dates.map((date) => byDate.get(date)?.unique_visitors || 0);
   return {
     animationDuration: 260,
     color: ["#d96e51", "#2f655a"],
@@ -108,6 +111,12 @@ function trendOptions(daily, labels) {
         symbolSize: 5,
         lineStyle: { width: 2 },
         areaStyle: { opacity: 0.08 },
+        markLine: rules.length ? {
+          symbol: "none",
+          lineStyle: { color: "#d9a942", type: "dashed", width: 1 },
+          label: { color: "#765b10", formatter: (params) => `${params.data.windowDays} ${labels.days || "days"}` },
+          data: rules.map((rule) => ({ xAxis: rule.effective_date, windowDays: rule.window_days })),
+        } : undefined,
       },
       {
         name: labels.uniqueVisitors || "Unique Visitors",
