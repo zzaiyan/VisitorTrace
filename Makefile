@@ -1,6 +1,6 @@
 GO ?= go
 NPM ?= npm
-VERSION ?= 0.1.0-dev
+VERSION ?= 0.1.1-dev
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || printf unknown)
 BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 UPDATE_PUBLIC_KEY ?=

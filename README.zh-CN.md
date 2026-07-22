@@ -7,7 +7,7 @@
 
 面向个人主页、博客和其他小型网站的轻量级自托管访客地图与访问记录服务。
 
-[英文主页](./README.md) · [用户指南](./docs/user-guide.zh-CN.md) · [部署指南](./docs/deployment.zh-CN.md) · [开发指南](./docs/development.zh-CN.md) · [第三方声明](./THIRD_PARTY_NOTICES.zh-CN.md)
+[英文主页](./README.md) · [用户指南](./docs/user-guide.zh-CN.md) · [部署指南](./docs/deployment.zh-CN.md) · [开发指南](./docs/development.zh-CN.md) · [更新历史](./docs/update.zh-CN.md) · [第三方声明](./THIRD_PARTY_NOTICES.zh-CN.md)
 
 ## 功能
 

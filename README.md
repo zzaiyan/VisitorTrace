@@ -7,7 +7,7 @@
 
 A tiny self-hosted visitor map and Pageview tracker for personal homepages, blogs, and other small websites.
 
-[Chinese README](./README.zh-CN.md) · [User Guide](./docs/user-guide.md) · [Deployment Guide](./docs/deployment.md) · [Development Guide](./docs/development.md) · [Third-Party Notices](./THIRD_PARTY_NOTICES.md)
+[Chinese README](./README.zh-CN.md) · [User Guide](./docs/user-guide.md) · [Deployment Guide](./docs/deployment.md) · [Development Guide](./docs/development.md) · [Update History](./docs/update.md) · [Third-Party Notices](./THIRD_PARTY_NOTICES.md)
 
 ## Features
 

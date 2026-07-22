@@ -18,7 +18,7 @@
 设置版本和架构，然后下载对应二进制及校验文件：
 
 ```sh
-VERSION=0.1.0
+VERSION=0.1.1
 ARCH=amd64
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/visitortrace-${VERSION}-linux-${ARCH}"
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/checksums.txt"

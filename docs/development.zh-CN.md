@@ -97,8 +97,8 @@ make build \
 发布使用语义化版本标签。确认 `main` 的 CI 通过后创建并推送标签：
 
 ```sh
-git tag -a v0.1.0 -m "VisitorTrace v0.1.0"
-git push origin v0.1.0
+git tag -a v0.1.1 -m "VisitorTrace v0.1.1"
+git push origin v0.1.1
 ```
 
 `.github/workflows/release.yml` 会重新执行测试，使用 `CGO_ENABLED=0` 构建 `visitortrace-<版本>-linux-amd64` 和 `visitortrace-<版本>-linux-arm64`，并将版本、Commit、构建时间、数据库 Schema 和公钥嵌入二进制。工作流从实际文件生成 SHA-256、大小和更新清单，再用最终公钥验签。每个 Release 还会包含未经修改的 GPL 文本和由同一标签 Commit 生成的源码归档，所有文件都纳入 `checksums.txt`。验证完成的文件先上传到草稿 Release，全部成功后才公开；任务重跑可以刷新同一草稿，不能覆盖已经发布的版本。含 `-` 的 SemVer 标签会发布为 prerelease，不会替换稳定版 `releases/latest`。
@@ -107,10 +107,10 @@ git push origin v0.1.0
 
 ```sh
 go run ./tools/release-manifest generate \
-  --version 0.1.0 \
-  --published-at 2026-07-22T00:00:00Z \
-  --asset linux-amd64=dist/visitortrace-0.1.0-linux-amd64 \
-  --asset linux-arm64=dist/visitortrace-0.1.0-linux-arm64 \
+  --version 0.1.1 \
+  --published-at 2026-07-23T00:00:00Z \
+  --asset linux-amd64=dist/visitortrace-0.1.1-linux-amd64 \
+  --asset linux-arm64=dist/visitortrace-0.1.1-linux-arm64 \
   --output manifest.unsigned.json
 
 go run ./tools/release-manifest sign \

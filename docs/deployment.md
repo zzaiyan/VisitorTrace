@@ -18,7 +18,7 @@ Only ports 80 and 443 need to be public. Do not expose the VisitorTrace port to 
 Set the release version and architecture, then download the matching executable and checksum file:
 
 ```sh
-VERSION=0.1.0
+VERSION=0.1.1
 ARCH=amd64
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/visitortrace-${VERSION}-linux-${ARCH}"
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/checksums.txt"
