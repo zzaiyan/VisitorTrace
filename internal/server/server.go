@@ -38,6 +38,7 @@ type pageviewPayload struct {
 
 type Server struct {
 	Config     config.Config
+	ConfigPath string
 	Store      *store.Store
 	Started    time.Time
 	clientIP   *clientip.Resolver
@@ -82,6 +83,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/records", s.adminRecords)
 	mux.HandleFunc("GET /admin/records.csv", s.adminRecordsCSV)
 	mux.HandleFunc("GET /admin/aggregates.csv", s.adminAggregatesCSV)
+	mux.HandleFunc("POST /admin/operations/backup", s.adminRunBackup)
+	mux.HandleFunc("POST /admin/operations/cleanup", s.adminRunCleanup)
+	mux.HandleFunc("POST /admin/operations/geoip", s.adminRunGeoIPUpdate)
 	mux.HandleFunc("GET /admin/sites/new", s.adminNewSite)
 	mux.HandleFunc("POST /admin/sites/new", s.adminCreateSite)
 	mux.HandleFunc("GET /admin/sites/{siteID}", s.adminSite)

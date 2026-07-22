@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/maprender"
+	"github.com/zzaiyan/VisitorTrace/internal/operations"
 	"github.com/zzaiyan/VisitorTrace/internal/password"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
@@ -50,7 +51,8 @@ type siteSummary struct {
 
 type adminDashboardData struct {
 	pageLayout
-	Sites []siteSummary
+	Sites      []siteSummary
+	Operations operations.Snapshot
 }
 
 type adminSiteData struct {
@@ -91,8 +93,13 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string,
 	templates, err := template.New("layout.html").Funcs(template.FuncMap{
 		"formatCount":      func(value int64) string { return strconv.FormatInt(value, 10) },
 		"formatTime":       func(value time.Time) string { return value.Local().Format("2006-01-02 15:04:05") },
-		"formatUTC":        func(value time.Time) string { return value.UTC().Format(time.RFC3339) },
+		"formatUTC":        formatUTCValue,
 		"formatRecordTime": formatRecordTime,
+		"formatBytes":      formatBytes,
+		"formatDuration":   formatDuration,
+		"operationWarning": operationWarning,
+		"operationLabel":   operationLabel,
+		"operationState":   operationState,
 		"geoLabel":         geoLabel,
 		"metricPercent": func(value, total int64) string {
 			if total <= 0 {
@@ -131,6 +138,7 @@ func (s *Server) adminDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := adminDashboardData{pageLayout: s.adminLayout(r, session, "管理总览", "dashboard")}
+	result.Operations = operations.Collect(r.Context(), s.Config, s.Store, s.Started, time.Now())
 	for _, site := range sites {
 		overview, err := s.Store.SiteOverview(r.Context(), site.ID)
 		if err != nil {
@@ -532,6 +540,14 @@ func adminFlash(r *http.Request) string {
 		return "Site 数据已清空；采集和公开展示保持关闭。"
 	case "deleted":
 		return "Site 已永久删除。"
+	case "backup":
+		return "备份已创建并通过完整性检查。"
+	case "cleanup":
+		return "维护清理已完成。"
+	case "geoip":
+		return "GeoIP 数据库已更新并热加载。"
+	case "geoip-current":
+		return "GeoIP 数据库已是当月版本。"
 	default:
 		return ""
 	}
@@ -563,6 +579,90 @@ func geoLabel(value string) string {
 	parts := strings.Split(value, "|")
 	if len(parts) == 3 {
 		return parts[2]
+	}
+	return value
+}
+
+func formatBytes(input any) string {
+	var value uint64
+	switch typed := input.(type) {
+	case int64:
+		if typed > 0 {
+			value = uint64(typed)
+		}
+	case uint64:
+		value = typed
+	case int:
+		if typed > 0 {
+			value = uint64(typed)
+		}
+	}
+	const unit = 1024
+	if value < unit {
+		return fmt.Sprintf("%d B", value)
+	}
+	divisor, exponent := uint64(unit), 0
+	for amount := value / unit; amount >= unit && exponent < 3; amount /= unit {
+		divisor *= unit
+		exponent++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(value)/float64(divisor), "KMGT"[exponent])
+}
+
+func formatDuration(value time.Duration) string {
+	if value < time.Minute {
+		return "< 1 分钟"
+	}
+	days := value / (24 * time.Hour)
+	hours := value % (24 * time.Hour) / time.Hour
+	minutes := value % time.Hour / time.Minute
+	if days > 0 {
+		return fmt.Sprintf("%d 天 %d 小时", days, hours)
+	}
+	if hours > 0 {
+		return fmt.Sprintf("%d 小时 %d 分钟", hours, minutes)
+	}
+	return fmt.Sprintf("%d 分钟", minutes)
+}
+
+func formatUTCValue(input any) string {
+	var value time.Time
+	switch typed := input.(type) {
+	case time.Time:
+		value = typed
+	case *time.Time:
+		if typed != nil {
+			value = *typed
+		}
+	}
+	if value.IsZero() {
+		return "-"
+	}
+	return value.UTC().Format(time.RFC3339)
+}
+
+func operationWarning(value string) string {
+	labels := map[string]string{
+		"disk_low": "可用磁盘空间不足", "geoip_missing": "GeoIP 数据库不可用", "geoip_stale": "GeoIP 数据库超过 35 天未更新",
+		"backup_missing": "尚未创建备份", "backup_stale": "最近备份超过 48 小时", "cleanup_stale": "自动清理超过 2 小时未成功完成",
+		"backup_failed": "最近备份失败", "cleanup_failed": "最近清理失败", "geoip_update_failed": "最近 GeoIP 更新失败",
+	}
+	if label := labels[value]; label != "" {
+		return label
+	}
+	return value
+}
+
+func operationLabel(value string) string {
+	if label := map[string]string{"backup": "备份", "cleanup": "维护清理", "geoip_update": "GeoIP 更新"}[value]; label != "" {
+		return label
+	}
+	return value
+}
+
+func operationState(value string) string {
+	if label := map[string]string{"success": "成功", "failed": "失败", "running": "运行中"}[value]; label != "" {
+		return label
 	}
 	return value
 }

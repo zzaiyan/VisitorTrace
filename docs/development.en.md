@@ -48,6 +48,8 @@ The GeoIP updater runs at startup and every 24 hours. `{YYYY-MM}` expands using 
 
 Pageview Record lists use a compound `(occurred_at, id)` cursor with server-controlled ordering. Each cursor carries a fingerprint of normalized filters and cannot be reused across a changed filter set. Responses contain no more than 200 rows. Record and aggregate exports iterate SQLite rows directly into `encoding/csv` without temporary export files; sensitive exports exist only on authenticated Administrator routes and send `Cache-Control: no-store`.
 
+`internal/operations` collects read-only runtime information: build metadata, process uptime, combined SQLite/WAL/SHM size, filesystem capacity, GeoIP and local-backup state, and task outcomes from `operation_status`. Linux uses `statfs`; other platforms report unavailable data rather than inventing values. Manual Admin operations reuse the same backup, maintenance, and GeoIP implementations as the CLI and require an Administrator session plus CSRF validation. GeoIP and maintenance runners use process-wide exclusion to prevent duplicate runs.
+
 ## Backup Format
 
 A `.vtbackup` file is a ZIP container with:

@@ -28,6 +28,7 @@ Go 1.25 or newer is required.
 make check
 make build
 ./bin/visitortrace version
+./bin/visitortrace doctor --config "$HOME/.config/visitortrace/config.json"
 ```
 
 ## Initialize
@@ -69,6 +70,8 @@ The default listener is `127.0.0.1:8790`. In production, terminate HTTPS at a re
 - Health checks: `/health/live`, `/health/ready`
 
 The Admin Console manages Site settings, collection and publication state, Map Presets, and sensitive Pageview Record fields such as original IP, path, browser, operating system, and Visitor Digest. Public Analytics exposes aggregate data only.
+
+The top of the Admin dashboard reports application version and uptime, SQLite version/schema/size, available disk space, the GeoIP file, and the latest local backup. A task table retains the latest backup, maintenance cleanup, and GeoIP update outcomes. Low disk, a backup older than 48 hours, GeoIP data older than 35 days, stalled cleanup, or failed operations produce warnings. The page can trigger an immediate backup, cleanup, or GeoIP check.
 
 ### Pageview Records and Exports
 

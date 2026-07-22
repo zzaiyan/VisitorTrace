@@ -14,12 +14,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
+
+var updateMu sync.Mutex
 
 const (
 	checkInterval      = 24 * time.Hour
@@ -88,6 +91,10 @@ func (r *Runner) Start(ctx context.Context) <-chan struct{} {
 }
 
 func (r *Runner) RunOnce(ctx context.Context, force bool) (Result, error) {
+	if !updateMu.TryLock() {
+		return Result{}, fmt.Errorf("a GeoIP update is already running")
+	}
+	defer updateMu.Unlock()
 	if r.Config.GeoIPUpdate == "disabled" {
 		return Result{}, nil
 	}

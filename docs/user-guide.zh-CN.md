@@ -28,6 +28,7 @@ VISITORTRACE_LISTEN=127.0.0.1:8791 ./tools/preview-demo.sh
 make check
 make build
 ./bin/visitortrace version
+./bin/visitortrace doctor --config "$HOME/.config/visitortrace/config.json"
 ```
 
 ## 初始化
@@ -69,6 +70,8 @@ make build
 - 健康检查：`/health/live`、`/health/ready`
 
 Admin Console 可管理 Site 设置、Pageview 接收和公开状态、Map Preset，并查看原始 IP、路径、浏览器、操作系统和 Visitor Digest。Public Analytics 只展示聚合统计。
+
+管理总览顶部显示应用版本与运行时长、SQLite 版本/Schema/占用、可用磁盘空间、GeoIP 文件和最近本地备份。任务表记录最近一次备份、维护清理和 GeoIP 更新的结果；低磁盘、超过 48 小时没有新备份、超过 35 天的 GeoIP、清理停滞或任务失败会显示告警。页面可直接触发立即备份、立即清理和 GeoIP 检查。
 
 ### 访问明细与导出
 

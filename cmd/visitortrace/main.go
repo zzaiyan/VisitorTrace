@@ -20,6 +20,7 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 	"github.com/zzaiyan/VisitorTrace/internal/geoipupdate"
 	"github.com/zzaiyan/VisitorTrace/internal/maintenance"
+	"github.com/zzaiyan/VisitorTrace/internal/operations"
 	"github.com/zzaiyan/VisitorTrace/internal/password"
 	"github.com/zzaiyan/VisitorTrace/internal/server"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
@@ -178,6 +179,7 @@ func runServe(args []string) int {
 		logger.Warn("GeoIP database is unavailable", "path", cfg.GeoIPPath, "error", geoErr)
 	}
 	app := server.New(cfg, st, logger)
+	app.ConfigPath = *configPath
 	app.SetGeoIP(geoResolver)
 	defer app.CloseGeoIP()
 	httpServer := app.HTTPServer()
@@ -261,14 +263,50 @@ func runDoctor(args []string) int {
 		return 1
 	}
 	fmt.Println("schema: ok")
-	geoResolver, err := geoip.Open(cfg.GeoIPPath)
-	if err != nil {
+	snapshot := operations.Collect(ctx, cfg, st, time.Now(), time.Now())
+	fmt.Printf("database size: %s\n", formatCLIBytes(snapshot.DatabaseSize))
+	if snapshot.DiskTotal == 0 {
+		fmt.Println("disk: unavailable")
+	} else if snapshot.DiskLow {
+		fmt.Printf("disk: failed (%s available of %s)\n", formatCLIBytes(snapshot.DiskAvailable), formatCLIBytes(snapshot.DiskTotal))
+		return 1
+	} else {
+		fmt.Printf("disk: ok (%s available of %s)\n", formatCLIBytes(snapshot.DiskAvailable), formatCLIBytes(snapshot.DiskTotal))
+	}
+	if snapshot.Backup.Exists {
+		fmt.Printf("backup: %s (%s)\n", snapshot.Backup.Name, snapshot.Backup.ModifiedAt.Format(time.RFC3339))
+	} else {
+		fmt.Println("backup: warning (no local snapshot)")
+	}
+	if err := geoip.Validate(cfg.GeoIPPath); err != nil {
 		fmt.Printf("geoip: failed (%v)\n", err)
 		return 1
 	}
-	_ = geoResolver.Close()
 	fmt.Printf("geoip: ok (%s)\n", cfg.GeoIPPath)
 	return 0
+}
+
+func formatCLIBytes(input any) string {
+	var value uint64
+	switch typed := input.(type) {
+	case int64:
+		if typed > 0 {
+			value = uint64(typed)
+		}
+	case uint64:
+		value = typed
+	}
+	if value < 1024 {
+		return fmt.Sprintf("%d B", value)
+	}
+	units := []string{"KiB", "MiB", "GiB", "TiB"}
+	amount := float64(value)
+	unit := 0
+	for amount >= 1024 && unit < len(units) {
+		amount /= 1024
+		unit++
+	}
+	return fmt.Sprintf("%.1f %s", amount, units[unit-1])
 }
 
 func runSite(args []string) int {

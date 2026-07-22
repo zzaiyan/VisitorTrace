@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
+
+var cleanupMu sync.Mutex
 
 const (
 	DefaultInterval = time.Hour
@@ -46,6 +49,10 @@ func (r *Runner) Start(ctx context.Context) <-chan struct{} {
 }
 
 func (r *Runner) RunOnce(ctx context.Context) (store.CleanupResult, error) {
+	if !cleanupMu.TryLock() {
+		return store.CleanupResult{}, fmt.Errorf("maintenance cleanup is already running")
+	}
+	defer cleanupMu.Unlock()
 	now := r.Now().UTC()
 	if err := r.Store.StartOperation(ctx, "cleanup", now); err != nil {
 		return store.CleanupResult{}, err

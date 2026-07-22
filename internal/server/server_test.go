@@ -367,6 +367,46 @@ func TestRecordCursorRejectsChangedFilters(t *testing.T) {
 	}
 }
 
+func TestAdminOperationalActions(t *testing.T) {
+	app, st, _ := testAdminServer(t)
+	cookie, csrf := loginAdmin(t, app)
+	post := func(path string) *httptest.ResponseRecorder {
+		t.Helper()
+		form := url.Values{"csrf": {csrf}}
+		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
+		request.Host = "127.0.0.1:8790"
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.AddCookie(cookie)
+		response := httptest.NewRecorder()
+		app.Handler().ServeHTTP(response, request)
+		return response
+	}
+	backupResponse := post("/admin/operations/backup")
+	if backupResponse.Code != http.StatusSeeOther || backupResponse.Header().Get("Location") != "/admin?saved=backup" {
+		t.Fatalf("backup action = status %d location %q body %q", backupResponse.Code, backupResponse.Header().Get("Location"), backupResponse.Body.String())
+	}
+	archives, err := filepath.Glob(filepath.Join(app.Config.BackupDir, "*.vtbackup"))
+	if err != nil || len(archives) != 1 {
+		t.Fatalf("backup archives = %#v, %v", archives, err)
+	}
+	cleanupResponse := post("/admin/operations/cleanup")
+	if cleanupResponse.Code != http.StatusSeeOther || cleanupResponse.Header().Get("Location") != "/admin?saved=cleanup" {
+		t.Fatalf("cleanup action = status %d location %q", cleanupResponse.Code, cleanupResponse.Header().Get("Location"))
+	}
+	statuses, err := st.OperationStatuses(context.Background())
+	if err != nil || len(statuses) < 2 {
+		t.Fatalf("operation statuses = %#v, %v", statuses, err)
+	}
+	dashboard := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	dashboard.Host = "127.0.0.1:8790"
+	dashboard.AddCookie(cookie)
+	dashboardResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(dashboardResponse, dashboard)
+	if dashboardResponse.Code != http.StatusOK || !strings.Contains(dashboardResponse.Body.String(), "运行状态") || !strings.Contains(dashboardResponse.Body.String(), "visitortrace-") {
+		t.Fatalf("operations dashboard = status %d body %q", dashboardResponse.Code, dashboardResponse.Body.String())
+	}
+}
+
 func TestPublicAnalyticsHidesSensitiveFields(t *testing.T) {
 	app, st, site := testServer(t)
 	now := time.Now().UTC()
@@ -448,6 +488,10 @@ func testAdminServer(t *testing.T) (*Server, *store.Store, store.Site) {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := config.Default(dir)
+	configPath := filepath.Join(dir, "config.json")
+	if err := config.Save(configPath, cfg); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
 	passwordHash, err := password.Hash([]byte("correct horse"))
 	if err != nil {
 		t.Fatalf("Hash() error = %v", err)
@@ -461,7 +505,9 @@ func testAdminServer(t *testing.T) (*Server, *store.Store, store.Site) {
 	if err != nil {
 		t.Fatalf("CreateSite() error = %v", err)
 	}
-	return New(cfg, st), st, site
+	app := New(cfg, st)
+	app.ConfigPath = configPath
+	return app, st, site
 }
 
 func loginAdmin(t *testing.T, app *Server) (*http.Cookie, string) {

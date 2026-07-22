@@ -42,7 +42,7 @@ func runBackup(args []string) int {
 		fmt.Fprintf(os.Stderr, "backup: %v\n", err)
 		return 1
 	}
-	result, err := backupservice.Create(ctx, st, *configPath, *outputDir, *keep, time.Now())
+	result, err := backupservice.CreateTracked(ctx, st, *configPath, *outputDir, *keep, time.Now())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "backup: %v\n", err)
 		return 1

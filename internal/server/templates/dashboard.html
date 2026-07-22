@@ -3,6 +3,19 @@
   <div><p class="eyebrow">ADMIN CONSOLE</p><h1>管理总览</h1><p class="subhead">{{len .Sites}} 个 Site</p></div>
   <a class="button primary" href="/admin/sites/new">新增 Site</a>
 </header>
+{{if .Operations.Warnings}}<div class="notice danger" role="alert">运行状态需要关注：{{range $index, $warning := .Operations.Warnings}}{{if $index}} · {{end}}{{operationWarning $warning}}{{end}}</div>{{end}}
+<section class="operations-band" aria-label="运行状态">
+  <div class="operations-head"><div><p class="eyebrow">OPERATIONS</p><h2>运行状态</h2></div><div class="operation-actions"><form method="post" action="/admin/operations/backup"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">立即备份</button></form><form method="post" action="/admin/operations/cleanup"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">立即清理</button></form><form method="post" action="/admin/operations/geoip"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">检查 GeoIP</button></form></div></div>
+  <dl class="operations-grid">
+    <div><dt>版本</dt><dd>{{.Operations.Version}}</dd><small>{{.Operations.Commit}}</small></div>
+    <div><dt>运行时长</dt><dd>{{formatDuration .Operations.Uptime}}</dd><small>启动于 {{formatUTC .Operations.StartedAt}}</small></div>
+    <div><dt>SQLite</dt><dd>{{formatBytes .Operations.DatabaseSize}}</dd><small>{{.Operations.SQLiteVersion}} · Schema {{.Operations.SchemaVersion}}</small></div>
+    <div class="{{if .Operations.DiskLow}}operation-alert{{end}}"><dt>可用磁盘</dt><dd>{{formatBytes .Operations.DiskAvailable}}</dd><small>总计 {{formatBytes .Operations.DiskTotal}}</small></div>
+    <div class="{{if or (not .Operations.GeoIP.Exists) .Operations.GeoIP.Stale}}operation-alert{{end}}"><dt>GeoIP</dt><dd>{{if .Operations.GeoIP.Exists}}{{formatBytes .Operations.GeoIP.Size}}{{else}}不可用{{end}}</dd><small>{{if .Operations.GeoIP.Exists}}{{formatUTC .Operations.GeoIP.ModifiedAt}}{{else}}等待下载{{end}}</small></div>
+    <div class="{{if or (not .Operations.Backup.Exists) .Operations.Backup.Stale}}operation-alert{{end}}"><dt>最近备份</dt><dd>{{if .Operations.Backup.Exists}}{{formatBytes .Operations.Backup.Size}}{{else}}尚无备份{{end}}</dd><small>{{if .Operations.Backup.Exists}}{{.Operations.Backup.Name}}{{else}}建议立即创建{{end}}</small></div>
+  </dl>
+  <div class="operation-table table-wrap"><table><thead><tr><th>任务</th><th>状态</th><th>完成时间</th><th>摘要</th></tr></thead><tbody>{{range .Operations.Tasks}}<tr><td>{{operationLabel .Operation}}</td><td><span class="status {{.State}}">{{operationState .State}}</span></td><td>{{if .CompletedAt}}{{formatUTC .CompletedAt}}{{else}}运行中{{end}}</td><td><code>{{.Summary}}</code></td></tr>{{else}}<tr><td colspan="4" class="empty-cell">后台任务尚无运行记录</td></tr>{{end}}</tbody></table></div>
+</section>
 {{if .Sites}}
 <section class="site-grid" aria-label="站点列表">
   {{range .Sites}}

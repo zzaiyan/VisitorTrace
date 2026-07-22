@@ -46,6 +46,27 @@ type Result struct {
 	Manifest Manifest
 }
 
+func CreateTracked(ctx context.Context, st *store.Store, configPath, outputDir string, keep int, now time.Time) (Result, error) {
+	started := now.UTC()
+	result, runErr := Create(ctx, st, configPath, outputDir, keep, now)
+	if err := st.StartOperation(ctx, "backup", started); err != nil {
+		if runErr != nil {
+			return result, fmt.Errorf("%v; record backup status: %w", runErr, err)
+		}
+		return result, fmt.Errorf("record backup status: %w", err)
+	}
+	summary := "error="
+	if runErr == nil {
+		summary = "archive=" + filepath.Base(result.Path) + " sha256=" + result.Checksum
+	} else {
+		summary += runErr.Error()
+	}
+	if err := st.FinishOperation(ctx, "backup", time.Now().UTC(), runErr == nil, summary); err != nil && runErr == nil {
+		runErr = err
+	}
+	return result, runErr
+}
+
 func Create(ctx context.Context, st *store.Store, configPath, outputDir string, keep int, now time.Time) (Result, error) {
 	if keep < 1 {
 		return Result{}, fmt.Errorf("backup retention must be at least one")
