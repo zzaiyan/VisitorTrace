@@ -1,8 +1,8 @@
 # VisitorTrace Development Guide
 
-[简体中文](./development.zh-CN.md)
+[Chinese](./development.zh-CN.md)
 
-This guide is for contributors working on VisitorTrace or integrating its deployment. See the [User Guide](./user-guide.en.md) for Administrator commands and website integration.
+This guide is for contributors working on VisitorTrace or integrating its deployment. See the [User Guide](./user-guide.md) for Administrator commands and website integration.
 
 ## Design Boundary
 
@@ -101,7 +101,7 @@ git tag -a v0.1.0 -m "VisitorTrace v0.1.0"
 git push origin v0.1.0
 ```
 
-`.github/workflows/release.yml` reruns the tests, builds `linux-amd64` and `linux-arm64` with `CGO_ENABLED=0`, embeds the version, commit, build time, and public key, derives SHA-256 digests, sizes, and the Schema manifest from the actual files, and verifies the result with the final public key. Verified assets are uploaded to a draft Release and published only after every step succeeds. A rerun can refresh that draft but cannot overwrite an already published release. SemVer tags containing `-` become prereleases and do not replace the stable `releases/latest` target.
+`.github/workflows/release.yml` reruns the tests, builds `linux-amd64` and `linux-arm64` with `CGO_ENABLED=0`, embeds the version, commit, build time, and public key, derives SHA-256 digests, sizes, and the Schema manifest from the actual files, and verifies the result with the final public key. Each Release also carries the unmodified GPL text and a source archive generated from the same tagged commit; all files are covered by `checksums.txt`. Verified assets are uploaded to a draft Release and published only after every step succeeds. A rerun can refresh that draft but cannot overwrite an already published release. SemVer tags containing `-` become prereleases and do not replace the stable `releases/latest` target.
 
 To generate a manifest locally:
 
@@ -136,6 +136,10 @@ A `.vtbackup` file is a ZIP container with:
 - `manifest.json`: format, application, and schema versions plus file sizes and SHA-256 digests.
 
 The adjacent `.sha256` file verifies the complete container. Before activation, restore verifies both checksum layers, runs SQLite integrity checking, applies forward migrations, and revokes every Administrator session.
+
+## Licensing Contributions
+
+VisitorTrace is licensed under `GPL-3.0-only`. Contributions must be available under terms compatible with that license, and copied code or assets must retain their original notices. Record every bundled third-party component or dataset in the [Third-Party Notices](../THIRD_PARTY_NOTICES.md). Do not assume that a dependency's availability on a public repository makes it license-compatible.
 
 ## Published Documentation Boundary
 

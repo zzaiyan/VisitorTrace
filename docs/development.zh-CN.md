@@ -1,6 +1,6 @@
-# VisitorTrace · 访迹开发指南
+# 访迹（VisitorTrace）开发指南
 
-[English](./development.en.md)
+[英文版](./development.md)
 
 本文面向参与 VisitorTrace 开发和部署集成的贡献者。面向站点管理员的命令和接入说明见[用户指南](./user-guide.zh-CN.md)。
 
@@ -101,7 +101,7 @@ git tag -a v0.1.0 -m "VisitorTrace v0.1.0"
 git push origin v0.1.0
 ```
 
-`.github/workflows/release.yml` 会重新执行测试，使用 `CGO_ENABLED=0` 构建 `linux-amd64` 和 `linux-arm64`，将版本、Commit、构建时间和公钥嵌入二进制，从实际文件生成 SHA-256、大小和 Schema 清单，再用最终公钥验签。验证完成的文件先上传到草稿 Release，全部成功后才公开；任务重跑可以刷新同一草稿，不能覆盖已经发布的版本。含 `-` 的 SemVer 标签会发布为 prerelease，不会替换稳定版 `releases/latest`。
+`.github/workflows/release.yml` 会重新执行测试，使用 `CGO_ENABLED=0` 构建 `linux-amd64` 和 `linux-arm64`，将版本、Commit、构建时间和公钥嵌入二进制，从实际文件生成 SHA-256、大小和 Schema 清单，再用最终公钥验签。每个 Release 还会包含未经修改的 GPL 文本和由同一标签 Commit 生成的源码归档，所有文件都纳入 `checksums.txt`。验证完成的文件先上传到草稿 Release，全部成功后才公开；任务重跑可以刷新同一草稿，不能覆盖已经发布的版本。含 `-` 的 SemVer 标签会发布为 prerelease，不会替换稳定版 `releases/latest`。
 
 本地生成清单时使用：
 
@@ -136,6 +136,10 @@ go run ./tools/release-manifest verify \
 - `manifest.json`：格式版本、应用版本、Schema 版本、文件大小和 SHA-256。
 
 归档旁的 `.sha256` 校验整个容器。恢复在激活数据库前验证两层校验和、执行 SQLite 完整性检查、运行正向迁移并撤销全部管理员 Session。
+
+## 贡献许可
+
+VisitorTrace 采用 `GPL-3.0-only`。贡献内容必须能够按与该许可证兼容的条款提供；复制的代码或资产必须保留原始声明。所有打包进入项目的第三方组件和数据都应记录在[第三方声明](../THIRD_PARTY_NOTICES.zh-CN.md)中。依赖项位于公开仓库并不代表其许可证必然兼容。
 
 ## 发布文档边界
 

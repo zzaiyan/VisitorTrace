@@ -55,6 +55,12 @@ jobs:
           GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags "$ldflags" -o dist/visitortrace-linux-amd64 ./cmd/visitortrace
           GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags "$ldflags" -o dist/visitortrace-linux-arm64 ./cmd/visitortrace
           dist/visitortrace-linux-amd64 version --json
+          cp LICENSE dist/LICENSE
+          git archive \
+            --format=tar.gz \
+            --prefix="visitortrace-$VERSION/" \
+            --output="dist/visitortrace-$VERSION-source.tar.gz" \
+            "$GITHUB_SHA"
       - name: Create unsigned manifest
         run: |
           set -eu
@@ -82,7 +88,12 @@ jobs:
             --public-key "$UPDATE_PUBLIC_KEY" \
             --manifest dist/manifest.json
           cd dist
-          sha256sum visitortrace-linux-amd64 visitortrace-linux-arm64 manifest.json > checksums.txt
+          sha256sum \
+            visitortrace-linux-amd64 \
+            visitortrace-linux-arm64 \
+            "visitortrace-$VERSION-source.tar.gz" \
+            LICENSE \
+            manifest.json > checksums.txt
       - name: Stage release assets
         uses: actions/upload-artifact@v7
         with:
@@ -119,6 +130,8 @@ jobs:
             gh release upload "$GITHUB_REF_NAME" \
               dist/visitortrace-linux-amd64 \
               dist/visitortrace-linux-arm64 \
+              dist/visitortrace-*-source.tar.gz \
+              dist/LICENSE \
               dist/manifest.json \
               dist/checksums.txt \
               --clobber
@@ -126,6 +139,8 @@ jobs:
             gh release create "$GITHUB_REF_NAME" \
               dist/visitortrace-linux-amd64 \
               dist/visitortrace-linux-arm64 \
+              dist/visitortrace-*-source.tar.gz \
+              dist/LICENSE \
               dist/manifest.json \
               dist/checksums.txt \
               --draft \

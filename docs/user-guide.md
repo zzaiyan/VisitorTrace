@@ -1,6 +1,6 @@
 # VisitorTrace User Guide
 
-[简体中文](./user-guide.zh-CN.md)
+[Chinese](./user-guide.zh-CN.md)
 
 VisitorTrace is a lightweight self-hosted visitor map and Pageview tracker for personal homepages, blogs, and other small websites. Production requires one Go executable, one SQLite database, and a local GeoIP MMDB.
 
@@ -41,7 +41,7 @@ install -Dm700 visitortrace-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-Replace the filename with `visitortrace-linux-arm64` on an ARM64 server. The release manifest also carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
+Replace the filename with `visitortrace-linux-arm64` on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
 
 ## Initialize
 
@@ -280,6 +280,10 @@ Production release builds must embed the project's release public key. Developme
 ```
 
 A mirror cannot replace the trust root. The manifest must verify against the public key embedded in the executable regardless of its download location.
+
+## License
+
+VisitorTrace is distributed under the [GNU General Public License, version 3 only](../LICENSE). Third-party components and data remain under their respective terms as listed in the [Third-Party Notices](../THIRD_PARTY_NOTICES.md). The license text, rather than this guide, defines the applicable rights and obligations.
 
 ## Current Status
 

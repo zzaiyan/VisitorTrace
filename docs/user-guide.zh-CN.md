@@ -1,6 +1,6 @@
-# VisitorTrace · 访迹 用户指南
+# 访迹（VisitorTrace）用户指南
 
-[English](./user-guide.en.md)
+[英文版](./user-guide.md)
 
 VisitorTrace 是面向个人主页、博客和其他小型网站的轻量级自托管访客地图与 Pageview 记录服务。生产环境只需要一个 Go 可执行文件、SQLite 数据库和本地 GeoIP MMDB。
 
@@ -41,7 +41,7 @@ install -Dm700 visitortrace-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-ARM64 服务器把命令中的文件名替换为 `visitortrace-linux-arm64`。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
+ARM64 服务器把命令中的文件名替换为 `visitortrace-linux-arm64`。每个 Release 还会提供 GPL 文本和来自同一标签的对应源码归档。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
 
 ## 初始化
 
@@ -280,6 +280,10 @@ visitortrace update apply --config "$HOME/.config/visitortrace/config.json"
 ```
 
 镜像不能替换签名信任根；无论下载地址如何配置，清单都必须通过二进制内嵌公钥验证。
+
+## 许可证
+
+VisitorTrace 采用 [GNU 通用公共许可证第 3 版（仅此版本）](../LICENSE)发布。第三方组件和数据继续适用[第三方声明](../THIRD_PARTY_NOTICES.zh-CN.md)所列的各自条款。具体权利与义务以许可证原文为准，而不是以本指南为准。
 
 ## 当前状态
 

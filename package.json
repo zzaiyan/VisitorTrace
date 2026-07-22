@@ -1,6 +1,7 @@
 {
   "name": "visitortrace-assets",
   "private": true,
+  "license": "GPL-3.0-only",
   "scripts": {
     "build:analytics": "node tools/build-analytics.mjs"
   },
