@@ -9,8 +9,8 @@
 - 增加 `visitortrace geoip query` 和 `scripts/query-mmdb.sh`，用于查询单个 IP 并输出格式化的原始 MMDB 元数据、命中网段和记录内容，同时明确表示未命中状态。
 - 增加 `scripts/update-systemd-binary.sh`，用于从已经下载的本地二进制执行带校验的手动更新，包括升级前备份、原子版本切换、服务重启和可执行文件自动回滚。
 - tracker 会记录 hostname；对于部署在多个域名上的同一 Site，UV 按 hostname 独立计算。hostname 可用于 Pageview Record、筛选、CSV 导出、Public Analytics、Admin Analytics 和聚合导出。
-- 增加 DB-IP 中国城市标签规范化：在 City Lite 记录提供足够层级信息时移除区、街道等限定词。
-- 增加 DB-IP、MaxMind GeoLite2 City 和 IP2Location LITE DB11 多套 GeoIP 后端，统一提供国家、地区、城市、纬度和经度字段，并提供按后端校验和归因信息。非 DB-IP 后端默认手动安装数据库。
+- 增加 DB-IP 中国城市标签规范化：在 City Lite 记录提供足够层级信息时移除区、街道等限定词。清理逻辑现为 DB-IP provider adapter 私有，不会作用于 MaxMind 或 IP2Location 记录。
+- 将 DB-IP、MaxMind GeoLite2 City 和 IP2Location LITE DB11 作为平等的一等 GeoIP 后端，统一提供地理字段，并分别提供校验、归因、内置官方下载源、凭据处理和自动更新。更新器现可解包原始 MMDB、gzip MMDB、tar.gz 和 ZIP。
 - 本次尚未发布的改动将 SQLite Schema 升级到 9。已有安装会自动迁移；历史明细的 hostname 为空，历史聚合无法反推出 hostname。
 
 ## 0.1.1 - 2026-07-23

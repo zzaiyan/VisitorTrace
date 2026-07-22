@@ -39,7 +39,7 @@ func runGeoIPUpdate(args []string) int {
 	fs := flag.NewFlagSet("geoip update", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	configPath := fs.String("config", config.DefaultConfigPath(), "protected config path")
-	force := fs.Bool("force", false, "download even when the current monthly database is fresh")
+	force := fs.Bool("force", false, "download even when the current database is fresh")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}

@@ -45,7 +45,7 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
   --config /etc/visitortrace/config.json
 ```
 
-默认配置监听 `127.0.0.1:8790`，把 SQLite 和 GeoIP 数据保存在 `/var/lib/visitortrace`，并使用 DB-IP City Lite 作为自动更新后端。配置文件权限应保持为 `0600`。系统也支持 MaxMind GeoLite2 City 和 IP2Location LITE DB11；在 `geoip_provider` 中选择后，除非配置兼容的私有镜像，否则应手动安装对应 MMDB。
+默认配置监听 `127.0.0.1:8790`，把 SQLite 和 GeoIP 数据保存在 `/var/lib/visitortrace`，并使用 DB-IP City Lite 作为自动更新后端。MaxMind GeoLite2 City 与 IP2Location LITE DB11 具备同等的自动更新支持，但需要账户凭据。可在初始化命令中加入 `--geoip-provider maxmind --maxmind-account-id ACCOUNT_ID --maxmind-license-key LICENSE_KEY`，或加入 `--geoip-provider ip2location --ip2location-token DOWNLOAD_TOKEN`。配置文件权限应保持为 `0600`；备份包含这些凭据，需要采用同等的访问控制。
 
 接入反向代理前，在 `/etc/visitortrace/config.json` 中把本机回环地址加入 `trusted_proxies`：
 
@@ -258,7 +258,7 @@ curl -sS https://stats.example.com/health/ready
 {"checks":{"geoip":true,"schema":true,"sqlite":true},"status":"ready"}
 ```
 
-首次 GeoIP 下载在部分网络中可能失败或长时间不可用；非 DB-IP 后端则可能在 MMDB 复制到 `geoip_path` 前保持不可用，此时 ready 返回 HTTP 503。使用不带 `-f` 的 `curl` 保留诊断 JSON，然后检查并重试 GeoIP：
+首次 GeoIP 下载可能因网络访问、后端凭据无效或供应商调整下载 code 而失败或暂时不可用，此时 ready 检查会返回 HTTP 503。使用不带 `-f` 的 `curl` 保留诊断 JSON，然后检查并重试 GeoIP：
 
 ```sh
 sudo journalctl -u visitortrace -n 100 --no-pager

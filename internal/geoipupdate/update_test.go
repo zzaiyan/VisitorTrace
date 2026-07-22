@@ -1,6 +1,8 @@
 package geoipupdate
 
 import (
+	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -12,11 +14,13 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/config"
+	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
@@ -173,6 +177,135 @@ func gzipBytes(t *testing.T, data []byte) []byte {
 		t.Fatal(err)
 	}
 	return buffer.Bytes()
+}
+
+func TestUnpackSupportedFormats(t *testing.T) {
+	payload := []byte("test MMDB payload")
+	tests := map[string][]byte{
+		"raw":    payload,
+		"gzip":   gzipBytes(t, payload),
+		"tar.gz": tarGzipBytes(t, map[string][]byte{"GeoLite2-City/GeoLite2-City.mmdb": payload, "COPYRIGHT.txt": []byte("notice")}),
+		"zip":    zipBytes(t, map[string][]byte{"IP2LOCATION-LITE-DB11.MMDB": payload, "README.txt": []byte("notice")}),
+	}
+	for name, input := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			source := filepath.Join(dir, "download")
+			destination := filepath.Join(dir, "database.mmdb")
+			if err := os.WriteFile(source, input, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := unpack(source, destination); err != nil {
+				t.Fatalf("unpack() error = %v", err)
+			}
+			got, err := os.ReadFile(destination)
+			if err != nil || !bytes.Equal(got, payload) {
+				t.Fatalf("unpacked data = %q, %v", got, err)
+			}
+		})
+	}
+}
+
+func TestUnpackRejectsAmbiguousArchive(t *testing.T) {
+	archives := map[string][]byte{
+		"zip":    zipBytes(t, map[string][]byte{"one.mmdb": []byte("one"), "two.mmdb": []byte("two")}),
+		"tar.gz": tarGzipBytes(t, map[string][]byte{"one.mmdb": []byte("one"), "two.mmdb": []byte("two")}),
+	}
+	for name, data := range archives {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			source := filepath.Join(dir, "download")
+			destination := filepath.Join(dir, "database.mmdb")
+			if err := os.WriteFile(source, data, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := unpack(source, destination); err == nil || !strings.Contains(err.Error(), "multiple") {
+				t.Fatalf("unpack() error = %v", err)
+			}
+			if _, err := os.Stat(destination); !os.IsNotExist(err) {
+				t.Fatalf("ambiguous archive left candidate behind: %v", err)
+			}
+		})
+	}
+}
+
+func tarGzipBytes(t *testing.T, files map[string][]byte) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	zipped := gzip.NewWriter(&buffer)
+	archive := tar.NewWriter(zipped)
+	for name, data := range files {
+		if err := archive.WriteHeader(&tar.Header{Name: name, Mode: 0o600, Size: int64(len(data))}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := archive.Write(data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := archive.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := zipped.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.Bytes()
+}
+
+func zipBytes(t *testing.T, files map[string][]byte) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	archive := zip.NewWriter(&buffer)
+	for name, data := range files {
+		entry, err := archive.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := entry.Write(data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := archive.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buffer.Bytes()
+}
+
+func TestProviderAuthorizationIsLimitedToOfficialHost(t *testing.T) {
+	maxMindConfig := config.Default(t.TempDir())
+	maxMindConfig.GeoIPProvider = string(geoip.ProviderMaxMind)
+	maxMindConfig.MaxMindAccountID = "account"
+	maxMindConfig.MaxMindLicenseKey = "license"
+	maxMindProfile, _ := geoip.UpdateProfileForProvider(maxMindConfig.GeoIPProvider)
+	maxMind := &Runner{Config: maxMindConfig, Profile: maxMindProfile}
+	request, _ := http.NewRequest(http.MethodGet, maxMindProfile.URL, nil)
+	maxMind.authorize(request)
+	username, password, ok := request.BasicAuth()
+	if !ok || username != "account" || password != "license" {
+		t.Fatalf("MaxMind Basic Auth = %q, %q, %v", username, password, ok)
+	}
+	mirrorRequest, _ := http.NewRequest(http.MethodGet, "https://mirror.example.com/city.mmdb", nil)
+	maxMind.authorize(mirrorRequest)
+	if _, _, ok := mirrorRequest.BasicAuth(); ok {
+		t.Fatal("MaxMind credentials were attached to a custom mirror")
+	}
+
+	ip2Config := config.Default(t.TempDir())
+	ip2Config.GeoIPProvider = string(geoip.ProviderIP2Location)
+	ip2Config.IP2LocationToken = "download-token"
+	ip2Profile, _ := geoip.UpdateProfileForProvider(ip2Config.GeoIPProvider)
+	ip2 := &Runner{Config: ip2Config, Profile: ip2Profile}
+	ip2Request, _ := http.NewRequest(http.MethodGet, ip2Profile.URL, nil)
+	ip2.authorize(ip2Request)
+	if got := ip2Request.URL.Query().Get("token"); got != "download-token" {
+		t.Fatalf("IP2Location token = %q", got)
+	}
+}
+
+func TestPublicSourceRedactsCredentials(t *testing.T) {
+	got := publicSource("https://example.com/download?file=city&token=secret")
+	if strings.Contains(got, "secret") || !strings.Contains(got, "%5BREDACTED%5D") {
+		t.Fatalf("publicSource() = %q", got)
+	}
 }
 
 func TestValidateRemoteURL(t *testing.T) {

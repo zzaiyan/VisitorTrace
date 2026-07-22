@@ -73,9 +73,12 @@ func runInit(args []string) int {
 	passwordFile := fs.String("password-file", "", "protected file containing the administrator password")
 	geoIPPath := fs.String("geoip", "", "existing GeoIP MMDB path")
 	geoIPProvider := fs.String("geoip-provider", string(geoip.ProviderDBIP), "GeoIP provider: dbip, maxmind, or ip2location")
-	geoIPUpdate := fs.String("geoip-update", "", "GeoIP update mode: monthly or disabled; defaults to provider policy")
+	geoIPUpdate := fs.String("geoip-update", "", "GeoIP update mode: automatic or disabled")
 	geoIPUpdateURL := fs.String("geoip-update-url", "", "GeoIP download URL template override")
 	geoIPChecksumURL := fs.String("geoip-checksum-url", "", "optional SHA-256 sidecar URL template")
+	maxMindAccountID := fs.String("maxmind-account-id", "", "MaxMind account ID for official downloads")
+	maxMindLicenseKey := fs.String("maxmind-license-key", "", "MaxMind license key for official downloads")
+	ip2LocationToken := fs.String("ip2location-token", "", "IP2Location download token for official downloads")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -86,13 +89,13 @@ func runInit(args []string) int {
 	}
 	cfg.GeoIPProvider = *geoIPProvider
 	cfg.GeoIPUpdate = *geoIPUpdate
-	if *geoIPProvider != string(geoip.ProviderDBIP) && *geoIPUpdateURL == "" {
-		cfg.GeoIPUpdateURL = ""
-	}
 	if *geoIPUpdateURL != "" {
 		cfg.GeoIPUpdateURL = *geoIPUpdateURL
 	}
 	cfg.GeoIPChecksumURL = *geoIPChecksumURL
+	cfg.MaxMindAccountID = *maxMindAccountID
+	cfg.MaxMindLicenseKey = *maxMindLicenseKey
+	cfg.IP2LocationToken = *ip2LocationToken
 	if _, err := os.Stat(cfg.DatabasePath); err == nil {
 		fmt.Fprintf(os.Stderr, "init refused: database already exists at %s\n", cfg.DatabasePath)
 		return 1
@@ -140,7 +143,7 @@ func runInit(args []string) int {
 	defer st.Close()
 	fmt.Printf("initialized VisitorTrace\nconfig: %s\ndata: %s\n", *configPath, cfg.DataDir)
 	if _, err := os.Stat(cfg.GeoIPPath); err != nil {
-		if cfg.GeoIPUpdate == "monthly" {
+		if cfg.GeoIPUpdate == "automatic" {
 			fmt.Printf("notice: GeoIP database will be downloaded when the service starts\n")
 		} else {
 			fmt.Printf("warning: GeoIP database is not installed; readiness will remain unavailable\n")

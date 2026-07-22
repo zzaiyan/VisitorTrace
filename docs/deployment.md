@@ -45,7 +45,7 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
   --config /etc/visitortrace/config.json
 ```
 
-The default configuration listens on `127.0.0.1:8790`, stores SQLite and GeoIP data under `/var/lib/visitortrace`, and uses DB-IP City Lite as its automatically updated provider. Keep the configuration at mode `0600`. MaxMind GeoLite2 City and IP2Location LITE DB11 are also supported; select them with `geoip_provider` and install their MMDB manually unless you configure a compatible private mirror.
+The default configuration listens on `127.0.0.1:8790`, stores SQLite and GeoIP data under `/var/lib/visitortrace`, and uses DB-IP City Lite as its automatically updated provider. MaxMind GeoLite2 City and IP2Location LITE DB11 have equivalent automatic-update support but require account credentials. Add `--geoip-provider maxmind --maxmind-account-id ACCOUNT_ID --maxmind-license-key LICENSE_KEY` or `--geoip-provider ip2location --ip2location-token DOWNLOAD_TOKEN` to the initialization command. Keep the configuration at mode `0600`; backups include these credentials and require the same access control.
 
 Before placing a reverse proxy in front of the service, add its loopback addresses to `trusted_proxies` in `/etc/visitortrace/config.json`:
 
@@ -258,7 +258,7 @@ The two live checks isolate systemd from the BT Panel proxy: if both return `{"s
 {"checks":{"geoip":true,"schema":true,"sqlite":true},"status":"ready"}
 ```
 
-The first GeoIP download may fail or remain unavailable on some networks. For a non-DB-IP provider, readiness may instead remain unavailable until its MMDB is copied into `geoip_path`. In either case, readiness returns HTTP 503. Use `curl` without `-f` to retain its diagnostic JSON, then inspect and retry the GeoIP operation:
+The first GeoIP download may fail or remain unavailable because of network access, invalid provider credentials, or a download code changed by the provider. Readiness then returns HTTP 503. Use `curl` without `-f` to retain its diagnostic JSON, then inspect and retry the GeoIP operation:
 
 ```sh
 sudo journalctl -u visitortrace -n 100 --no-pager

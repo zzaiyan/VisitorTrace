@@ -9,8 +9,8 @@ This file records user-facing changes for each published VisitorTrace release.
 - Added `visitortrace geoip query` and `scripts/query-mmdb.sh` to print formatted raw MMDB metadata and records for one IP, including the matched network and explicit no-record status.
 - Added `scripts/update-systemd-binary.sh` for verified manual updates from an already-downloaded local binary, including a pre-update backup, atomic release switch, service restart, and automatic executable rollback.
 - Added tracker hostname capture and hostname-scoped UV counting for Sites deployed on multiple domains. Hostnames are available in Pageview Records, filters, CSV exports, Public Analytics, Admin Analytics, and aggregate exports.
-- Added DB-IP Chinese city-label normalization to remove district/subdistrict qualifiers where the City Lite record provides enough hierarchy information.
-- Added pluggable GeoIP backends for DB-IP, MaxMind GeoLite2 City, and IP2Location LITE DB11, with unified country, region, city, latitude, and longitude fields, provider-aware validation, and provider-specific attribution. Non-DB-IP providers default to manual database installation.
+- Added DB-IP Chinese city-label normalization to remove district/subdistrict qualifiers where the City Lite record provides enough hierarchy information. The cleanup is now private to the DB-IP provider adapter and is never applied to MaxMind or IP2Location records.
+- Added equal first-class GeoIP backends for DB-IP, MaxMind GeoLite2 City, and IP2Location LITE DB11, with unified location fields, provider-specific validation/attribution, built-in official download sources, credential handling, and automatic updates. The updater now extracts raw MMDB, gzip MMDB, tar.gz, and ZIP containers.
 - This upcoming change advances the SQLite schema to 9. Existing installations are migrated automatically; historical records retain an empty hostname and historical aggregates cannot be reconstructed by hostname.
 
 ## 0.1.1 - 2026-07-23

@@ -24,6 +24,10 @@ func TestProviders(t *testing.T) {
 		if _, err := OpenWithProvider(provider, t.TempDir()+"/missing.mmdb"); err == nil {
 			t.Errorf("OpenWithProvider(%q) accepted a missing database", provider)
 		}
+		profile, err := UpdateProfileForProvider(provider)
+		if err != nil || profile.URL == "" || profile.OfficialHost == "" {
+			t.Errorf("UpdateProfileForProvider(%q) = %#v, %v", provider, profile, err)
+		}
 	}
 }
 
@@ -51,7 +55,7 @@ func TestIP2LocationRecordMapsToLocation(t *testing.T) {
 }
 
 func TestNestedRecordMapsToLocationWithoutDBIPNormalization(t *testing.T) {
-	record := mmdbRecord{}
+	record := nestedRecord{}
 	record.Country.ISOCode = "CN"
 	record.Country.Names = map[string]string{"en": "China"}
 	record.Subdivisions = []struct {
@@ -62,30 +66,8 @@ func TestNestedRecordMapsToLocationWithoutDBIPNormalization(t *testing.T) {
 	record.Location.Latitude = 39.9042
 	record.Location.Longitude = 116.4074
 
-	got := locationFromMMDBRecord(record, false)
+	got := locationFromNestedRecord(record)
 	if got.City != "Jinrongjie (Xicheng District)" || got.RegionCode != "BJ" {
 		t.Fatalf("nested location = %#v", got)
-	}
-}
-
-func TestCityLevelName(t *testing.T) {
-	tests := []struct {
-		country string
-		city    string
-		region  string
-		want    string
-	}{
-		{"CN", "Shenzhen (Bantian Residential District)", "Guangdong", "Shenzhen"},
-		{"CN", "Qinghe (Qinghe Subdistrict, Beijing)", "Beijing", "Beijing"},
-		{"CN", "Jinrongjie (Xicheng District)", "Beijing", "Beijing"},
-		{"CN", "Longgang District", "Guangdong", ""},
-		{"CN", "Dali Old Town", "Yunnan", "Dali"},
-		{"CN", "Guangzhou", "Guangdong", "Guangzhou"},
-		{"US", "Washington (District)", "District of Columbia", "Washington (District)"},
-	}
-	for _, test := range tests {
-		if got := CityLevelName(test.country, test.city, test.region); got != test.want {
-			t.Errorf("CityLevelName(%q, %q, %q) = %q, want %q", test.country, test.city, test.region, got, test.want)
-		}
 	}
 }

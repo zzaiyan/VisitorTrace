@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 )
 
 func TestSaveLoadRoundTrip(t *testing.T) {
@@ -55,7 +57,7 @@ func TestLoadDefaultsBackupDirectoryForExistingConfig(t *testing.T) {
 	if got.BackupDir != filepath.Join(dataDir, "backups") {
 		t.Fatalf("BackupDir = %q", got.BackupDir)
 	}
-	if got.GeoIPUpdate != "monthly" || !strings.Contains(got.GeoIPUpdateURL, "{YYYY-MM}") {
+	if got.GeoIPUpdate != "automatic" || !strings.Contains(got.GeoIPUpdateURL, "{YYYY-MM}") {
 		t.Fatalf("GeoIP update defaults = %q, %q", got.GeoIPUpdate, got.GeoIPUpdateURL)
 	}
 	if !strings.Contains(got.UpdateManifestURL, "VisitorTrace/releases/latest") {
@@ -63,21 +65,65 @@ func TestLoadDefaultsBackupDirectoryForExistingConfig(t *testing.T) {
 	}
 }
 
-func TestNonDBIPProviderDefaultsToManualUpdates(t *testing.T) {
-	cfg := Default(filepath.Join(t.TempDir(), "data"))
-	cfg.GeoIPProvider = "maxmind"
-	cfg.GeoIPUpdate = ""
-	cfg.GeoIPUpdateURL = ""
-	path := filepath.Join(t.TempDir(), "visitortrace.json")
-	if err := Save(path, cfg); err != nil {
-		t.Fatalf("Save() error = %v", err)
+func TestProvidersDefaultToAutomaticOfficialUpdates(t *testing.T) {
+	for _, provider := range []string{"dbip", "maxmind", "ip2location"} {
+		t.Run(provider, func(t *testing.T) {
+			cfg := Default(filepath.Join(t.TempDir(), "data"))
+			cfg.GeoIPProvider = provider
+			cfg.GeoIPUpdate = ""
+			cfg.MaxMindAccountID = "account"
+			cfg.MaxMindLicenseKey = "license"
+			cfg.IP2LocationToken = "token"
+			path := filepath.Join(t.TempDir(), "visitortrace.json")
+			if err := Save(path, cfg); err != nil {
+				t.Fatalf("Save() error = %v", err)
+			}
+			got, err := Load(path)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			profile, _ := geoip.UpdateProfileForProvider(provider)
+			if got.GeoIPProvider != provider || got.GeoIPUpdate != "automatic" || got.GeoIPUpdateURL != profile.URL {
+				t.Fatalf("provider defaults = %#v", got)
+			}
+		})
+	}
+}
+
+func TestOfficialProviderUpdatesRequireCredentials(t *testing.T) {
+	for _, provider := range []string{"maxmind", "ip2location"} {
+		t.Run(provider, func(t *testing.T) {
+			cfg := Default(t.TempDir())
+			cfg.GeoIPProvider = provider
+			cfg.GeoIPUpdateURL = ""
+			cfg.applyDefaults()
+			if err := cfg.Validate(); err == nil {
+				t.Fatal("Validate() accepted an official source without credentials")
+			}
+
+			cfg.GeoIPUpdateURL = "https://mirror.example.com/city.mmdb"
+			if err := cfg.Validate(); err != nil {
+				t.Fatalf("Validate() rejected a credential-free custom mirror: %v", err)
+			}
+		})
+	}
+}
+
+func TestLegacyMonthlyUpdateModeMigratesToAutomatic(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "visitortrace.json")
+	cfg := Default(filepath.Join(dir, "data"))
+	cfg.GeoIPUpdate = "monthly"
+	data := `{"version":1,"data_dir":"` + cfg.DataDir + `","database_path":"` + cfg.DatabasePath + `","geoip_path":"` + cfg.GeoIPPath + `","geoip_provider":"dbip","geoip_update":"monthly","listen":"127.0.0.1:8790"}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
 	}
 	got, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if got.GeoIPProvider != "maxmind" || got.GeoIPUpdate != "disabled" || got.GeoIPUpdateURL != "" {
-		t.Fatalf("non-DB-IP defaults = %#v", got)
+	if got.GeoIPUpdate != "automatic" {
+		t.Fatalf("GeoIPUpdate = %q", got.GeoIPUpdate)
 	}
 }
 

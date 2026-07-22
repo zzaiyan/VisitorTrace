@@ -175,29 +175,42 @@ VisitorTrace uses one active local MMDB provider at a time and maps all supporte
 
 | Provider | Database format | Default update behavior |
 | --- | --- | --- |
-| `dbip` | DB-IP City Lite | Monthly automatic update |
-| `maxmind` | MaxMind GeoLite2 City | Manual installation |
-| `ip2location` | IP2Location LITE DB11 | Manual installation |
+| `dbip` | DB-IP City Lite (`.mmdb.gz`) | Monthly, no credentials |
+| `maxmind` | MaxMind GeoLite2 City (`.tar.gz`) | Automatic, Account ID and License Key required |
+| `ip2location` | IP2Location LITE DB11 MMDB (`.zip`) | Monthly, Download Token required |
 
-The default provider is `dbip`. A MaxMind configuration looks like this:
+The default provider is `dbip`. All providers use the same automatic updater and atomic activation path. Initialize MaxMind with credentials from the MaxMind account portal:
 
-```json
-{
-  "geoip_provider": "maxmind",
-  "geoip_path": "/var/lib/visitortrace/GeoLite2-City.mmdb",
-  "geoip_update": "disabled"
-}
+```sh
+visitortrace init \
+  --data-dir /var/lib/visitortrace \
+  --config /etc/visitortrace/config.json \
+  --geoip-provider maxmind \
+  --maxmind-account-id ACCOUNT_ID \
+  --maxmind-license-key LICENSE_KEY
 ```
 
-For IP2Location, use `"geoip_provider": "ip2location"` and point `geoip_path` to the LITE DB11 MMDB. Provider selection is part of configuration validation; the service will reject unsupported provider names.
+MaxMind official downloads use HTTP Basic Authentication. Initialize IP2Location with its account Download Token:
 
-DB-IP is checked at startup and daily. When the local file is missing, invalid, or not from the current month, the default configuration downloads:
+```sh
+visitortrace init \
+  --data-dir /var/lib/visitortrace \
+  --config /etc/visitortrace/config.json \
+  --geoip-provider ip2location \
+  --ip2location-token DOWNLOAD_TOKEN
+```
+
+The equivalent protected configuration fields are `maxmind_account_id`, `maxmind_license_key`, and `ip2location_download_token`. The three built-in sources are:
 
 ```text
-https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz
+DB-IP:       https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz
+MaxMind:     https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz
+IP2Location: https://www.ip2location.com/download?file=DB11LITEMMDB
 ```
 
-VisitorTrace bounds compressed and expanded sizes, verifies the complete MMDB search tree and data section, validates the configured provider's database shape, and only then atomically replaces and hot-loads the database. The prior version remains at `<geoip_path>.previous`; a failed activation rolls back automatically. The same resolver and readiness path is used for all three providers.
+IP2Location publishes the exact download code in the account Download page. `DB11LITEMMDB` is the built-in LITE DB11 MMDB code; if the account page shows a different code, override `geoip_update_url` with the URL shown there. The updater follows the HTTPS redirects used by MaxMind and IP2Location.
+
+VisitorTrace checks at startup and every 24 hours. DB-IP and IP2Location use a calendar-month freshness policy; MaxMind is checked after 72 hours. It recognizes raw MMDB, gzip-compressed MMDB, tar.gz, and ZIP by file signature. VisitorTrace bounds downloaded and expanded sizes, verifies the complete MMDB search tree and data section, validates the configured provider's database shape, and only then atomically replaces and hot-loads the database. The prior version remains at `<geoip_path>.previous`; a failed activation rolls back automatically.
 
 Check and update manually with:
 
@@ -206,7 +219,7 @@ Check and update manually with:
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-Use `--force` to download again despite a current-month file. A command-line update runs in a separate process, so restart a running systemd service afterward. The built-in automatic update hot-loads the new database directly.
+Use `--force` to download again despite the provider's freshness policy. A command-line update runs in a separate process, so restart a running systemd service afterward. The built-in automatic update hot-loads the new database directly.
 
 Inspect the raw MMDB record for one IP when diagnosing a city-level result:
 
@@ -224,17 +237,19 @@ Inspect the raw MMDB record for one IP when diagnosing a city-level result:
 
 The command prints formatted JSON containing the database metadata, the matched CIDR, a `found` flag, and the unmodified MMDB `record` tree. It does not apply VisitorTrace's city-level label normalization. A missing address returns `found: false` and a `null` record. On a deployed system, the same operation can be run directly with the installed executable, for example `sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip query --config /etc/visitortrace/config.json 1.2.3.4`.
 
-The built-in updater is provider-neutral and can consume an HTTPS mirror when the mirror exposes a compatible archive and optional SHA-256 sidecar. Official MaxMind and IP2Location downloads commonly require account credentials or license-specific access, so automatic updates are disabled by default for those providers. To use a private or domestic mirror, configure it explicitly:
+The updater can consume an HTTPS mirror that exposes any supported container and an optional SHA-256 sidecar. Provider credentials are attached only to that provider's exact official hostname and are never sent to a custom mirror. Configure a private or domestic mirror explicitly:
 
 ```json
 {
-  "geoip_update": "monthly",
+  "geoip_update": "automatic",
   "geoip_update_url": "https://mirror.example.com/dbip-city-lite-{YYYY-MM}.mmdb.gz",
   "geoip_checksum_url": "https://mirror.example.com/dbip-city-lite-{YYYY-MM}.mmdb.gz.sha256"
 }
 ```
 
-`geoip_checksum_url` is optional. When present, VisitorTrace verifies the compressed file's SHA-256 before extraction. Remote sources must use HTTPS, except loopback test endpoints. Set `"geoip_update": "disabled"` to disable downloads.
+`geoip_checksum_url` is optional. When present, VisitorTrace verifies the downloaded container's SHA-256 before extraction. Remote sources must use HTTPS, except loopback test endpoints. Set `"geoip_update": "disabled"` to disable downloads. Existing `"monthly"` values are migrated to `"automatic"` when read.
+
+The account credentials are secrets. Keep the configuration at mode `0600`, restrict backup access because backups include the configuration, and do not put credentials in either update URL.
 
 Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. The map hover details, Admin previews, and Public Analytics show the attribution for the active provider. DB-IP Chinese city-label normalization applies only to DB-IP records; MaxMind and IP2Location city names are mapped as supplied by those databases.
 

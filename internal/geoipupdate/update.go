@@ -1,6 +1,8 @@
 package geoipupdate
 
 import (
+	"archive/tar"
+	"archive/zip"
 	"bufio"
 	"compress/gzip"
 	"context"
@@ -39,6 +41,7 @@ type Result struct {
 
 type Runner struct {
 	Config   config.Config
+	Profile  geoip.UpdateProfile
 	Store    *store.Store
 	Logger   *slog.Logger
 	Client   *http.Client
@@ -49,6 +52,7 @@ type Runner struct {
 }
 
 func New(cfg config.Config, st *store.Store, logger *slog.Logger) *Runner {
+	profile, _ := geoip.UpdateProfileForProvider(cfg.GeoIPProvider)
 	client := &http.Client{
 		Timeout: 30 * time.Minute,
 		CheckRedirect: func(request *http.Request, via []*http.Request) error {
@@ -59,7 +63,7 @@ func New(cfg config.Config, st *store.Store, logger *slog.Logger) *Runner {
 		},
 	}
 	return &Runner{
-		Config: cfg, Store: st, Logger: logger, Client: client, Now: time.Now,
+		Config: cfg, Profile: profile, Store: st, Logger: logger, Client: client, Now: time.Now,
 		Validate: func(path string) error {
 			return geoip.ValidateWithProvider(cfg.GeoIPProvider, path)
 		},
@@ -127,8 +131,15 @@ func (r *Runner) currentDatabaseIsFresh(now time.Time) bool {
 		return false
 	}
 	modified := info.ModTime().UTC()
-	if modified.Year() != now.Year() || modified.Month() != now.Month() {
-		return false
+	if r.Profile.CalendarMonthly {
+		if modified.Year() != now.Year() || modified.Month() != now.Month() {
+			return false
+		}
+	} else if r.Profile.FreshFor > 0 {
+		age := now.Sub(modified)
+		if age > r.Profile.FreshFor {
+			return false
+		}
 	}
 	return r.Probe(r.Config.GeoIPPath) == nil
 }
@@ -175,7 +186,7 @@ func (r *Runner) downloadAndInstall(ctx context.Context, now time.Time) (Result,
 	if err := install(candidate, r.Config.GeoIPPath, r.Activate); err != nil {
 		return Result{}, err
 	}
-	return Result{Updated: true, Source: source, SHA256: checksum, CompressedSize: size}, nil
+	return Result{Updated: true, Source: publicSource(source), SHA256: checksum, CompressedSize: size}, nil
 }
 
 func (r *Runner) download(ctx context.Context, source, destination string, limit int64) (string, int64, error) {
@@ -184,9 +195,10 @@ func (r *Runner) download(ctx context.Context, source, destination string, limit
 		return "", 0, fmt.Errorf("create GeoIP download request: %w", err)
 	}
 	request.Header.Set("User-Agent", "VisitorTrace GeoIP Updater")
+	r.authorize(request)
 	response, err := r.Client.Do(request)
 	if err != nil {
-		return "", 0, fmt.Errorf("download GeoIP database: %w", err)
+		return "", 0, fmt.Errorf("download GeoIP database: %s", r.redactError(err))
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
@@ -226,9 +238,11 @@ func (r *Runner) downloadChecksum(ctx context.Context, source string) (string, e
 	if err != nil {
 		return "", err
 	}
+	request.Header.Set("User-Agent", "VisitorTrace GeoIP Updater")
+	r.authorize(request)
 	response, err := r.Client.Do(request)
 	if err != nil {
-		return "", fmt.Errorf("download GeoIP checksum: %w", err)
+		return "", fmt.Errorf("download GeoIP checksum: %s", r.redactError(err))
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
@@ -254,25 +268,128 @@ func unpack(source, destination string) error {
 		return fmt.Errorf("open GeoIP download: %w", err)
 	}
 	defer file.Close()
-	buffered := bufio.NewReader(file)
-	header, err := buffered.Peek(2)
+	info, err := file.Stat()
 	if err != nil {
-		return fmt.Errorf("read GeoIP download header: %w", err)
+		return fmt.Errorf("stat GeoIP download: %w", err)
 	}
-	var reader io.Reader = buffered
-	var zipped *gzip.Reader
-	if header[0] == 0x1f && header[1] == 0x8b {
-		zipped, err = gzip.NewReader(buffered)
+	header := make([]byte, 4)
+	n, readErr := io.ReadFull(file, header)
+	if readErr != nil && readErr != io.ErrUnexpectedEOF {
+		return fmt.Errorf("read GeoIP download header: %w", readErr)
+	}
+	header = header[:n]
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("rewind GeoIP download: %w", err)
+	}
+
+	if isZipHeader(header) {
+		archive, err := zip.NewReader(file, info.Size())
+		if err != nil {
+			return fmt.Errorf("open GeoIP ZIP archive: %w", err)
+		}
+		return unpackZip(archive, destination)
+	}
+	if len(header) >= 2 && header[0] == 0x1f && header[1] == 0x8b {
+		zipped, err := gzip.NewReader(file)
 		if err != nil {
 			return fmt.Errorf("open compressed GeoIP database: %w", err)
 		}
 		defer zipped.Close()
-		reader = zipped
+		buffered := bufio.NewReader(zipped)
+		tarHeader, peekErr := buffered.Peek(512)
+		if peekErr != nil && peekErr != io.EOF {
+			return fmt.Errorf("inspect compressed GeoIP database: %w", peekErr)
+		}
+		if isTarHeader(tarHeader) {
+			return unpackTar(tar.NewReader(buffered), destination)
+		}
+		return writeDatabase(buffered, destination)
 	}
+	return writeDatabase(file, destination)
+}
+
+func isZipHeader(header []byte) bool {
+	if len(header) < 4 || header[0] != 'P' || header[1] != 'K' {
+		return false
+	}
+	return (header[2] == 3 && header[3] == 4) || (header[2] == 5 && header[3] == 6) || (header[2] == 7 && header[3] == 8)
+}
+
+func isTarHeader(header []byte) bool {
+	return len(header) >= 265 && string(header[257:262]) == "ustar"
+}
+
+func unpackZip(archive *zip.Reader, destination string) error {
+	var candidate *zip.File
+	for _, entry := range archive.File {
+		if entry.FileInfo().IsDir() || !strings.EqualFold(filepath.Ext(entry.Name), ".mmdb") {
+			continue
+		}
+		if candidate != nil {
+			return fmt.Errorf("GeoIP ZIP archive contains multiple MMDB files")
+		}
+		candidate = entry
+	}
+	if candidate == nil {
+		return fmt.Errorf("GeoIP ZIP archive contains no MMDB file")
+	}
+	reader, err := candidate.Open()
+	if err != nil {
+		return fmt.Errorf("open MMDB in GeoIP ZIP archive: %w", err)
+	}
+	defer reader.Close()
+	return writeDatabase(reader, destination)
+}
+
+func unpackTar(archive *tar.Reader, destination string) error {
+	found := false
+	candidateWritten := false
+	defer func() {
+		if candidateWritten {
+			_ = os.Remove(destination)
+		}
+	}()
+	for {
+		entry, err := archive.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("read GeoIP tar archive: %w", err)
+		}
+		if (entry.Typeflag != tar.TypeReg && entry.Typeflag != tar.TypeRegA) || !strings.EqualFold(filepath.Ext(entry.Name), ".mmdb") {
+			continue
+		}
+		if found {
+			return fmt.Errorf("GeoIP tar archive contains multiple MMDB files")
+		}
+		if entry.Size > maxDatabaseBytes {
+			return fmt.Errorf("unpacked GeoIP database exceeds %d bytes", maxDatabaseBytes)
+		}
+		if err := writeDatabase(archive, destination); err != nil {
+			return err
+		}
+		found = true
+		candidateWritten = true
+	}
+	if !found {
+		return fmt.Errorf("GeoIP tar archive contains no MMDB file")
+	}
+	candidateWritten = false
+	return nil
+}
+
+func writeDatabase(reader io.Reader, destination string) error {
 	target, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fmt.Errorf("create GeoIP candidate: %w", err)
 	}
+	remove := true
+	defer func() {
+		if remove {
+			_ = os.Remove(destination)
+		}
+	}()
 	written, copyErr := io.Copy(target, io.LimitReader(reader, maxDatabaseBytes+1))
 	if copyErr == nil {
 		copyErr = target.Sync()
@@ -287,6 +404,7 @@ func unpack(source, destination string) error {
 	if written > maxDatabaseBytes {
 		return fmt.Errorf("unpacked GeoIP database exceeds %d bytes", maxDatabaseBytes)
 	}
+	remove = false
 	return nil
 }
 
@@ -337,6 +455,48 @@ func rollback(target, previous string, hadPrevious bool, activate func(string) e
 
 func expandTemplate(value string, now time.Time) string {
 	return strings.ReplaceAll(value, "{YYYY-MM}", now.UTC().Format("2006-01"))
+}
+
+func (r *Runner) authorize(request *http.Request) {
+	if request == nil || !strings.EqualFold(request.URL.Hostname(), r.Profile.OfficialHost) {
+		return
+	}
+	switch geoip.Provider(r.Config.GeoIPProvider) {
+	case geoip.ProviderMaxMind:
+		request.SetBasicAuth(r.Config.MaxMindAccountID, r.Config.MaxMindLicenseKey)
+	case geoip.ProviderIP2Location:
+		query := request.URL.Query()
+		query.Set("token", r.Config.IP2LocationToken)
+		request.URL.RawQuery = query.Encode()
+	}
+}
+
+func (r *Runner) redactError(err error) string {
+	if err == nil {
+		return ""
+	}
+	value := err.Error()
+	for _, secret := range []string{r.Config.MaxMindLicenseKey, r.Config.IP2LocationToken} {
+		if secret != "" {
+			value = strings.ReplaceAll(value, secret, "[REDACTED]")
+		}
+	}
+	return value
+}
+
+func publicSource(value string) string {
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return value
+	}
+	query := parsed.Query()
+	for _, key := range []string{"token", "license_key", "key", "password"} {
+		if query.Has(key) {
+			query.Set(key, "[REDACTED]")
+		}
+	}
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func validateRemoteURL(value *url.URL) error {

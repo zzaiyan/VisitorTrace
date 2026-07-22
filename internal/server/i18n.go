@@ -56,7 +56,7 @@ var messages = map[string]map[string]string{
 		"public_language": "公开分析默认语言", "language_auto": "自动（跟随访客浏览器）",
 		"flash_site": "Site 已创建。", "flash_settings": "站点设置已保存。", "flash_preset": "Map Preset 已保存。", "flash_reset": "Site 数据已清空；采集和公开展示保持关闭。",
 		"flash_deleted": "Site 已永久删除。", "flash_backup": "备份已创建并通过完整性检查。", "flash_cleanup": "维护清理已完成。", "flash_geoip": "GeoIP 数据库已更新并热加载。",
-		"flash_geoip_current": "GeoIP 数据库已是当月版本。", "flash_update_current": "VisitorTrace 已是最新版本。",
+		"flash_geoip_current": "GeoIP 数据库当前无需更新。", "flash_update_current": "VisitorTrace 已是最新版本。",
 	},
 	"en": {
 		"dashboard": "Dashboard", "sites": "Sites", "records": "Pageview Records", "settings": "Administrator Settings", "logout": "Log out", "admin_navigation": "Admin navigation",
@@ -101,7 +101,7 @@ var messages = map[string]map[string]string{
 		"public_language": "Default Public Analytics language", "language_auto": "Automatic (visitor browser preference)",
 		"flash_site": "Site created.", "flash_settings": "Site settings saved.", "flash_preset": "Map Preset saved.", "flash_reset": "Site data reset; ingestion and public views remain disabled.",
 		"flash_deleted": "Site permanently deleted.", "flash_backup": "Backup created and verified.", "flash_cleanup": "Maintenance cleanup completed.", "flash_geoip": "GeoIP database updated and hot-loaded.",
-		"flash_geoip_current": "The GeoIP database is already current for this month.", "flash_update_current": "VisitorTrace is up to date.",
+		"flash_geoip_current": "The GeoIP database is already current.", "flash_update_current": "VisitorTrace is up to date.",
 	},
 }
 

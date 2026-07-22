@@ -28,6 +28,9 @@ type Config struct {
 	GeoIPUpdate       string   `json:"geoip_update,omitempty"`
 	GeoIPUpdateURL    string   `json:"geoip_update_url,omitempty"`
 	GeoIPChecksumURL  string   `json:"geoip_checksum_url,omitempty"`
+	MaxMindAccountID  string   `json:"maxmind_account_id,omitempty"`
+	MaxMindLicenseKey string   `json:"maxmind_license_key,omitempty"`
+	IP2LocationToken  string   `json:"ip2location_download_token,omitempty"`
 	BackupDir         string   `json:"backup_dir,omitempty"`
 	UpdateManifestURL string   `json:"update_manifest_url,omitempty"`
 	Listen            string   `json:"listen"`
@@ -52,14 +55,15 @@ func DefaultDataDir() string {
 }
 
 func Default(dataDir string) Config {
+	profile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderDBIP))
 	return Config{
 		Version:           CurrentVersion,
 		DataDir:           dataDir,
 		DatabasePath:      filepath.Join(dataDir, "visitortrace.sqlite3"),
 		GeoIPPath:         filepath.Join(dataDir, "geoip.mmdb"),
 		GeoIPProvider:     string(geoip.ProviderDBIP),
-		GeoIPUpdate:       "monthly",
-		GeoIPUpdateURL:    "https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz",
+		GeoIPUpdate:       "automatic",
+		GeoIPUpdateURL:    profile.URL,
 		BackupDir:         filepath.Join(dataDir, "backups"),
 		UpdateManifestURL: "https://github.com/zzaiyan/VisitorTrace/releases/latest/download/manifest.json",
 		Listen:            "127.0.0.1:8790",
@@ -168,11 +172,32 @@ func (c Config) Validate() error {
 			return fmt.Errorf("invalid trusted proxy CIDR %q", value)
 		}
 	}
-	if c.GeoIPUpdate != "monthly" && c.GeoIPUpdate != "disabled" {
-		return fmt.Errorf("geoip_update must be monthly or disabled")
+	if c.GeoIPUpdate != "automatic" && c.GeoIPUpdate != "disabled" {
+		return fmt.Errorf("geoip_update must be automatic or disabled")
 	}
-	if c.GeoIPUpdate == "monthly" && strings.TrimSpace(c.GeoIPUpdateURL) == "" {
+	if c.GeoIPUpdate == "automatic" && strings.TrimSpace(c.GeoIPUpdateURL) == "" {
 		return errors.New("geoip_update_url is required when GeoIP updates are enabled")
+	}
+	profile, err := geoip.UpdateProfileForProvider(c.GeoIPProvider)
+	if err != nil {
+		return err
+	}
+	if c.GeoIPUpdate == "automatic" && c.GeoIPUpdateURL == profile.URL {
+		switch geoip.Provider(c.GeoIPProvider) {
+		case geoip.ProviderMaxMind:
+			if c.MaxMindAccountID == "" || c.MaxMindLicenseKey == "" {
+				return errors.New("maxmind_account_id and maxmind_license_key are required for the official MaxMind update source")
+			}
+		case geoip.ProviderIP2Location:
+			if c.IP2LocationToken == "" {
+				return errors.New("ip2location_download_token is required for the official IP2Location update source")
+			}
+		}
+	}
+	for name, value := range map[string]string{"maxmind_account_id": c.MaxMindAccountID, "maxmind_license_key": c.MaxMindLicenseKey, "ip2location_download_token": c.IP2LocationToken} {
+		if strings.ContainsAny(value, "\r\n") {
+			return fmt.Errorf("%s must not contain line breaks", name)
+		}
 	}
 	for name, value := range map[string]string{"geoip_update_url": c.GeoIPUpdateURL, "geoip_checksum_url": c.GeoIPChecksumURL, "update_manifest_url": c.UpdateManifestURL} {
 		if value == "" {
@@ -181,6 +206,9 @@ func (c Config) Validate() error {
 		parsed, err := url.Parse(value)
 		if err != nil || parsed.Host == "" {
 			return fmt.Errorf("%s must be an absolute URL", name)
+		}
+		if parsed.User != nil {
+			return fmt.Errorf("%s must not contain credentials", name)
 		}
 		host := strings.ToLower(parsed.Hostname())
 		loopback := host == "localhost" || host == "127.0.0.1" || host == "::1"
@@ -236,6 +264,12 @@ func (c *Config) normalize() error {
 		return err
 	}
 	c.GeoIPProvider = provider
+	if c.GeoIPUpdate == "monthly" {
+		c.GeoIPUpdate = "automatic"
+	}
+	c.MaxMindAccountID = strings.TrimSpace(c.MaxMindAccountID)
+	c.MaxMindLicenseKey = strings.TrimSpace(c.MaxMindLicenseKey)
+	c.IP2LocationToken = strings.TrimSpace(c.IP2LocationToken)
 	baseURL, err := NormalizeBaseURL(c.BaseURL)
 	if err != nil {
 		return err
@@ -252,14 +286,11 @@ func (c *Config) applyDefaults() {
 		c.BackupDir = filepath.Join(c.DataDir, "backups")
 	}
 	if c.GeoIPUpdate == "" {
-		if c.GeoIPProvider == string(geoip.ProviderDBIP) {
-			c.GeoIPUpdate = "monthly"
-		} else {
-			c.GeoIPUpdate = "disabled"
-		}
+		c.GeoIPUpdate = "automatic"
 	}
-	if c.GeoIPProvider == string(geoip.ProviderDBIP) && c.GeoIPUpdateURL == "" {
-		c.GeoIPUpdateURL = "https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz"
+	profile, err := geoip.UpdateProfileForProvider(c.GeoIPProvider)
+	if err == nil && (c.GeoIPUpdateURL == "" || geoip.IsDefaultUpdateURL(c.GeoIPUpdateURL)) {
+		c.GeoIPUpdateURL = profile.URL
 	}
 	if c.UpdateManifestURL == "" {
 		c.UpdateManifestURL = "https://github.com/zzaiyan/VisitorTrace/releases/latest/download/manifest.json"
