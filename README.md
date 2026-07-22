@@ -1,5 +1,7 @@
 # VisitorTrace · 访迹
 
+[![CI](https://github.com/zzaiyan/VisitorTrace/actions/workflows/ci.yml/badge.svg)](https://github.com/zzaiyan/VisitorTrace/actions/workflows/ci.yml)
+
 轻量、自托管的访客地图与访问记录服务。
 
 A tiny self-hosted visitor map and Pageview tracker.
@@ -39,6 +41,8 @@ make check
 make build
 ./bin/visitortrace version
 ```
+
+正式版本会在 [GitHub Releases](https://github.com/zzaiyan/VisitorTrace/releases) 提供 `linux-amd64`、`linux-arm64` 二进制及校验文件。
 
 ### 基本启动
 
@@ -87,6 +91,8 @@ make check
 make build
 ./bin/visitortrace version
 ```
+
+Published versions provide `linux-amd64` and `linux-arm64` executables plus checksums on [GitHub Releases](https://github.com/zzaiyan/VisitorTrace/releases).
 
 ### Basic Startup
 

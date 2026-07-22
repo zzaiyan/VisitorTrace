@@ -67,7 +67,9 @@ Public Map 的有效 Options `CacheKey` 与 Site ID 组成缓存键。内存 LRU
 
 ## 发布签名与自更新
 
-生成一次性项目发布密钥：
+项目使用 `.github/workflows/ci.yml` 校验 Go 测试、Race Detector、Vet、依赖完整性，以及前端锁定依赖、漏洞和提交产物的一致性。普通 CI 只有仓库只读权限。
+
+首次正式发布前，在离线或受保护环境生成一次项目发布密钥：
 
 ```sh
 go run ./tools/release-manifest keygen \
@@ -75,7 +77,16 @@ go run ./tools/release-manifest keygen \
   --public-key .release-secrets/update.pub
 ```
 
-`.release-secrets` 已被 Git 忽略。私钥必须保存在仓库外的受保护备份中，不得提交或放到发布服务器；正式构建只嵌入命令输出的 Base64 公钥：
+`.release-secrets` 已被 Git 忽略。私钥必须保存在仓库外的受保护备份中，不得提交或放到应用服务器。丢失私钥后无法为现有客户端发布可信更新；替换公钥也不能让已安装版本自动信任新密钥。
+
+在 GitHub 仓库中创建名为 `release` 的 Environment，建议配置 Required reviewers，然后添加：
+
+- Environment secret `UPDATE_PRIVATE_KEY`：私钥文件中的单行 Base64 内容；
+- Environment variable `UPDATE_PUBLIC_KEY`：公钥文件中的单行 Base64 内容。
+
+Release 工作流只把公钥嵌入正式二进制。私钥仅暴露给受 Environment 保护的签名步骤；构建和签名 job 只有 `contents: read`，独立发布 job 才有 `contents: write`。
+
+本地仍可构建带自更新能力的正式二进制：
 
 ```sh
 make build \
@@ -83,16 +94,36 @@ make build \
   UPDATE_PUBLIC_KEY="BASE64_RAW_ED25519_PUBLIC_KEY"
 ```
 
-为 `linux-amd64` 和 `linux-arm64` 构建二进制，计算大小和 SHA-256，并以 [release-manifest.example.json](./release-manifest.example.json) 为模板。`version` 必须与构建时 `VERSION` 完全一致，`schema_version` 必须等于该二进制输出的 `visitortrace version --json`。签名：
+发布使用语义化版本标签。确认 `main` 的 CI 通过后创建并推送标签：
 
 ```sh
+git tag -a v0.1.0 -m "VisitorTrace v0.1.0"
+git push origin v0.1.0
+```
+
+`.github/workflows/release.yml` 会重新执行测试，使用 `CGO_ENABLED=0` 构建 `linux-amd64` 和 `linux-arm64`，将版本、Commit、构建时间和公钥嵌入二进制，从实际文件生成 SHA-256、大小和 Schema 清单，再用最终公钥验签。验证完成的文件先上传到草稿 Release，全部成功后才公开；任务重跑可以刷新同一草稿，不能覆盖已经发布的版本。含 `-` 的 SemVer 标签会发布为 prerelease，不会替换稳定版 `releases/latest`。
+
+本地生成清单时使用：
+
+```sh
+go run ./tools/release-manifest generate \
+  --version 0.1.0 \
+  --published-at 2026-07-22T00:00:00Z \
+  --asset linux-amd64=dist/visitortrace-linux-amd64 \
+  --asset linux-arm64=dist/visitortrace-linux-arm64 \
+  --output manifest.unsigned.json
+
 go run ./tools/release-manifest sign \
   --private-key .release-secrets/update.ed25519 \
   --manifest manifest.unsigned.json \
   --output manifest.json
+
+go run ./tools/release-manifest verify \
+  --public-key "BASE64_RAW_ED25519_PUBLIC_KEY" \
+  --manifest manifest.json
 ```
 
-签名载荷是去除 `signature` 后的固定 Go 结构 JSON；Assets map 由 `encoding/json` 按键排序。发布后不得原地修改清单或二进制。
+签名载荷是去除 `signature` 后的固定 Go 结构 JSON；Assets map 由 `encoding/json` 按键排序。`manifest.json` 使用相对资产 URL，整组 Release 文件可原样同步到国内镜像。发布后不得原地修改清单或二进制。
 
 更新器将候选文件放入 `data_dir/releases/v<version>/visitortrace`，并通过 `releases/current` 相对符号链接切换。`data_dir/.update-pending.json` 记录旧/新目标、升级前快照和启动次数。`serve` 在打开 SQLite 前登记启动；第三次失败会使用不执行正向迁移的恢复路径还原快照。只有 HTTP 服务的 SQLite、Schema 和 GeoIP 就绪后，pending 状态才会完成。后台发起更新需要在当前请求中重新验证密码，然后在响应完成后请求进程优雅退出。
 

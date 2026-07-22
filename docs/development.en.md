@@ -67,7 +67,9 @@ The effective Public Map Options `CacheKey` is namespaced by Site ID. The in-mem
 
 ## Release Signing and Self-Update
 
-Generate the project release key once:
+`.github/workflows/ci.yml` checks Go tests, the Race Detector, Vet, module integrity, locked frontend dependencies, dependency vulnerabilities, and reproducibility of committed browser assets. Normal CI has read-only repository access.
+
+Before the first production release, generate the project release key once in an offline or otherwise protected environment:
 
 ```sh
 go run ./tools/release-manifest keygen \
@@ -75,7 +77,16 @@ go run ./tools/release-manifest keygen \
   --public-key .release-secrets/update.pub
 ```
 
-Git ignores `.release-secrets`. Keep the private key in protected storage outside the repository and never publish it or place it on the download server. Production builds embed only the Base64 public key printed by the command:
+Git ignores `.release-secrets`. Keep the private key in protected storage outside the repository and never publish it or place it on the application server. Losing it prevents trusted updates for existing clients; replacing the public key does not make installed versions trust the replacement automatically.
+
+Create a GitHub Environment named `release`, preferably with required reviewers, then add:
+
+- Environment secret `UPDATE_PRIVATE_KEY`: the single-line Base64 private-key file content;
+- Environment variable `UPDATE_PUBLIC_KEY`: the single-line Base64 public-key file content.
+
+The Release workflow embeds only the public key in production executables. The private key is exposed only to the Environment-protected signing step; the build-and-sign job has `contents: read`, while a separate publishing job alone has `contents: write`.
+
+A production binary with self-update enabled can still be built locally:
 
 ```sh
 make build \
@@ -83,16 +94,36 @@ make build \
   UPDATE_PUBLIC_KEY="BASE64_RAW_ED25519_PUBLIC_KEY"
 ```
 
-Build `linux-amd64` and `linux-arm64` executables and calculate their sizes and SHA-256 values, using [release-manifest.example.json](./release-manifest.example.json) as a template. `version` must exactly match the build's `VERSION`; `schema_version` must equal that binary's `visitortrace version --json` output. Sign with:
+Releases use semantic-version tags. Once CI on `main` is green, create and push a tag:
 
 ```sh
+git tag -a v0.1.0 -m "VisitorTrace v0.1.0"
+git push origin v0.1.0
+```
+
+`.github/workflows/release.yml` reruns the tests, builds `linux-amd64` and `linux-arm64` with `CGO_ENABLED=0`, embeds the version, commit, build time, and public key, derives SHA-256 digests, sizes, and the Schema manifest from the actual files, and verifies the result with the final public key. Verified assets are uploaded to a draft Release and published only after every step succeeds. A rerun can refresh that draft but cannot overwrite an already published release. SemVer tags containing `-` become prereleases and do not replace the stable `releases/latest` target.
+
+To generate a manifest locally:
+
+```sh
+go run ./tools/release-manifest generate \
+  --version 0.1.0 \
+  --published-at 2026-07-22T00:00:00Z \
+  --asset linux-amd64=dist/visitortrace-linux-amd64 \
+  --asset linux-arm64=dist/visitortrace-linux-arm64 \
+  --output manifest.unsigned.json
+
 go run ./tools/release-manifest sign \
   --private-key .release-secrets/update.ed25519 \
   --manifest manifest.unsigned.json \
   --output manifest.json
+
+go run ./tools/release-manifest verify \
+  --public-key "BASE64_RAW_ED25519_PUBLIC_KEY" \
+  --manifest manifest.json
 ```
 
-The signature payload is the fixed Go structure serialized without `signature`; `encoding/json` sorts Asset map keys. Never modify a published manifest or executable in place.
+The signature payload is the fixed Go structure serialized without `signature`; `encoding/json` sorts Asset map keys. `manifest.json` uses relative asset URLs, so a domestic mirror can copy the complete Release file set unchanged. Never modify a published manifest or executable in place.
 
 The updater places a candidate at `data_dir/releases/v<version>/visitortrace` and switches the relative `releases/current` symbolic link. `data_dir/.update-pending.json` records old/new targets, the pre-update snapshot, and startup attempts. `serve` registers an attempt before opening SQLite; the third failure restores the snapshot without forward migration. Pending state completes only after HTTP SQLite, schema, and GeoIP readiness. An Admin-triggered update re-verifies the password in the current request and asks the process to exit gracefully after sending the response.
 

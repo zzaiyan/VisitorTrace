@@ -32,19 +32,14 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
       - name: Validate release inputs
-        env:
-          UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
         run: |
           set -eu
-          test -n "$UPDATE_PUBLIC_KEY" || { echo "Repository variable UPDATE_PUBLIC_KEY is required" >&2; exit 1; }
-          test -n "$UPDATE_PRIVATE_KEY" || { echo "Repository secret UPDATE_PRIVATE_KEY is required" >&2; exit 1; }
+          test -n "$UPDATE_PUBLIC_KEY" || { echo "Release variable UPDATE_PUBLIC_KEY is required" >&2; exit 1; }
           version="${GITHUB_REF_NAME#v}"
           test "$version" != "$GITHUB_REF_NAME" || { echo "Release tag must start with v" >&2; exit 1; }
           build_time="$(git show -s --format=%cI "$GITHUB_SHA")"
           printf 'VERSION=%s\n' "$version" >> "$GITHUB_ENV"
           printf 'BUILD_TIME=%s\n' "$build_time" >> "$GITHUB_ENV"
-          umask 077
-          printf '%s\n' "$UPDATE_PRIVATE_KEY" > "$RUNNER_TEMP/update.ed25519"
       - name: Test tagged source
         run: |
           go mod verify
@@ -60,7 +55,7 @@ jobs:
           GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags "$ldflags" -o dist/visitortrace-linux-amd64 ./cmd/visitortrace
           GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags "$ldflags" -o dist/visitortrace-linux-arm64 ./cmd/visitortrace
           dist/visitortrace-linux-amd64 version --json
-      - name: Create and verify signed manifest
+      - name: Create unsigned manifest
         run: |
           set -eu
           go run ./tools/release-manifest generate \
@@ -69,14 +64,25 @@ jobs:
             --asset linux-amd64=dist/visitortrace-linux-amd64 \
             --asset linux-arm64=dist/visitortrace-linux-arm64 \
             --output "$RUNNER_TEMP/manifest.unsigned.json"
+      - name: Sign and verify manifest
+        env:
+          UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
+        run: |
+          set -eu
+          test -n "$UPDATE_PRIVATE_KEY" || { echo "Release secret UPDATE_PRIVATE_KEY is required" >&2; exit 1; }
+          private_key="$RUNNER_TEMP/update.ed25519"
+          trap 'rm -f "$private_key"' EXIT
+          umask 077
+          printf '%s\n' "$UPDATE_PRIVATE_KEY" > "$private_key"
           go run ./tools/release-manifest sign \
-            --private-key "$RUNNER_TEMP/update.ed25519" \
+            --private-key "$private_key" \
             --manifest "$RUNNER_TEMP/manifest.unsigned.json" \
             --output dist/manifest.json
           go run ./tools/release-manifest verify \
             --public-key "$UPDATE_PUBLIC_KEY" \
             --manifest dist/manifest.json
-          sha256sum dist/visitortrace-linux-amd64 dist/visitortrace-linux-arm64 dist/manifest.json > dist/checksums.txt
+          cd dist
+          sha256sum visitortrace-linux-amd64 visitortrace-linux-arm64 manifest.json > checksums.txt
       - name: Stage release assets
         uses: actions/upload-artifact@v7
         with:
@@ -98,7 +104,7 @@ jobs:
         with:
           name: release-assets
           path: dist
-      - name: Create draft release
+      - name: Create or refresh draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -108,16 +114,26 @@ jobs:
           case "$version" in
             *-*) prerelease="--prerelease" ;;
           esac
-          gh release create "$GITHUB_REF_NAME" \
-            dist/visitortrace-linux-amd64 \
-            dist/visitortrace-linux-arm64 \
-            dist/manifest.json \
-            dist/checksums.txt \
-            --draft \
-            --verify-tag \
-            --generate-notes \
-            --title "VisitorTrace $GITHUB_REF_NAME" \
-            $prerelease
+          if draft="$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            test "$draft" = "true" || { echo "Release already exists and is not a draft" >&2; exit 1; }
+            gh release upload "$GITHUB_REF_NAME" \
+              dist/visitortrace-linux-amd64 \
+              dist/visitortrace-linux-arm64 \
+              dist/manifest.json \
+              dist/checksums.txt \
+              --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              dist/visitortrace-linux-amd64 \
+              dist/visitortrace-linux-arm64 \
+              dist/manifest.json \
+              dist/checksums.txt \
+              --draft \
+              --verify-tag \
+              --generate-notes \
+              --title "VisitorTrace $GITHUB_REF_NAME" \
+              $prerelease
+          fi
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

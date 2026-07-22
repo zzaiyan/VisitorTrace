@@ -31,6 +31,18 @@ make build
 ./bin/visitortrace doctor --config "$HOME/.config/visitortrace/config.json"
 ```
 
+## Install a Release
+
+GitHub Releases provide Linux executables that do not require a Go toolchain. Select `visitortrace-linux-amd64` or `visitortrace-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it:
+
+```sh
+grep ' visitortrace-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-linux-amd64 "$HOME/.local/bin/visitortrace"
+"$HOME/.local/bin/visitortrace" version
+```
+
+Replace the filename with `visitortrace-linux-arm64` on an ARM64 server. The release manifest also carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
+
 ## Initialize
 
 ```sh
