@@ -5,12 +5,12 @@
   "schema_version": 8,
   "assets": {
     "linux-amd64": {
-      "url": "visitortrace-linux-amd64",
+      "url": "visitortrace-0.2.0-linux-amd64",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size": 1
     },
     "linux-arm64": {
-      "url": "visitortrace-linux-arm64",
+      "url": "visitortrace-0.2.0-linux-arm64",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size": 1
     }

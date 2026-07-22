@@ -33,15 +33,15 @@ make build
 
 ## Install a Release
 
-GitHub Releases provide Linux executables that do not require a Go toolchain. Select `visitortrace-linux-amd64` or `visitortrace-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it:
+GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.1.0` on AMD64:
 
 ```sh
-grep ' visitortrace-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.1.0-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.1.0-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-Replace the filename with `visitortrace-linux-arm64` on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
+Replace `0.1.0` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
 
 ## Initialize
 
@@ -73,6 +73,8 @@ Changing the visitor deduplication window schedules a new rule for the next midn
 ./bin/visitortrace serve \
   --config "$HOME/.config/visitortrace/config.json"
 ```
+
+For a production installation with systemd, Nginx, or BT Panel, continue with the [Deployment Guide](./deployment.md).
 
 The default listener is `127.0.0.1:8790`. In production, terminate HTTPS at a reverse proxy. Only explicitly configured `trusted_proxies` may provide forwarded client IP and HTTPS scheme information.
 
@@ -283,7 +285,7 @@ A mirror cannot replace the trust root. The manifest must verify against the pub
 
 ## License
 
-VisitorTrace is distributed under the [GNU General Public License, version 3 only](../LICENSE). Third-party components and data remain under their respective terms as listed in the [Third-Party Notices](../THIRD_PARTY_NOTICES.md). The license text, rather than this guide, defines the applicable rights and obligations.
+VisitorTrace is distributed under the [GNU General Public License, version 3](../LICENSE). Third-party components and data remain under their respective terms as listed in the [Third-Party Notices](../THIRD_PARTY_NOTICES.md). The license text, rather than this guide, defines the applicable rights and obligations.
 
 ## Current Status
 

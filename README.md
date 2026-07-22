@@ -1,10 +1,13 @@
 # VisitorTrace
 
 [![CI](https://github.com/zzaiyan/VisitorTrace/actions/workflows/ci.yml/badge.svg)](https://github.com/zzaiyan/VisitorTrace/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Release](https://img.shields.io/github/v/release/zzaiyan/VisitorTrace?display_name=tag&sort=semver)](https://github.com/zzaiyan/VisitorTrace/releases)
+[![License](https://img.shields.io/github/license/zzaiyan/VisitorTrace)](./LICENSE)
 
 A tiny self-hosted visitor map and Pageview tracker for personal homepages, blogs, and other small websites.
 
-[Chinese README](./README.zh-CN.md) · [User Guide](./docs/user-guide.md) · [Development Guide](./docs/development.md) · [Third-Party Notices](./THIRD_PARTY_NOTICES.md)
+[Chinese README](./README.zh-CN.md) · [User Guide](./docs/user-guide.md) · [Deployment Guide](./docs/deployment.md) · [Development Guide](./docs/development.md) · [Third-Party Notices](./THIRD_PARTY_NOTICES.md)
 
 ## Features
 
@@ -38,7 +41,7 @@ make build
 ./bin/visitortrace version
 ```
 
-Published versions provide `linux-amd64` and `linux-arm64` executables, checksums, the license, and corresponding source archives on [GitHub Releases](https://github.com/zzaiyan/VisitorTrace/releases).
+Published versions provide `visitortrace-<version>-linux-amd64` and `visitortrace-<version>-linux-arm64` executables, checksums, the license, and corresponding source archives on [GitHub Releases](https://github.com/zzaiyan/VisitorTrace/releases). Each executable also reports its embedded version, commit, build time, and database schema through `visitortrace version`.
 
 ## Basic Startup
 
@@ -52,8 +55,8 @@ Published versions provide `linux-amd64` and `linux-arm64` executables, checksum
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-See the [User Guide](./docs/user-guide.md) for complete configuration, Site creation, website integration, map parameters, and deployment guidance.
+See the [User Guide](./docs/user-guide.md) for configuration, Site creation, website integration, and map parameters. Production setup for systemd and BT Panel is covered by the [Deployment Guide](./docs/deployment.md).
 
 ## License
 
-VisitorTrace is free software licensed under the [GNU General Public License, version 3 only](./LICENSE). Third-party components and data retain their respective licenses; see [Third-Party Notices](./THIRD_PARTY_NOTICES.md).
+VisitorTrace is free software licensed under the [GNU General Public License, version 3](./LICENSE). Third-party components and data retain their respective licenses; see [Third-Party Notices](./THIRD_PARTY_NOTICES.md).

@@ -1,10 +1,13 @@
 # 访迹（VisitorTrace）
 
 [![CI](https://github.com/zzaiyan/VisitorTrace/actions/workflows/ci.yml/badge.svg)](https://github.com/zzaiyan/VisitorTrace/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Release](https://img.shields.io/github/v/release/zzaiyan/VisitorTrace?display_name=tag&sort=semver)](https://github.com/zzaiyan/VisitorTrace/releases)
+[![License](https://img.shields.io/github/license/zzaiyan/VisitorTrace)](./LICENSE)
 
 面向个人主页、博客和其他小型网站的轻量级自托管访客地图与访问记录服务。
 
-[英文主页](./README.md) · [用户指南](./docs/user-guide.zh-CN.md) · [开发指南](./docs/development.zh-CN.md) · [第三方声明](./THIRD_PARTY_NOTICES.zh-CN.md)
+[英文主页](./README.md) · [用户指南](./docs/user-guide.zh-CN.md) · [部署指南](./docs/deployment.zh-CN.md) · [开发指南](./docs/development.zh-CN.md) · [第三方声明](./THIRD_PARTY_NOTICES.zh-CN.md)
 
 ## 功能
 
@@ -38,7 +41,7 @@ make build
 ./bin/visitortrace version
 ```
 
-正式版本会在 [GitHub Releases](https://github.com/zzaiyan/VisitorTrace/releases) 提供 `linux-amd64`、`linux-arm64` 二进制、校验文件、许可证和对应源码归档。
+正式版本会在 [GitHub Releases](https://github.com/zzaiyan/VisitorTrace/releases) 提供 `visitortrace-<版本>-linux-amd64`、`visitortrace-<版本>-linux-arm64` 二进制、校验文件、许可证和对应源码归档。每个二进制还会内嵌版本、Commit、构建时间和数据库 Schema 信息，可通过 `visitortrace version` 查看。
 
 ## 基本启动
 
@@ -52,8 +55,8 @@ make build
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-完整配置、Site 创建、网站接入、地图参数和部署说明请参阅[用户指南](./docs/user-guide.zh-CN.md)。
+配置、Site 创建、网站接入和地图参数请参阅[用户指南](./docs/user-guide.zh-CN.md)；systemd 与宝塔的生产环境安装步骤见[部署指南](./docs/deployment.zh-CN.md)。
 
 ## 许可证
 
-VisitorTrace 是采用 [GNU 通用公共许可证第 3 版（仅此版本）](./LICENSE)发布的自由软件。第三方组件和数据继续适用各自的许可证，详见[第三方声明](./THIRD_PARTY_NOTICES.zh-CN.md)。
+VisitorTrace 是采用 [GNU 通用公共许可证第 3 版](./LICENSE)发布的自由软件。第三方组件和数据继续适用各自的许可证，详见[第三方声明](./THIRD_PARTY_NOTICES.zh-CN.md)。
