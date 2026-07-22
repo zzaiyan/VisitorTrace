@@ -55,6 +55,16 @@ Before placing a reverse proxy in front of the service, add its loopback address
 
 Only add addresses that are actual trusted proxies. This setting controls whether forwarded client IP and HTTPS headers are accepted.
 
+### Base URL and a subpath
+
+The optional `base_url` is the public URL used in integration snippets and generated links. It also enables subpath routing. For example:
+
+```json
+"base_url": "https://stats.example.com/visitortrace"
+```
+
+The value must be an absolute HTTP or HTTPS URL without credentials, query parameters, or a fragment. Leave it empty for a root deployment. The same setting is available in **Administrator Settings > Public Base URL**. Saving it writes the protected configuration file and restarts the service; systemd must be running with `Restart=always` for the new route prefix to take effect.
+
 Initialize the stable executable path used by one-click updates:
 
 ```sh
@@ -162,7 +172,7 @@ Do not create a VisitorTrace project in BT Panel's Go Project Manager. The panel
 
 ### Reverse Proxy
 
-Under the website settings, open **Reverse Proxy** and add one rule with values equivalent to:
+For a root deployment, open the website's **Reverse Proxy** settings and add one rule with values equivalent to:
 
 | Setting | Value |
 |---|---|
@@ -187,6 +197,25 @@ location / {
 
 `X-Forwarded-For` supplies the original visitor IP, while `X-Forwarded-Proto` lets secure Admin cookies work behind HTTPS. VisitorTrace accepts them only from the loopback CIDRs configured in `trusted_proxies`. Do not enable proxy caching for ingestion, Admin, health, or analytics routes; static assets and SVG responses already send their own cache headers.
 
+For a subpath deployment such as `/visitortrace`, configure the application with the matching Base URL and preserve that prefix in Nginx. The `proxy_pass` value must not have a trailing slash:
+
+```nginx
+location = /visitortrace {
+    return 308 /visitortrace/;
+}
+
+location /visitortrace/ {
+    proxy_pass http://127.0.0.1:8790;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+With this configuration, use `https://stats.example.com/visitortrace/admin/login`, `https://stats.example.com/visitortrace/health/live`, and the prefixed URLs generated on each Site page. Do not proxy `/visitortrace/` to a target ending in `/visitortrace/`; VisitorTrace performs the prefix matching itself.
+
 The current BT Panel navigation and reverse-proxy fields are documented in the [official reverse-proxy guide](https://docs.bt.cn/user-guide/site/php/site-config/reverse-proxy).
 
 ## Verify and Troubleshoot
@@ -198,6 +227,8 @@ curl -fsS http://127.0.0.1:8790/health/live
 curl -fsS https://stats.example.com/health/live
 curl -sS https://stats.example.com/health/ready
 ```
+
+When `base_url` contains `/visitortrace`, use `/visitortrace/health/live` and `/visitortrace/health/ready` for the public checks. The local check also includes the prefix because the application itself owns the prefixed route.
 
 The two live checks isolate systemd from the BT Panel proxy: if both return `{"status":"ok"}`, process supervision, Nginx, DNS, and TLS are working. A fully ready response is:
 
@@ -219,11 +250,11 @@ sudo systemctl restart visitortrace
 
 A command-line GeoIP update runs outside the serving process, so restart the service after a successful manual update. If the server cannot reach DB-IP, download a valid DB-IP City Lite MMDB through another trusted network or mirror, place it at `/var/lib/visitortrace/geoip.mmdb` with owner `visitortrace`, mode `0600`, and restart the service. Disabling automatic updates does not remove the requirement for a valid local MMDB.
 
-VisitorTrace intentionally has no route at `/`, so `https://stats.example.com/` returns `404 page not found`. The Administrator entry point is `https://stats.example.com/admin/login`; a public Site uses `/public/<SITE-ID>/analytics`. To redirect the bare domain to the login page, add an exact Nginx location alongside the proxy rule:
+For a root deployment, `https://stats.example.com/` redirects to `/admin`; the Administrator entry point is `https://stats.example.com/admin/login`, and a public Site uses `/public/<SITE-ID>/analytics`. For a subpath deployment, use the same paths below the configured prefix. If desired, add an exact Nginx location to redirect the bare domain directly to the login page:
 
 ```nginx
 location = / {
-    return 302 /admin/login;
+    return 302 /visitortrace/admin/login;
 }
 ```
 

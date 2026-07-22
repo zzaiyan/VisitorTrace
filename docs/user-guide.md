@@ -78,12 +78,20 @@ For a production installation with systemd and BT Panel's Nginx/SSL features, co
 
 The default listener is `127.0.0.1:8790`. In production, terminate HTTPS at a reverse proxy. Only explicitly configured `trusted_proxies` may provide forwarded client IP and HTTPS scheme information.
 
+### Base URL and subpath routing
+
+Set **Administrator Settings > Public Base URL** to the public address of the service, for example `https://stats.example.com/visitortrace`. This value is used by Site integration snippets and public links, and its path becomes the application route prefix. Saving the setting restarts the service so systemd can activate the new route set. Leave it empty when VisitorTrace is deployed at the domain root.
+
+When a Base URL is configured, every application route includes its path: `/visitortrace/admin/login`, `/visitortrace/health/live`, `/visitortrace/embed/tracker.js`, and so on. The reverse proxy must preserve that path. This setting also prevents integration code from falling back to a local address such as `127.0.0.1`.
+
 ## Administrative and Public Views
 
 - Admin Console: `/admin/login`
 - Public Analytics: `/public/<SITE-ID>/analytics`
 - Public Map: `/api/v1/sites/<SITE-ID>/map.svg`
 - Health checks: `/health/live`, `/health/ready`
+
+When a Base URL has a path, prepend that path to each route above.
 
 The Admin Console manages Site settings, collection and publication state, Map Presets, and sensitive Pageview Record fields such as original IP, path, browser, operating system, and Visitor Digest. Public Analytics exposes aggregate data only.
 
@@ -113,6 +121,12 @@ The integrated Widget records a Pageview and inserts the map:
 <script async src="https://stats.example.com/embed/widget.js?site_id=SITE_ID"></script>
 ```
 
+For a subpath deployment, use the Base URL shown in the Admin Console:
+
+```html
+<script async src="https://stats.example.com/visitortrace/embed/widget.js?site_id=SITE_ID"></script>
+```
+
 The separated Tracker records a Pageview without rendering a map:
 
 ```html
@@ -126,6 +140,8 @@ The map can be loaded independently as an image:
      src="https://stats.example.com/api/v1/sites/SITE_ID/map.svg"
      alt="Visitor map">
 ```
+
+The Site page provides one-click copy controls for the integration snippets and endpoint URLs.
 
 ## Map Presets and URL Overrides
 

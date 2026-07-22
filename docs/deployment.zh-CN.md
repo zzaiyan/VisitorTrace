@@ -55,6 +55,16 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
 
 只应添加真实可信的代理地址；该设置决定服务是否接受代理提供的客户端 IP 和 HTTPS 协议头。
 
+### Base URL 与子路径部署
+
+可选配置项 `base_url` 用于生成接入代码和公开链接，同时启用子路径路由。例如：
+
+```json
+"base_url": "https://stats.example.com/visitortrace"
+```
+
+该值必须是没有凭据、查询参数和片段的完整 HTTP 或 HTTPS URL。根路径部署时可以留空。也可以在后台“管理员设置 > 公开 Base URL”中设置；保存后会写入受保护的配置文件并请求服务重启。要让新的路由前缀生效，systemd 必须使用 `Restart=always`。
+
 初始化一键自更新使用的稳定执行路径：
 
 ```sh
@@ -162,7 +172,7 @@ sudo systemctl enable --now visitortrace-backup.timer
 
 ### 反向代理
 
-进入网站设置中的“反向代理”，添加一条与下表等价的规则：
+根路径部署时，进入网站设置中的“反向代理”，添加一条与下表等价的规则：
 
 | 设置 | 值 |
 |---|---|
@@ -187,6 +197,25 @@ location / {
 
 `X-Forwarded-For` 用于传递真实访客 IP，`X-Forwarded-Proto` 用于让后台在 HTTPS 反向代理后正确设置安全 Cookie。VisitorTrace 只接受 `trusted_proxies` 中回环地址提供的这些请求头。不要为采集、后台、健康检查或分析路由开启代理缓存；静态资源和 SVG 响应已经自行发送缓存头。
 
+如果使用 `/visitortrace` 这样的子路径，需要在后台设置相同的 Base URL，并让 Nginx 保留此前缀。`proxy_pass` 末尾不要加斜杠：
+
+```nginx
+location = /visitortrace {
+    return 308 /visitortrace/;
+}
+
+location /visitortrace/ {
+    proxy_pass http://127.0.0.1:8790;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+配置后，后台地址为 `https://stats.example.com/visitortrace/admin/login`，健康检查为 `https://stats.example.com/visitortrace/health/live`，各 Site 页面生成的接入代码也会自动带上此前缀。不要把 `/visitortrace/` 代理到以 `/visitortrace/` 结尾的目标地址；VisitorTrace 自己负责此前缀的路由匹配。
+
 当前宝塔导航和反向代理字段可参考[宝塔官方反向代理文档](https://docs.bt.cn/user-guide/site/php/site-config/reverse-proxy)。
 
 ## 验证与排障
@@ -198,6 +227,8 @@ curl -fsS http://127.0.0.1:8790/health/live
 curl -fsS https://stats.example.com/health/live
 curl -sS https://stats.example.com/health/ready
 ```
+
+如果 `base_url` 包含 `/visitortrace`，公网检查应改为 `/visitortrace/health/live` 和 `/visitortrace/health/ready`；本机检查同样要带此前缀，因为应用自身负责此前缀路由。
 
 两个 live 检查可以区分 systemd 与宝塔代理问题：若都返回 `{"status":"ok"}`，说明进程管理、Nginx、DNS 和 SSL 已经正常。完全就绪时返回：
 
@@ -219,11 +250,11 @@ sudo systemctl restart visitortrace
 
 命令行 GeoIP 更新运行在服务进程之外，因此手动更新成功后必须重启服务。若服务器无法访问 DB-IP，可通过其他可信网络或镜像取得有效的 DB-IP City Lite MMDB，以 `visitortrace` 所有者和 `0600` 权限放到 `/var/lib/visitortrace/geoip.mmdb`，然后重启服务。关闭自动更新并不能取消本地有效 MMDB 的要求。
 
-VisitorTrace 有意不提供 `/` 路由，因此访问 `https://stats.example.com/` 会返回 `404 page not found`。后台入口是 `https://stats.example.com/admin/login`，公开 Site 使用 `/public/<SITE-ID>/analytics`。若希望裸域名跳转到后台，可在代理规则旁添加精确匹配：
+根路径部署时，访问 `https://stats.example.com/` 会跳转到 `/admin`；后台入口是 `https://stats.example.com/admin/login`，公开 Site 使用 `/public/<SITE-ID>/analytics`。子路径部署时，在这些路径前加上已经设置的前缀即可。若希望裸域名直接跳转到子路径后台，可在代理规则旁添加精确匹配：
 
 ```nginx
 location = / {
-    return 302 /admin/login;
+    return 302 /visitortrace/admin/login;
 }
 ```
 

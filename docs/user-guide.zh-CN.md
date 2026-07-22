@@ -78,12 +78,20 @@ install -Dm700 visitortrace-0.1.0-linux-amd64 "$HOME/.local/bin/visitortrace"
 
 默认监听 `127.0.0.1:8790`。生产环境应由反向代理终止 HTTPS，并且只有显式配置的 `trusted_proxies` 才能提供转发客户端 IP 和 HTTPS 协议信息。
 
+### Base URL 与子路径路由
+
+在“管理员设置 > 公开 Base URL”中填写服务的公开地址，例如 `https://stats.example.com/visitortrace`。该值用于生成 Site 接入代码和公开链接，其中的路径也会成为应用路由前缀。保存后服务会重启，由 systemd 激活新的路由。根路径部署时可以留空。
+
+配置 Base URL 后，所有应用路由都会带上此前缀，例如 `/visitortrace/admin/login`、`/visitortrace/health/live` 和 `/visitortrace/embed/tracker.js`。反向代理必须保留此前缀。该设置也能避免接入代码退回到 `127.0.0.1` 等本机地址。
+
 ## 后台与公开页面
 
 - Admin Console：`/admin/login`
 - Public Analytics：`/public/<SITE-ID>/analytics`
 - Public Map：`/api/v1/sites/<SITE-ID>/map.svg`
 - 健康检查：`/health/live`、`/health/ready`
+
+如果 Base URL 包含路径，请在以上各路由前加上该路径。
 
 Admin Console 可管理 Site 设置、Pageview 接收和公开状态、Map Preset，并查看原始 IP、路径、浏览器、操作系统和 Visitor Digest。Public Analytics 只展示聚合统计。
 
@@ -113,6 +121,12 @@ Site 管理页的“聚合分析”使用相同日期范围和交互组件，并
 <script async src="https://stats.example.com/embed/widget.js?site_id=SITE_ID"></script>
 ```
 
+子路径部署时，使用后台显示的 Base URL：
+
+```html
+<script async src="https://stats.example.com/visitortrace/embed/widget.js?site_id=SITE_ID"></script>
+```
+
 分离式 Tracker 只记录 Pageview：
 
 ```html
@@ -126,6 +140,8 @@ Site 管理页的“聚合分析”使用相同日期范围和交互组件，并
      src="https://stats.example.com/api/v1/sites/SITE_ID/map.svg"
      alt="Visitor map">
 ```
+
+Site 页面为接入代码和端点 URL 提供一键复制按钮。
 
 ## Map Preset 与 URL 覆写
 
