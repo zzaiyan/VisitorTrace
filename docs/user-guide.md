@@ -285,6 +285,16 @@ visitortrace update check --config "$HOME/.config/visitortrace/config.json"
 visitortrace update apply --config "$HOME/.config/visitortrace/config.json"
 ```
 
+When a release binary has already been downloaded manually, use the repository script to install it without network access:
+
+```sh
+sudo ./scripts/update-systemd-binary.sh \
+  --binary ./visitortrace-0.1.1-linux-amd64 \
+  --checksum-file ./checksums.txt
+```
+
+The script verifies the local checksum when supplied, runs the candidate's `doctor --upgrade-check`, creates a verified pre-update backup, switches the stable release link atomically, and restarts the systemd service. If the new process does not stay active, it restores the previous release. It preserves an intentionally inactive service as inactive. To keep automatic rollback from mixing executable and database versions, local updates must keep the same database schema; use the signed updater for a schema-changing release. The defaults match the deployment guide; use `--user`, `--data-dir`, `--config`, or `--service-name` for a custom installation.
+
 Alternatively, enter the current password under Administrator Settings and select Check and update. The Admin workflow re-verifies the password in that request. Once the candidate is prepared, the current process exits gracefully and the supervisor starts the new version through the stable path.
 
 The updater verifies the Ed25519 manifest signature, platform asset size and SHA-256, candidate version/schema identity, and the candidate's `doctor --upgrade-check`. Only then does it create a pre-update database snapshot, persist pending state, and atomically switch `current`. Readiness confirms the new release and retains the two latest prior versions. Three failed readiness startups restore the pre-update database and switch back to the prior release.

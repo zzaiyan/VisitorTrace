@@ -4,6 +4,10 @@
 
 This file records user-facing changes for each published VisitorTrace release.
 
+## Unreleased
+
+- Added `scripts/update-systemd-binary.sh` for verified manual updates from an already-downloaded local binary, including a pre-update backup, atomic release switch, service restart, and automatic executable rollback.
+
 ## 0.1.1 - 2026-07-23
 
 - Fixed deformation in the interactive Public Analytics and Admin Analytics maps by preserving the world-map aspect ratio and using fixed Bering Strait bounds.

@@ -84,6 +84,18 @@ sudo -u visitortrace /usr/local/bin/visitortrace update bootstrap \
 
 The process supervisor must run `/var/lib/visitortrace/releases/current/visitortrace` and restart it even after a clean exit, because a verified self-update exits normally after switching the stable link.
 
+### Manual update from a local binary
+
+If the new release binary and `checksums.txt` are already on the server, update without downloading anything:
+
+```sh
+sudo ./scripts/update-systemd-binary.sh \
+  --binary ./visitortrace-0.1.1-linux-amd64 \
+  --checksum-file ./checksums.txt
+```
+
+The script expects the existing `releases/current` layout. It validates the checksum when provided, checks the candidate with `doctor --upgrade-check`, creates a verified pre-update backup, switches the stable link atomically, and restarts the systemd service. A failed startup restores the previous release. Manual binary updates are limited to releases with the same database schema; use the signed updater when a release changes the schema. It does not configure downloads, backups beyond the pre-update safety snapshot, reverse proxy, or BT Panel; the proxy and TLS configuration remain unchanged.
+
 ## systemd
 
 Create `/etc/systemd/system/visitortrace.service`:

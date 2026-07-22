@@ -285,6 +285,16 @@ visitortrace update check --config "$HOME/.config/visitortrace/config.json"
 visitortrace update apply --config "$HOME/.config/visitortrace/config.json"
 ```
 
+如果已经手动下载了新版二进制，可以使用仓库脚本在不联网的情况下完成更新：
+
+```sh
+sudo ./scripts/update-systemd-binary.sh \
+  --binary ./visitortrace-0.1.1-linux-amd64 \
+  --checksum-file ./checksums.txt
+```
+
+脚本会在提供校验文件时验证本地二进制，运行候选版本的 `doctor --upgrade-check`，创建带校验的升级前备份，原子切换稳定版本链接并重启 systemd 服务。如果新进程无法保持运行，会恢复到旧版本；如果服务原本处于停止状态，脚本也会保持停止。为避免自动回滚时混用可执行文件和数据库版本，本地更新要求数据库 Schema 不变；改变 Schema 的版本应使用签名更新器。默认参数适用于部署指南中的目录；自定义安装可使用 `--user`、`--data-dir`、`--config` 或 `--service-name`。
+
 也可在“管理员设置”输入当前密码后点击“检查并更新”。后台方式要求密码在本次请求中重新验证；候选版本准备完成后，当前进程会优雅退出，由进程管理器从稳定路径拉起新版本。
 
 更新流程会依次验证 Ed25519 清单签名、平台资产大小和 SHA-256、候选版本/Schema 身份，并运行候选二进制的 `doctor --upgrade-check`。全部通过后才创建升级前数据库快照、写入 pending 状态并原子切换 `current`。新版本达到 ready 后确认更新并保留最近两个旧版本；连续三次未能达到 ready 时，会恢复升级前数据库并切回旧版本。

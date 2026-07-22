@@ -84,6 +84,18 @@ sudo -u visitortrace /usr/local/bin/visitortrace update bootstrap \
 
 进程管理器必须运行 `/var/lib/visitortrace/releases/current/visitortrace`，并在进程正常退出后也重新启动；验签通过的自更新切换稳定链接后会正常退出。
 
+### 使用本地二进制手动更新
+
+如果新版二进制和 `checksums.txt` 已经位于服务器，可以在不下载文件的情况下执行更新：
+
+```sh
+sudo ./scripts/update-systemd-binary.sh \
+  --binary ./visitortrace-0.1.1-linux-amd64 \
+  --checksum-file ./checksums.txt
+```
+
+脚本要求已有 `releases/current` 稳定路径。它会在提供校验文件时验证二进制，运行候选版本的 `doctor --upgrade-check`，创建带校验的升级前备份，原子切换稳定链接并重启 systemd 服务。若新版本启动失败，会恢复旧版本。手动二进制更新只适用于数据库 Schema 不变的版本；改变 Schema 时应使用签名更新器。脚本不会下载文件，也不会配置反向代理或宝塔；除升级前安全快照外，备份策略也不由它负责，代理和 SSL 配置保持不变。
+
 ## systemd 部署
 
 创建 `/etc/systemd/system/visitortrace.service`：
