@@ -114,7 +114,36 @@ URL 参数只覆写当前请求，不会改变保存的 Map Preset。
 
 ## GeoIP
 
-生产环境需要有效的 DB-IP City Lite MMDB。GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/health/ready` 返回不可用，新 Pageview 不会获得地理位置。
+生产环境需要有效的 DB-IP City Lite MMDB。默认配置会在启动时检查数据库，并每天检查一次；当本地文件缺失、无效或不是当月版本时，下载：
+
+```text
+https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz
+```
+
+下载完成后，VisitorTrace 会限制压缩包和解压后文件大小、验证完整 MMDB 搜索树与数据区、确认数据库类型为 City/Location，再原子替换当前文件并热加载。上一版保存在 `<geoip_path>.previous`，激活失败时自动回滚。
+
+可人工检查并更新：
+
+```sh
+./bin/visitortrace geoip update \
+  --config "$HOME/.config/visitortrace/config.json"
+```
+
+使用 `--force` 可忽略当月文件状态重新下载。命令行更新发生在另一个进程中，若服务正在运行，更新后需要由宝塔或其他进程管理器重启服务；服务内置的自动更新会直接热加载。
+
+国内镜像可在配置文件中设置：
+
+```json
+{
+  "geoip_update": "monthly",
+  "geoip_update_url": "https://mirror.example.com/dbip-city-lite-{YYYY-MM}.mmdb.gz",
+  "geoip_checksum_url": "https://mirror.example.com/dbip-city-lite-{YYYY-MM}.mmdb.gz.sha256"
+}
+```
+
+`geoip_checksum_url` 可省略；配置后会在解压前校验压缩文件 SHA-256。远程源必须使用 HTTPS，本机回环测试地址例外。设置 `"geoip_update": "disabled"` 可关闭下载。
+
+GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/health/ready` 返回不可用，新 Pageview 不会获得地理位置。DB-IP City Lite 每月更新并采用 CC BY 4.0，VisitorTrace 在地图悬浮提示、后台预览和 Public Analytics 中保留 DB-IP 归因链接。
 
 ## 备份与恢复
 
@@ -181,4 +210,4 @@ URL 参数只覆写当前请求，不会改变保存的 Map Preset。
 
 ## 当前状态
 
-当前版本已经实现 Pageview 采集、聚合统计、自动记录清理、SVG 地图、Public Analytics、管理员认证与密码管理、Site 清空/删除、Map Preset，以及带校验和完整性检查的备份恢复。GeoIP 自动更新和一键自更新仍在后续里程碑中。
+当前版本已经实现 Pageview 采集、聚合统计、自动记录清理、GeoIP 自动更新、SVG 地图、Public Analytics、管理员认证与密码管理、Site 清空/删除、Map Preset，以及带校验和完整性检查的备份恢复。一键自更新仍在后续里程碑中。

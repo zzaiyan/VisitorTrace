@@ -33,7 +33,7 @@ fi
 
 "$GO_BIN" build -trimpath -o "$BINARY" ./cmd/visitortrace
 
-printf '%s\n%s\n' "$PASSWORD" "$PASSWORD" | "$BINARY" init --data-dir "$WORK_DIR/data" --config "$CONFIG"
+printf '%s\n%s\n' "$PASSWORD" "$PASSWORD" | "$BINARY" init --data-dir "$WORK_DIR/data" --config "$CONFIG" --geoip-update disabled
 
 SITE_OUTPUT=$("$BINARY" site create --config "$CONFIG" --name "VisitorTrace Demo" --origin "$SITE_ORIGIN")
 SITE_ID=$(printf '%s\n' "$SITE_OUTPUT" | awk '/^id:/ {print $2}')

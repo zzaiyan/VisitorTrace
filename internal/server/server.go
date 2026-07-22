@@ -12,6 +12,7 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/clientip"
@@ -43,6 +44,7 @@ type Server struct {
 	ipLimit    *ratelimit.Limiter
 	siteLimit  *ratelimit.Limiter
 	logger     *slog.Logger
+	geoMu      sync.RWMutex
 	geoIP      *geoip.Resolver
 	mapCache   *mapCache
 	loginLimit *ratelimit.Limiter
@@ -103,7 +105,17 @@ func (s *Server) HTTPServer() *http.Server {
 }
 
 func (s *Server) SetGeoIP(resolver *geoip.Resolver) {
+	s.geoMu.Lock()
+	defer s.geoMu.Unlock()
+	previous := s.geoIP
 	s.geoIP = resolver
+	if previous != nil && previous != resolver {
+		_ = previous.Close()
+	}
+}
+
+func (s *Server) CloseGeoIP() {
+	s.SetGeoIP(nil)
 }
 
 func (s *Server) live(w http.ResponseWriter, _ *http.Request) {
@@ -118,7 +130,10 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 	if err := s.Store.SchemaReady(r.Context()); err == nil {
 		checks["schema"] = true
 	}
-	if s.geoIP != nil {
+	s.geoMu.RLock()
+	geoAvailable := s.geoIP != nil
+	s.geoMu.RUnlock()
+	if geoAvailable {
 		checks["geoip"] = true
 	}
 	status := http.StatusOK
@@ -198,10 +213,12 @@ func (s *Server) collectPageview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid visitor identity", http.StatusBadRequest)
 		return
 	}
+	s.geoMu.RLock()
 	location := geoip.Location{}
 	if s.geoIP != nil {
 		location = s.geoIP.Lookup(address)
 	}
+	s.geoMu.RUnlock()
 	_, err = s.Store.RecordPageview(r.Context(), store.PageviewObservation{
 		SiteID:          siteID,
 		Path:            path,

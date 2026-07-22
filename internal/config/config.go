@@ -7,21 +7,26 @@ import (
 	"fmt"
 	"io"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 const CurrentVersion = 1
 
 type Config struct {
-	Version        int      `json:"version"`
-	DataDir        string   `json:"data_dir"`
-	DatabasePath   string   `json:"database_path"`
-	GeoIPPath      string   `json:"geoip_path"`
-	BackupDir      string   `json:"backup_dir,omitempty"`
-	Listen         string   `json:"listen"`
-	TrustedProxies []string `json:"trusted_proxies,omitempty"`
+	Version          int      `json:"version"`
+	DataDir          string   `json:"data_dir"`
+	DatabasePath     string   `json:"database_path"`
+	GeoIPPath        string   `json:"geoip_path"`
+	GeoIPUpdate      string   `json:"geoip_update,omitempty"`
+	GeoIPUpdateURL   string   `json:"geoip_update_url,omitempty"`
+	GeoIPChecksumURL string   `json:"geoip_checksum_url,omitempty"`
+	BackupDir        string   `json:"backup_dir,omitempty"`
+	Listen           string   `json:"listen"`
+	TrustedProxies   []string `json:"trusted_proxies,omitempty"`
 }
 
 func DefaultConfigPath() string {
@@ -42,12 +47,14 @@ func DefaultDataDir() string {
 
 func Default(dataDir string) Config {
 	return Config{
-		Version:      CurrentVersion,
-		DataDir:      dataDir,
-		DatabasePath: filepath.Join(dataDir, "visitortrace.sqlite3"),
-		GeoIPPath:    filepath.Join(dataDir, "geoip.mmdb"),
-		BackupDir:    filepath.Join(dataDir, "backups"),
-		Listen:       "127.0.0.1:8790",
+		Version:        CurrentVersion,
+		DataDir:        dataDir,
+		DatabasePath:   filepath.Join(dataDir, "visitortrace.sqlite3"),
+		GeoIPPath:      filepath.Join(dataDir, "geoip.mmdb"),
+		GeoIPUpdate:    "monthly",
+		GeoIPUpdateURL: "https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz",
+		BackupDir:      filepath.Join(dataDir, "backups"),
+		Listen:         "127.0.0.1:8790",
 	}
 }
 
@@ -137,11 +144,37 @@ func (c Config) Validate() error {
 			return fmt.Errorf("invalid trusted proxy CIDR %q", value)
 		}
 	}
+	if c.GeoIPUpdate != "monthly" && c.GeoIPUpdate != "disabled" {
+		return fmt.Errorf("geoip_update must be monthly or disabled")
+	}
+	if c.GeoIPUpdate == "monthly" && strings.TrimSpace(c.GeoIPUpdateURL) == "" {
+		return errors.New("geoip_update_url is required when GeoIP updates are enabled")
+	}
+	for name, value := range map[string]string{"geoip_update_url": c.GeoIPUpdateURL, "geoip_checksum_url": c.GeoIPChecksumURL} {
+		if value == "" {
+			continue
+		}
+		parsed, err := url.Parse(value)
+		if err != nil || parsed.Host == "" {
+			return fmt.Errorf("%s must be an absolute URL", name)
+		}
+		host := strings.ToLower(parsed.Hostname())
+		loopback := host == "localhost" || host == "127.0.0.1" || host == "::1"
+		if parsed.Scheme != "https" && !(parsed.Scheme == "http" && loopback) {
+			return fmt.Errorf("%s must use HTTPS except on loopback", name)
+		}
+	}
 	return nil
 }
 
 func (c *Config) applyDefaults() {
 	if c.BackupDir == "" && c.DataDir != "" {
 		c.BackupDir = filepath.Join(c.DataDir, "backups")
+	}
+	if c.GeoIPUpdate == "" {
+		c.GeoIPUpdate = "monthly"
+	}
+	if c.GeoIPUpdateURL == "" {
+		c.GeoIPUpdateURL = "https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz"
 	}
 }

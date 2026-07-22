@@ -17,6 +17,7 @@ Package responsibilities:
 - `internal/backup`: consistent snapshots, archive verification, and restoration;
 - `internal/maintenance`: in-process scheduling and bounded cleanup;
 - `internal/geoip`: local MMDB lookup.
+- `internal/geoipupdate`: monthly download, verification, atomic activation, hot reload, and rollback.
 
 ## Development Checks
 
@@ -42,6 +43,8 @@ The Pageview ingestion transaction stores the individual record, visitor-window 
 The Administrator password is stored as an Argon2id hash. Both the Admin Console change flow and `visitortrace password reset` update the credential and revoke every session in one transaction. Session records retain the most recent password-verification time for short-lived reauthentication gates on high-risk operations such as updates.
 
 A Site-data reset first disables ingestion and publication in the same transaction, then removes records, visitor registrations, aggregates, and map locations and rotates the Site HMAC key. Permanent deletion also disables external behavior before foreign-key cascading cleanup. The HTTP layer additionally requires both the Administrator password and exact Site ID.
+
+The GeoIP updater runs at startup and every 24 hours. `{YYYY-MM}` expands using the UTC month. Compressed input is limited to 1 GiB and the expanded MMDB to 2 GiB. A configured SHA-256 sidecar verifies the downloaded container first; full MMDB verification always follows. The candidate is created on the target filesystem and activated by rename, preserving the prior file as `.previous`. The service swaps resolvers behind a mutex so an old reader is not closed during an active lookup.
 
 ## Backup Format
 

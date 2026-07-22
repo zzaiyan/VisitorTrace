@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -53,5 +54,16 @@ func TestLoadDefaultsBackupDirectoryForExistingConfig(t *testing.T) {
 	}
 	if got.BackupDir != filepath.Join(dataDir, "backups") {
 		t.Fatalf("BackupDir = %q", got.BackupDir)
+	}
+	if got.GeoIPUpdate != "monthly" || !strings.Contains(got.GeoIPUpdateURL, "{YYYY-MM}") {
+		t.Fatalf("GeoIP update defaults = %q, %q", got.GeoIPUpdate, got.GeoIPUpdateURL)
+	}
+}
+
+func TestValidateRejectsInsecureRemoteGeoIPSource(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPUpdateURL = "http://example.com/geoip.mmdb.gz"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate() accepted an insecure remote GeoIP source")
 	}
 }

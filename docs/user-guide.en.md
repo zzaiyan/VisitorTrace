@@ -114,7 +114,36 @@ URL parameters override one response without changing the saved Map Preset.
 
 ## GeoIP
 
-Production requires a valid DB-IP City Lite MMDB. Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location.
+Production requires a valid DB-IP City Lite MMDB. The default configuration checks at startup and daily. When the local file is missing, invalid, or not from the current month, it downloads:
+
+```text
+https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz
+```
+
+VisitorTrace bounds compressed and expanded sizes, verifies the complete MMDB search tree and data section, confirms a City/Location database type, and only then atomically replaces and hot-loads the database. The prior version remains at `<geoip_path>.previous`; a failed activation rolls back automatically.
+
+Check and update manually with:
+
+```sh
+./bin/visitortrace geoip update \
+  --config "$HOME/.config/visitortrace/config.json"
+```
+
+Use `--force` to download again despite a current-month file. A command-line update runs in a separate process, so restart a running service through aaPanel or another supervisor afterward. The built-in automatic update hot-loads the new database directly.
+
+Configure a domestic mirror in the configuration file:
+
+```json
+{
+  "geoip_update": "monthly",
+  "geoip_update_url": "https://mirror.example.com/dbip-city-lite-{YYYY-MM}.mmdb.gz",
+  "geoip_checksum_url": "https://mirror.example.com/dbip-city-lite-{YYYY-MM}.mmdb.gz.sha256"
+}
+```
+
+`geoip_checksum_url` is optional. When present, VisitorTrace verifies the compressed file's SHA-256 before extraction. Remote sources must use HTTPS, except loopback test endpoints. Set `"geoip_update": "disabled"` to disable downloads.
+
+Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. DB-IP City Lite is updated monthly under CC BY 4.0; VisitorTrace retains the DB-IP attribution link in map hover details, Admin previews, and Public Analytics.
 
 ## Backup and Restore
 
@@ -181,4 +210,4 @@ Both operations are irreversible. Create a backup first.
 
 ## Current Status
 
-The current milestone implements Pageview ingestion, aggregate statistics, automatic record cleanup, SVG maps, Public Analytics, Administrator authentication and password management, Site reset/deletion, Map Presets, and checksum-verified backup and restore. Automatic GeoIP updates and one-click self-update remain follow-up work.
+The current milestone implements Pageview ingestion, aggregate statistics, automatic record cleanup, automatic GeoIP updates, SVG maps, Public Analytics, Administrator authentication and password management, Site reset/deletion, Map Presets, and checksum-verified backup and restore. One-click self-update remains follow-up work.

@@ -18,6 +18,7 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/buildinfo"
 	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
+	"github.com/zzaiyan/VisitorTrace/internal/geoipupdate"
 	"github.com/zzaiyan/VisitorTrace/internal/maintenance"
 	"github.com/zzaiyan/VisitorTrace/internal/password"
 	"github.com/zzaiyan/VisitorTrace/internal/server"
@@ -45,6 +46,8 @@ func main() {
 		code = runMaintenance(os.Args[2:])
 	case "password":
 		code = runPassword(os.Args[2:])
+	case "geoip":
+		code = runGeoIP(os.Args[2:])
 	case "site":
 		code = runSite(os.Args[2:])
 	case "version":
@@ -65,6 +68,9 @@ func runInit(args []string) int {
 	configPath := fs.String("config", config.DefaultConfigPath(), "protected config path")
 	passwordFile := fs.String("password-file", "", "protected file containing the administrator password")
 	geoIPPath := fs.String("geoip", "", "existing GeoIP MMDB path")
+	geoIPUpdate := fs.String("geoip-update", "monthly", "GeoIP update mode: monthly or disabled")
+	geoIPUpdateURL := fs.String("geoip-update-url", "", "GeoIP download URL template override")
+	geoIPChecksumURL := fs.String("geoip-checksum-url", "", "optional SHA-256 sidecar URL template")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -73,6 +79,11 @@ func runInit(args []string) int {
 	if *geoIPPath != "" {
 		cfg.GeoIPPath = *geoIPPath
 	}
+	cfg.GeoIPUpdate = *geoIPUpdate
+	if *geoIPUpdateURL != "" {
+		cfg.GeoIPUpdateURL = *geoIPUpdateURL
+	}
+	cfg.GeoIPChecksumURL = *geoIPChecksumURL
 	if _, err := os.Stat(cfg.DatabasePath); err == nil {
 		fmt.Fprintf(os.Stderr, "init refused: database already exists at %s\n", cfg.DatabasePath)
 		return 1
@@ -120,7 +131,11 @@ func runInit(args []string) int {
 	defer st.Close()
 	fmt.Printf("initialized VisitorTrace\nconfig: %s\ndata: %s\n", *configPath, cfg.DataDir)
 	if _, err := os.Stat(cfg.GeoIPPath); err != nil {
-		fmt.Printf("warning: GeoIP database is not installed; readiness will remain unavailable\n")
+		if cfg.GeoIPUpdate == "monthly" {
+			fmt.Printf("notice: GeoIP database will be downloaded when the service starts\n")
+		} else {
+			fmt.Printf("warning: GeoIP database is not installed; readiness will remain unavailable\n")
+		}
 	}
 	return 0
 }
@@ -161,15 +176,24 @@ func runServe(args []string) int {
 	geoResolver, geoErr := geoip.Open(cfg.GeoIPPath)
 	if geoErr != nil {
 		logger.Warn("GeoIP database is unavailable", "path", cfg.GeoIPPath, "error", geoErr)
-	} else {
-		defer geoResolver.Close()
 	}
 	app := server.New(cfg, st, logger)
 	app.SetGeoIP(geoResolver)
+	defer app.CloseGeoIP()
 	httpServer := app.HTTPServer()
 	stopCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	maintenance.New(st, logger).Start(stopCtx)
+	maintenanceDone := maintenance.New(st, logger).Start(stopCtx)
+	geoUpdater := geoipupdate.New(cfg, st, logger)
+	geoUpdater.Activate = func(path string) error {
+		resolver, err := geoip.Open(path)
+		if err != nil {
+			return err
+		}
+		app.SetGeoIP(resolver)
+		return nil
+	}
+	geoIPDone := geoUpdater.Start(stopCtx)
 	serverErrors := make(chan error, 1)
 	go func() {
 		logger.Info("server starting", "listen", cfg.Listen, "version", buildinfo.Version, "commit", buildinfo.Commit)
@@ -182,13 +206,20 @@ func runServe(args []string) int {
 	case <-stopCtx.Done():
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
-		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			logger.Error("server shutdown failed", "error", err)
+		shutdownErr := httpServer.Shutdown(shutdownCtx)
+		stop()
+		<-maintenanceDone
+		<-geoIPDone
+		if shutdownErr != nil {
+			logger.Error("server shutdown failed", "error", shutdownErr)
 			return 1
 		}
 		logger.Info("server stopped")
 		return 0
 	case err := <-serverErrors:
+		stop()
+		<-maintenanceDone
+		<-geoIPDone
 		logger.Error("server stopped unexpectedly", "error", err)
 		return 1
 	}
@@ -354,5 +385,5 @@ func (s *stringList) Set(value string) error {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: visitortrace <init|serve|doctor|backup|restore|maintenance|password|site|version> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: visitortrace <init|serve|doctor|backup|restore|maintenance|password|geoip|site|version> [flags]")
 }

@@ -26,8 +26,10 @@ func New(st *store.Store, logger *slog.Logger) *Runner {
 	return &Runner{Store: st, Logger: logger, Interval: DefaultInterval, Now: time.Now}
 }
 
-func (r *Runner) Start(ctx context.Context) {
+func (r *Runner) Start(ctx context.Context) <-chan struct{} {
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		r.runLogged(ctx)
 		ticker := time.NewTicker(r.Interval)
 		defer ticker.Stop()
@@ -40,6 +42,7 @@ func (r *Runner) Start(ctx context.Context) {
 			}
 		}
 	}()
+	return done
 }
 
 func (r *Runner) RunOnce(ctx context.Context) (store.CleanupResult, error) {

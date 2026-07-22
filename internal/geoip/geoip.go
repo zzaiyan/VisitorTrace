@@ -52,6 +52,22 @@ func Open(path string) (*Resolver, error) {
 	return &Resolver{reader: reader}, nil
 }
 
+func Validate(path string) error {
+	reader, err := maxminddb.Open(path)
+	if err != nil {
+		return fmt.Errorf("open GeoIP database: %w", err)
+	}
+	defer reader.Close()
+	databaseType := strings.ToLower(reader.Metadata.DatabaseType)
+	if !strings.Contains(databaseType, "city") && !strings.Contains(databaseType, "location") {
+		return fmt.Errorf("unsupported GeoIP database type %q", reader.Metadata.DatabaseType)
+	}
+	if err := reader.Verify(); err != nil {
+		return fmt.Errorf("verify GeoIP database: %w", err)
+	}
+	return nil
+}
+
 func (r *Resolver) Lookup(address netip.Addr) Location {
 	if r == nil || r.reader == nil || !address.IsValid() {
 		return Location{}
