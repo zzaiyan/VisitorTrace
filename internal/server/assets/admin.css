@@ -48,6 +48,8 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .button.primary:hover { background: var(--green-dark); }
 .button.ghost { border-color: var(--line); background: transparent; color: var(--ink); }
 .button.ghost:hover { border-color: var(--green); color: var(--green); }
+.button.danger { border-color: var(--danger); background: transparent; color: var(--danger); }
+.button.danger:hover { background: var(--danger); color: white; }
 .button.full { width: 100%; }
 .notice { margin: 0 0 22px; padding: 12px 15px; border-left: 3px solid; background: white; font-size: 13px; }
 .notice.success { border-color: var(--green); color: var(--green-dark); }
@@ -131,6 +133,13 @@ tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: #f6f9f7; }
 .empty-cell { padding: 34px; color: var(--muted); text-align: center; }
 .digest { color: var(--muted); }
+.danger-zone { border-top-color: #d9b6af; }
+.danger-zone .eyebrow { color: var(--danger); }
+.danger-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.danger-form { display: grid; gap: 16px; padding: 20px; border: 1px solid #dfc3bd; background: #fffafa; }
+.danger-form h3 { margin-bottom: 7px; color: var(--danger); }
+.danger-form p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.danger-form .button { justify-self: start; }
 
 .login-shell { display: grid; min-height: 100vh; place-items: center; padding: 24px; background: #e9efeb; }
 .login-panel { width: min(100%, 410px); padding: 38px; border: 1px solid var(--line); background: white; box-shadow: var(--shadow); }
@@ -190,7 +199,7 @@ tbody tr:hover { background: #f6f9f7; }
   .page-header, .analytics-heading, .public-header { align-items: flex-start; flex-direction: column; }
   .page-header .button, .header-actions { width: 100%; }
   .header-actions .button { flex: 1; }
-  .site-grid, .field-grid.two, .field-grid.four, .snippet-grid, .dimension-grid { grid-template-columns: 1fr; }
+  .site-grid, .field-grid.two, .field-grid.four, .snippet-grid, .dimension-grid, .danger-grid { grid-template-columns: 1fr; }
   .site-card { grid-template-columns: 1fr; }
   .site-map { min-height: 160px; }
   .metric-strip { grid-template-columns: repeat(2, 1fr); }

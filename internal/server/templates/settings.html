@@ -1,0 +1,15 @@
+{{define "content"}}
+<header class="page-header">
+  <div><p class="eyebrow">ADMINISTRATOR</p><h1>管理员设置</h1><p class="subhead">凭据与安全会话</p></div>
+</header>
+<section class="form-panel narrow">
+  <div class="section-heading"><div><p class="eyebrow">PASSWORD</p><h2>修改密码</h2></div></div>
+  <form method="post" action="/admin/settings/password" class="stack-form">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label class="field"><span>当前密码</span><input type="password" name="current_password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
+    <label class="field"><span>新密码</span><input type="password" name="new_password" autocomplete="new-password" minlength="8" maxlength="128" required><small>8 至 128 个字符</small></label>
+    <label class="field"><span>确认新密码</span><input type="password" name="confirm_password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
+    <div class="form-actions"><button class="button primary" type="submit">更新密码</button></div>
+  </form>
+</section>
+{{end}}

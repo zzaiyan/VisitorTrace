@@ -15,6 +15,7 @@
     <nav class="side-nav" aria-label="后台导航">
       <a href="/admin" {{if eq .Active "dashboard"}}aria-current="page"{{end}}>管理总览</a>
       <a href="/admin/sites/new" {{if eq .Active "sites"}}aria-current="page"{{end}}>站点管理</a>
+      <a href="/admin/settings" {{if eq .Active "settings"}}aria-current="page"{{end}}>管理员设置</a>
     </nav>
     <form class="logout-form" method="post" action="/admin/logout">
       <input type="hidden" name="csrf" value="{{.CSRF}}">

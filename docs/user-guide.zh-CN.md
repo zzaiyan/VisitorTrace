@@ -157,6 +157,28 @@ URL 参数只覆写当前请求，不会改变保存的 Map Preset。
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
+## 管理员密码
+
+登录后台后可在“管理员设置”中输入当前密码并设置新密码。密码长度为 8 至 128 个字符；修改成功后全部管理员 Session 都会失效，需要重新登录。
+
+忘记密码时，可在服务器上重置：
+
+```sh
+./bin/visitortrace password reset \
+  --config "$HOME/.config/visitortrace/config.json"
+```
+
+命令会交互式读取并确认新密码。自动化环境可通过权限为 `0600` 的 `--password-file` 提供密码；重置同样会撤销全部 Session。
+
+## Site 清空与删除
+
+每个 Site 管理页底部提供两项危险操作，均要求输入完整 Site ID 和当前管理员密码：
+
+- “清空 Site 数据”删除 Pageview Record、全部聚合和地图位置，保留 Site 设置，轮换 HMAC 密钥并解除统计时区锁；采集和公开展示会保持关闭，检查设置后再手动开启。
+- “永久删除 Site”删除 Site 及其全部数据和设置，原 Site ID 不会重新分配。
+
+两项操作都不可撤销，执行前应先创建备份。
+
 ## 当前状态
 
-当前版本已经实现 Pageview 采集、聚合统计、自动记录清理、SVG 地图、Public Analytics、管理员认证、Map Preset，以及带校验和完整性检查的备份恢复。GeoIP 自动更新、密码重置和一键自更新仍在后续里程碑中。
+当前版本已经实现 Pageview 采集、聚合统计、自动记录清理、SVG 地图、Public Analytics、管理员认证与密码管理、Site 清空/删除、Map Preset，以及带校验和完整性检查的备份恢复。GeoIP 自动更新和一键自更新仍在后续里程碑中。

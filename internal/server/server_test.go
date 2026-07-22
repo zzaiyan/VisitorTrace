@@ -253,6 +253,72 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	}
 }
 
+func TestAdminPasswordChangeRevokesSession(t *testing.T) {
+	app, st, _ := testAdminServer(t)
+	cookie, csrf := loginAdmin(t, app)
+	form := url.Values{
+		"csrf": {csrf}, "current_password": {"correct horse"},
+		"new_password": {"new password"}, "confirm_password": {"new password"},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/password", strings.NewReader(form.Encode()))
+	request.Host = "127.0.0.1:8790"
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/admin/login?changed=1" {
+		t.Fatalf("password change = status %d location %q body %q", response.Code, response.Header().Get("Location"), response.Body.String())
+	}
+	hash, err := st.AdministratorPasswordHash(context.Background())
+	if err != nil || !password.Verify([]byte("new password"), hash) {
+		t.Fatalf("new password was not stored: %v", err)
+	}
+	dashboard := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	dashboard.Host = "127.0.0.1:8790"
+	dashboard.AddCookie(cookie)
+	dashboardResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(dashboardResponse, dashboard)
+	if dashboardResponse.Code != http.StatusSeeOther {
+		t.Fatalf("revoked session status = %d", dashboardResponse.Code)
+	}
+}
+
+func TestAdminSiteResetAndDelete(t *testing.T) {
+	app, st, site := testAdminServer(t)
+	cookie, csrf := loginAdmin(t, app)
+	if _, err := st.RecordPageview(context.Background(), store.PageviewObservation{
+		SiteID: site.ID, Path: "/", VisitorDigest: bytes.Repeat([]byte{9}, 32), OriginalIP: "192.0.2.9", OperatingSystem: "Linux", Browser: "Firefox",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	post := func(path string) *httptest.ResponseRecorder {
+		t.Helper()
+		form := url.Values{"csrf": {csrf}, "site_id": {site.ID}, "password": {"correct horse"}}
+		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
+		request.Host = "127.0.0.1:8790"
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.AddCookie(cookie)
+		response := httptest.NewRecorder()
+		app.Handler().ServeHTTP(response, request)
+		return response
+	}
+	reset := post("/admin/sites/" + site.ID + "/reset")
+	if reset.Code != http.StatusSeeOther || reset.Header().Get("Location") != "/admin/sites/"+site.ID+"?saved=reset#danger" {
+		t.Fatalf("reset = status %d location %q", reset.Code, reset.Header().Get("Location"))
+	}
+	resetSite, err := st.GetSite(context.Background(), site.ID)
+	if err != nil || resetSite.AcceptPageviews || resetSite.PublishPublic {
+		t.Fatalf("reset Site = %#v, %v", resetSite, err)
+	}
+	deleted := post("/admin/sites/" + site.ID + "/delete")
+	if deleted.Code != http.StatusSeeOther || deleted.Header().Get("Location") != "/admin?saved=deleted" {
+		t.Fatalf("delete = status %d location %q", deleted.Code, deleted.Header().Get("Location"))
+	}
+	if _, err := st.GetSite(context.Background(), site.ID); err == nil {
+		t.Fatal("Site remained after Admin deletion")
+	}
+}
+
 func TestPublicAnalyticsHidesSensitiveFields(t *testing.T) {
 	app, st, site := testServer(t)
 	now := time.Now().UTC()
@@ -348,6 +414,29 @@ func testAdminServer(t *testing.T) (*Server, *store.Store, store.Site) {
 		t.Fatalf("CreateSite() error = %v", err)
 	}
 	return New(cfg, st), st, site
+}
+
+func loginAdmin(t *testing.T, app *Server) (*http.Cookie, string) {
+	t.Helper()
+	login := httptest.NewRequest(http.MethodPost, "/admin/login", strings.NewReader(url.Values{"password": {"correct horse"}}.Encode()))
+	login.Host = "127.0.0.1:8790"
+	login.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	loggedIn := httptest.NewRecorder()
+	app.Handler().ServeHTTP(loggedIn, login)
+	if loggedIn.Code != http.StatusSeeOther || len(loggedIn.Result().Cookies()) != 1 {
+		t.Fatalf("login status = %d, body = %q", loggedIn.Code, loggedIn.Body.String())
+	}
+	cookie := loggedIn.Result().Cookies()[0]
+	dashboard := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	dashboard.Host = "127.0.0.1:8790"
+	dashboard.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, dashboard)
+	match := regexp.MustCompile(`name="csrf" value="([a-f0-9]{64})"`).FindStringSubmatch(response.Body.String())
+	if response.Code != http.StatusOK || len(match) != 2 {
+		t.Fatalf("dashboard status = %d, body = %q", response.Code, response.Body.String())
+	}
+	return cookie, match[1]
 }
 
 func min(left, right int) int {

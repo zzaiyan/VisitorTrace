@@ -26,3 +26,12 @@ func TestReadNonInteractive(t *testing.T) {
 		t.Fatalf("Read() = %q", value)
 	}
 }
+
+func TestValidateMinimumLength(t *testing.T) {
+	if _, err := Validate("1234567"); err == nil {
+		t.Fatal("Validate() accepted a seven-character password")
+	}
+	if value, err := Validate("12345678"); err != nil || string(value) != "12345678" {
+		t.Fatalf("Validate() = %q, %v", value, err)
+	}
+}

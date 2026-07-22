@@ -2,6 +2,7 @@ package server
 
 import (
 	"container/list"
+	"strings"
 	"sync"
 	"time"
 )
@@ -17,6 +18,17 @@ type mapCache struct {
 	entries map[string]*list.Element
 	order   *list.List
 	bytes   int
+}
+
+func (c *mapCache) deleteSite(siteID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	prefix := siteID + "|"
+	for key, element := range c.entries {
+		if strings.HasPrefix(key, prefix) {
+			c.remove(element)
+		}
+	}
 }
 
 type mapCacheItem struct {

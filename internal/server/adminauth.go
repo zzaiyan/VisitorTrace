@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
@@ -30,7 +31,11 @@ func (s *Server) adminLogin(w http.ResponseWriter, r *http.Request) {
 		s.handleAdminLogin(w, r)
 		return
 	}
-	s.renderPage(w, r, "login", loginPageData{pageLayout: pageLayout{Title: "管理员登录"}, Next: safeNext(r.URL.Query().Get("next"), "/admin")})
+	layout := pageLayout{Title: "管理员登录"}
+	if r.URL.Query().Get("changed") == "1" {
+		layout.Flash = "管理员密码已更新，请重新登录。"
+	}
+	s.renderPage(w, r, "login", loginPageData{pageLayout: layout, Next: safeNext(r.URL.Query().Get("next"), "/admin")})
 }
 
 func (s *Server) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +98,7 @@ func (s *Server) adminLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.Store.DeleteAdministratorSession(r.Context(), session.TokenDigest)
-	http.SetCookie(w, &http.Cookie{Name: adminSessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.secureAdminCookie(r), SameSite: http.SameSiteStrictMode})
+	s.clearAdminCookie(w, r)
 	http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
 }
 
@@ -188,6 +193,22 @@ func (s *Server) loginClientKey(r *http.Request) string {
 		return host
 	}
 	return value
+}
+
+func (s *Server) administratorPasswordMatches(ctx context.Context, value string) bool {
+	if !utf8.ValidString(value) {
+		return false
+	}
+	length := utf8.RuneCountInString(value)
+	if length < 8 || length > 128 {
+		return false
+	}
+	hash, err := s.Store.AdministratorPasswordHash(ctx)
+	return err == nil && password.Verify([]byte(value), hash)
+}
+
+func (s *Server) clearAdminCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{Name: adminSessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.secureAdminCookie(r), SameSite: http.SameSiteStrictMode})
 }
 
 func safeNext(value, fallback string) string {

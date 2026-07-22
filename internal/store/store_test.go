@@ -1,10 +1,12 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestInitializeCreatesProtectedSQLiteStore(t *testing.T) {
@@ -36,6 +38,32 @@ func TestInitializeCreatesProtectedSQLiteStore(t *testing.T) {
 	}
 	if _, err := Initialize(ctx, path, "test-hash"); err == nil {
 		t.Fatal("Initialize() allowed overwriting an existing database")
+	}
+}
+
+func TestUpdateAdministratorPasswordRevokesSessions(t *testing.T) {
+	ctx := context.Background()
+	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "old-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.CreateAdministratorSession(ctx, bytes.Repeat([]byte{1}, 32), bytes.Repeat([]byte{2}, 32), time.Now(), time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.UpdateAdministratorPassword(ctx, "new-hash"); err != nil {
+		t.Fatal(err)
+	}
+	hash, err := st.AdministratorPasswordHash(ctx)
+	if err != nil || hash != "new-hash" {
+		t.Fatalf("password hash = %q, error = %v", hash, err)
+	}
+	var sessions int
+	if err := st.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM administrator_sessions`).Scan(&sessions); err != nil {
+		t.Fatal(err)
+	}
+	if sessions != 0 {
+		t.Fatalf("sessions = %d, want 0", sessions)
 	}
 }
 

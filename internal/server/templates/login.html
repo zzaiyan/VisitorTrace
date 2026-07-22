@@ -6,6 +6,7 @@
       <p class="eyebrow">ADMIN CONSOLE</p>
       <h1>管理员登录</h1>
     </div>
+    {{if .Flash}}<div class="notice success" role="status">{{.Flash}}</div>{{end}}
     {{if .Error}}<div class="notice danger" role="alert">{{.Error}}</div>{{end}}
     <form method="post" action="/admin/login" class="stack-form">
       <input type="hidden" name="next" value="{{.Next}}">

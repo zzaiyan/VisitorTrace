@@ -82,6 +82,26 @@
     </table>
   </div>
 </section>
+
+<section class="section-block danger-zone" id="danger">
+  <div class="section-heading"><div><p class="eyebrow">DANGER ZONE</p><h2>危险操作</h2></div><span class="muted">不可撤销，请先备份</span></div>
+  <div class="danger-grid">
+    <form method="post" action="/admin/sites/{{.Site.ID}}/reset" class="danger-form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <div><h3>清空 Site 数据</h3><p>删除逐条记录、聚合和地图点，保留 Site 设置；同时关闭采集和公开展示。</p></div>
+      <label class="field"><span>输入 Site ID</span><input type="text" name="site_id" autocomplete="off" required></label>
+      <label class="field"><span>管理员密码</span><input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="button danger" type="submit">清空数据</button>
+    </form>
+    <form method="post" action="/admin/sites/{{.Site.ID}}/delete" class="danger-form">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <div><h3>永久删除 Site</h3><p>删除 Site 及其全部记录、聚合、地图数据和设置，Site ID 不会再次分配。</p></div>
+      <label class="field"><span>输入 Site ID</span><input type="text" name="site_id" autocomplete="off" required></label>
+      <label class="field"><span>管理员密码</span><input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="button danger" type="submit">永久删除</button>
+    </form>
+  </div>
+</section>
 <script>
 (function () {
   var form = document.getElementById("preset-form");

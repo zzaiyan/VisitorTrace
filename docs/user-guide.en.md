@@ -157,6 +157,28 @@ Run the same maintenance flow manually with:
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
+## Administrator Password
+
+After signing in, open Administrator Settings and provide the current password to choose a new one. Passwords contain 8 to 128 characters. A successful change revokes every Administrator session and requires a new login.
+
+If the password is lost, reset it on the server:
+
+```sh
+./bin/visitortrace password reset \
+  --config "$HOME/.config/visitortrace/config.json"
+```
+
+The command reads and confirms the new password interactively. Automation may provide it through a `0600` file using `--password-file`. A command-line reset also revokes every session.
+
+## Site Reset and Deletion
+
+The bottom of each Site page contains two dangerous operations. Both require the complete Site ID and current Administrator password:
+
+- Reset Site data removes Pageview Records, all aggregates, and map locations while preserving Site settings. It rotates the HMAC key, unlocks the statistics timezone, and leaves collection and public views disabled until they are reviewed and enabled manually.
+- Permanently delete Site removes the Site, all associated data, and its settings. Its Site ID is never reassigned.
+
+Both operations are irreversible. Create a backup first.
+
 ## Current Status
 
-The current milestone implements Pageview ingestion, aggregate statistics, automatic record cleanup, SVG maps, Public Analytics, Administrator authentication, Map Presets, and checksum-verified backup and restore. Automatic GeoIP updates, password reset, and one-click self-update remain follow-up work.
+The current milestone implements Pageview ingestion, aggregate statistics, automatic record cleanup, SVG maps, Public Analytics, Administrator authentication and password management, Site reset/deletion, Map Presets, and checksum-verified backup and restore. Automatic GeoIP updates and one-click self-update remain follow-up work.

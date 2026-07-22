@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/subtle"
 	"embed"
 	"encoding/hex"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/maprender"
+	"github.com/zzaiyan/VisitorTrace/internal/password"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
@@ -71,6 +73,10 @@ type newSiteData struct {
 	Origins         string
 	DedupWindowDays int
 	RetentionDays   int
+}
+
+type adminSettingsData struct {
+	pageLayout
 }
 
 type publicAnalyticsData struct {
@@ -139,6 +145,58 @@ func (s *Server) adminDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	result.Flash = adminFlash(r)
 	s.renderPage(w, r, "dashboard", result)
+}
+
+func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
+	session, ok := s.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+	data := adminSettingsData{pageLayout: s.adminLayout(r, session, "管理员设置", "settings")}
+	data.Flash = adminFlash(r)
+	data.Error = r.URL.Query().Get("error")
+	s.renderPage(w, r, "settings", data)
+}
+
+func (s *Server) adminChangePassword(w http.ResponseWriter, r *http.Request) {
+	session, ok := s.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
+	if !s.validCSRF(r, session) {
+		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.redirectWithError(w, r, "/admin/settings", "密码表单无效。")
+		return
+	}
+	if !s.administratorPasswordMatches(r.Context(), r.FormValue("current_password")) {
+		s.redirectWithError(w, r, "/admin/settings", "当前密码不正确。")
+		return
+	}
+	newPassword, err := password.Validate(r.FormValue("new_password"))
+	if err != nil {
+		s.redirectWithError(w, r, "/admin/settings", err.Error())
+		return
+	}
+	confirmation := []byte(r.FormValue("confirm_password"))
+	if len(newPassword) != len(confirmation) || subtle.ConstantTimeCompare(newPassword, confirmation) != 1 {
+		s.redirectWithError(w, r, "/admin/settings", "两次输入的新密码不一致。")
+		return
+	}
+	hash, err := password.Hash(newPassword)
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "无法生成密码凭据。")
+		return
+	}
+	if err := s.Store.UpdateAdministratorPassword(r.Context(), hash); err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "无法更新管理员密码。")
+		return
+	}
+	s.clearAdminCookie(w, r)
+	http.Redirect(w, r, "/admin/login?changed=1", http.StatusSeeOther)
 }
 
 func (s *Server) adminNewSite(w http.ResponseWriter, r *http.Request) {
@@ -287,6 +345,60 @@ func (s *Server) adminUpdatePreset(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/sites/"+r.PathValue("siteID")+"?saved=preset#preset", http.StatusSeeOther)
 }
 
+func (s *Server) adminResetSite(w http.ResponseWriter, r *http.Request) {
+	session, ok := s.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
+	if !s.validCSRF(r, session) {
+		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.redirectWithError(w, r, "/admin/sites/"+r.PathValue("siteID")+"#danger", "确认表单无效。")
+		return
+	}
+	siteID := r.PathValue("siteID")
+	if r.FormValue("site_id") != siteID || !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", "Site ID 或管理员密码不正确。")
+		return
+	}
+	if err := s.Store.ResetSiteData(r.Context(), siteID); err != nil {
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", err.Error())
+		return
+	}
+	s.mapCache.deleteSite(siteID)
+	http.Redirect(w, r, "/admin/sites/"+siteID+"?saved=reset#danger", http.StatusSeeOther)
+}
+
+func (s *Server) adminDeleteSite(w http.ResponseWriter, r *http.Request) {
+	session, ok := s.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
+	if !s.validCSRF(r, session) {
+		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.redirectWithError(w, r, "/admin/sites/"+r.PathValue("siteID")+"#danger", "确认表单无效。")
+		return
+	}
+	siteID := r.PathValue("siteID")
+	if r.FormValue("site_id") != siteID || !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", "Site ID 或管理员密码不正确。")
+		return
+	}
+	if err := s.Store.DeleteSite(r.Context(), siteID); err != nil {
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", err.Error())
+		return
+	}
+	s.mapCache.deleteSite(siteID)
+	http.Redirect(w, r, "/admin?saved=deleted", http.StatusSeeOther)
+}
+
 func (s *Server) adminPresetPreview(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return
@@ -385,7 +497,12 @@ func (s *Server) analyticsRange(r *http.Request, site store.Site) (string, strin
 
 func (s *Server) redirectWithError(w http.ResponseWriter, r *http.Request, path, message string) {
 	query := url.Values{"error": []string{message}}
-	http.Redirect(w, r, path+"?"+query.Encode(), http.StatusSeeOther)
+	fragment := ""
+	if index := strings.IndexByte(path, '#'); index >= 0 {
+		fragment = path[index:]
+		path = path[:index]
+	}
+	http.Redirect(w, r, path+"?"+query.Encode()+fragment, http.StatusSeeOther)
 }
 
 func (s *Server) adminAssets(w http.ResponseWriter, r *http.Request) {
@@ -410,6 +527,10 @@ func adminFlash(r *http.Request) string {
 		return "站点设置已保存。"
 	case "preset":
 		return "Map Preset 已保存。"
+	case "reset":
+		return "Site 数据已清空；采集和公开展示保持关闭。"
+	case "deleted":
+		return "Site 已永久删除。"
 	default:
 		return ""
 	}

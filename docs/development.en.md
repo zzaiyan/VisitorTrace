@@ -39,6 +39,10 @@ The Pageview ingestion transaction stores the individual record, visitor-window 
 
 `serve` starts a lightweight maintenance loop that runs on startup and hourly. `visitortrace maintenance` exposes the same cleanup flow for diagnostics and external schedulers. Every deletion transaction has a bounded batch size; `operation_status` retains the latest maintenance outcome for the operational dashboard.
 
+The Administrator password is stored as an Argon2id hash. Both the Admin Console change flow and `visitortrace password reset` update the credential and revoke every session in one transaction. Session records retain the most recent password-verification time for short-lived reauthentication gates on high-risk operations such as updates.
+
+A Site-data reset first disables ingestion and publication in the same transaction, then removes records, visitor registrations, aggregates, and map locations and rotates the Site HMAC key. Permanent deletion also disables external behavior before foreign-key cascading cleanup. The HTTP layer additionally requires both the Administrator password and exact Site ID.
+
 ## Backup Format
 
 A `.vtbackup` file is a ZIP container with:

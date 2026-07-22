@@ -43,6 +43,8 @@ func main() {
 		code = runRestore(os.Args[2:])
 	case "maintenance":
 		code = runMaintenance(os.Args[2:])
+	case "password":
+		code = runPassword(os.Args[2:])
 	case "site":
 		code = runSite(os.Args[2:])
 	case "version":
@@ -352,5 +354,5 @@ func (s *stringList) Set(value string) error {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: visitortrace <init|serve|doctor|backup|restore|maintenance|site|version> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: visitortrace <init|serve|doctor|backup|restore|maintenance|password|site|version> [flags]")
 }

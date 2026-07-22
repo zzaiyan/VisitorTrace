@@ -39,7 +39,7 @@ func Read(passwordFile string, in *os.File, out io.Writer) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read password file: %w", err)
 		}
-		return validate(strings.TrimRight(string(data), "\r\n"))
+		return Validate(strings.TrimRight(string(data), "\r\n"))
 	}
 	if term.IsTerminal(int(in.Fd())) {
 		_, _ = fmt.Fprint(out, "Administrator password: ")
@@ -57,7 +57,7 @@ func Read(passwordFile string, in *os.File, out io.Writer) ([]byte, error) {
 		if subtle.ConstantTimeCompare(first, second) != 1 {
 			return nil, errors.New("password confirmation does not match")
 		}
-		return validate(string(first))
+		return Validate(string(first))
 	}
 
 	data, err := io.ReadAll(in)
@@ -73,7 +73,7 @@ func Read(passwordFile string, in *os.File, out io.Writer) ([]byte, error) {
 	if first != second {
 		return nil, errors.New("password confirmation does not match")
 	}
-	return validate(first)
+	return Validate(first)
 }
 
 func Hash(value []byte) (string, error) {
@@ -107,7 +107,7 @@ func Verify(value []byte, encoded string) bool {
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
 
-func validate(value string) ([]byte, error) {
+func Validate(value string) ([]byte, error) {
 	if !utf8.ValidString(value) {
 		return nil, errors.New("password must be valid UTF-8")
 	}

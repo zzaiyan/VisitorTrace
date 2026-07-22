@@ -119,6 +119,13 @@ var migrations = []migration{
 			) WITHOUT ROWID`,
 		},
 	},
+	{
+		version: 6,
+		statements: []string{
+			`ALTER TABLE administrator_sessions ADD COLUMN password_verified_at TEXT NOT NULL DEFAULT ''`,
+			`UPDATE administrator_sessions SET password_verified_at = created_at WHERE password_verified_at = ''`,
+		},
+	},
 }
 
 func (s *Store) initializeBaseSchema(ctx context.Context, passwordHash string) error {

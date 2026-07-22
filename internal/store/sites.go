@@ -241,6 +241,70 @@ func (s *Store) UpdateMapPreset(ctx context.Context, id, presetJSON string) erro
 	return nil
 }
 
+func (s *Store) ResetSiteData(ctx context.Context, id string) error {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return fmt.Errorf("regenerate Site HMAC key: %w", err)
+	}
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin Site data reset: %w", err)
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `
+		UPDATE sites
+		SET accept_pageviews = 0, publish_public = 0, first_pageview_at = NULL,
+		    hmac_key = ?, updated_at = ?
+		WHERE id = ?
+	`, key, time.Now().UTC().Format(time.RFC3339Nano), id)
+	if err != nil {
+		return fmt.Errorf("disable Site before data reset: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows != 1 {
+		return fmt.Errorf("Site %q not found", id)
+	}
+	for _, statement := range []string{
+		`DELETE FROM pageviews WHERE site_id = ?`,
+		`DELETE FROM visitor_registrations WHERE site_id = ?`,
+		`DELETE FROM daily_aggregates WHERE site_id = ?`,
+		`DELETE FROM geo_locations WHERE site_id = ?`,
+	} {
+		if _, err := tx.ExecContext(ctx, statement, id); err != nil {
+			return fmt.Errorf("clear Site data: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit Site data reset: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) DeleteSite(ctx context.Context, id string) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin Site deletion: %w", err)
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `UPDATE sites SET accept_pageviews = 0, publish_public = 0 WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("disable Site before deletion: %w", err)
+	}
+	if rows, _ := result.RowsAffected(); rows != 1 {
+		return fmt.Errorf("Site %q not found", id)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sites WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("delete Site: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit Site deletion: %w", err)
+	}
+	return nil
+}
+
 func boolInt(value bool) int {
 	if value {
 		return 1
