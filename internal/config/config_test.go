@@ -63,6 +63,32 @@ func TestLoadDefaultsBackupDirectoryForExistingConfig(t *testing.T) {
 	}
 }
 
+func TestNonDBIPProviderDefaultsToManualUpdates(t *testing.T) {
+	cfg := Default(filepath.Join(t.TempDir(), "data"))
+	cfg.GeoIPProvider = "maxmind"
+	cfg.GeoIPUpdate = ""
+	cfg.GeoIPUpdateURL = ""
+	path := filepath.Join(t.TempDir(), "visitortrace.json")
+	if err := Save(path, cfg); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.GeoIPProvider != "maxmind" || got.GeoIPUpdate != "disabled" || got.GeoIPUpdateURL != "" {
+		t.Fatalf("non-DB-IP defaults = %#v", got)
+	}
+}
+
+func TestValidateRejectsUnknownGeoIPProvider(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPProvider = "unknown"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate() accepted an unknown GeoIP provider")
+	}
+}
+
 func TestValidateRejectsInsecureRemoteGeoIPSource(t *testing.T) {
 	cfg := Default(t.TempDir())
 	cfg.GeoIPUpdateURL = "http://example.com/geoip.mmdb.gz"

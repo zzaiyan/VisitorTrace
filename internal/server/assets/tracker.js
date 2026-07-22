@@ -93,7 +93,7 @@
 	if (height >= 90 && height <= 800) image.height = height;
     image.loading = "eager";
     image.alt = "Visitor map";
-    image.title = "VisitorTrace Public Map | IP geolocation by DB-IP";
+    image.title = "VisitorTrace Public Map | IP geolocation data";
     link.appendChild(image);
     wrapper.appendChild(link);
     if (script.parentNode) script.parentNode.insertBefore(wrapper, script.nextSibling);

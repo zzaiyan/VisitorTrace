@@ -14,7 +14,8 @@ A tiny self-hosted visitor map and Pageview tracker for personal homepages, blog
 - Site-isolated Pageview ingestion
 - Hostname-separated statistics for multi-domain Sites
 - SQLite Pageview Records and durable aggregates
-- Local GeoIP lookup and SVG visitor maps
+- Pluggable local GeoIP lookup for DB-IP, MaxMind, and IP2Location
+- SVG visitor maps with provider-specific attribution
 - Date-linked Public Analytics with zoomable trends and an interactive map
 - Simplified Chinese and English interfaces with a per-Site public default
 - A password-protected Admin Console

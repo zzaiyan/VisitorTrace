@@ -19,7 +19,7 @@
       <div class="section-heading"><div><p class="eyebrow">GEOGRAPHY</p><h2>{{t "visitor_map"}}</h2></div><span class="muted">{{t "selected_range"}}</span></div>
       <div id="geo-chart" class="interactive-chart geo-chart" role="img" aria-label="{{.Site.Name}} {{t "visitor_map"}}"></div>
       <a class="chart-fallback" href="{{.MapURL}}" target="_blank" rel="noopener"><img src="{{.MapURL}}" alt="{{.Site.Name}} {{t "visitor_map"}}"></a>
-      <a class="attribution" href="https://db-ip.com" target="_blank" rel="noopener">IP geolocation by DB-IP</a>
+      {{with geoAttribution}}<a class="attribution" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}
     </div>
     <div class="trend-panel">
       <div class="section-heading"><div><p class="eyebrow">TREND</p><h2>{{t "visit_trend"}}</h2></div></div>

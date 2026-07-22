@@ -171,13 +171,33 @@ Equivalent parameters normalize to one SVG cache entry. Public maps return an `E
 
 ## GeoIP
 
-Production requires a valid DB-IP City Lite MMDB. The default configuration checks at startup and daily. When the local file is missing, invalid, or not from the current month, it downloads:
+VisitorTrace uses one active local MMDB provider at a time and maps all supported schemas to the same internal fields: country code/name, region code/name, city, latitude, and longitude. Select the provider with `geoip_provider`:
+
+| Provider | Database format | Default update behavior |
+| --- | --- | --- |
+| `dbip` | DB-IP City Lite | Monthly automatic update |
+| `maxmind` | MaxMind GeoLite2 City | Manual installation |
+| `ip2location` | IP2Location LITE DB11 | Manual installation |
+
+The default provider is `dbip`. A MaxMind configuration looks like this:
+
+```json
+{
+  "geoip_provider": "maxmind",
+  "geoip_path": "/var/lib/visitortrace/GeoLite2-City.mmdb",
+  "geoip_update": "disabled"
+}
+```
+
+For IP2Location, use `"geoip_provider": "ip2location"` and point `geoip_path` to the LITE DB11 MMDB. Provider selection is part of configuration validation; the service will reject unsupported provider names.
+
+DB-IP is checked at startup and daily. When the local file is missing, invalid, or not from the current month, the default configuration downloads:
 
 ```text
 https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz
 ```
 
-VisitorTrace bounds compressed and expanded sizes, verifies the complete MMDB search tree and data section, confirms a City/Location database type, and only then atomically replaces and hot-loads the database. The prior version remains at `<geoip_path>.previous`; a failed activation rolls back automatically.
+VisitorTrace bounds compressed and expanded sizes, verifies the complete MMDB search tree and data section, validates the configured provider's database shape, and only then atomically replaces and hot-loads the database. The prior version remains at `<geoip_path>.previous`; a failed activation rolls back automatically. The same resolver and readiness path is used for all three providers.
 
 Check and update manually with:
 
@@ -204,7 +224,7 @@ Inspect the raw MMDB record for one IP when diagnosing a city-level result:
 
 The command prints formatted JSON containing the database metadata, the matched CIDR, a `found` flag, and the unmodified MMDB `record` tree. It does not apply VisitorTrace's city-level label normalization. A missing address returns `found: false` and a `null` record. On a deployed system, the same operation can be run directly with the installed executable, for example `sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip query --config /etc/visitortrace/config.json 1.2.3.4`.
 
-Configure a domestic mirror in the configuration file:
+The built-in updater is provider-neutral and can consume an HTTPS mirror when the mirror exposes a compatible archive and optional SHA-256 sidecar. Official MaxMind and IP2Location downloads commonly require account credentials or license-specific access, so automatic updates are disabled by default for those providers. To use a private or domestic mirror, configure it explicitly:
 
 ```json
 {
@@ -216,7 +236,7 @@ Configure a domestic mirror in the configuration file:
 
 `geoip_checksum_url` is optional. When present, VisitorTrace verifies the compressed file's SHA-256 before extraction. Remote sources must use HTTPS, except loopback test endpoints. Set `"geoip_update": "disabled"` to disable downloads.
 
-Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. DB-IP City Lite is updated monthly under CC BY 4.0; VisitorTrace retains the DB-IP attribution link in map hover details, Admin previews, and Public Analytics. For Chinese records, VisitorTrace removes DB-IP district/subdistrict qualifiers from city labels where the database provides enough hierarchy information; the result is a city-level display label rather than a street-level claim.
+Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. The map hover details, Admin previews, and Public Analytics show the attribution for the active provider. DB-IP Chinese city-label normalization applies only to DB-IP records; MaxMind and IP2Location city names are mapped as supplied by those databases.
 
 ## Backup and Restore
 

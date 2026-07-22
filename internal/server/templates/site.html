@@ -17,7 +17,7 @@
   <div class="preset-layout">
     <div class="preview-stage">
       <img id="preset-preview" src="{{.MapPreviewURL}}" data-preview-base="{{.MapPreviewURL}}" alt="{{t "preset_preview"}}">
-      <a class="attribution" href="https://db-ip.com" target="_blank" rel="noopener">IP geolocation by DB-IP</a>
+      {{with geoAttribution}}<a class="attribution" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}
     </div>
     <form id="preset-form" method="post" action="{{appPath (printf "/admin/sites/%s/preset" .Site.ID)}}" class="preset-form" data-map-aspect="{{.MapAspect}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">

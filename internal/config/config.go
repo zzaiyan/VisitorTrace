@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 )
 
 const CurrentVersion = 1
@@ -22,6 +24,7 @@ type Config struct {
 	DataDir           string   `json:"data_dir"`
 	DatabasePath      string   `json:"database_path"`
 	GeoIPPath         string   `json:"geoip_path"`
+	GeoIPProvider     string   `json:"geoip_provider,omitempty"`
 	GeoIPUpdate       string   `json:"geoip_update,omitempty"`
 	GeoIPUpdateURL    string   `json:"geoip_update_url,omitempty"`
 	GeoIPChecksumURL  string   `json:"geoip_checksum_url,omitempty"`
@@ -54,6 +57,7 @@ func Default(dataDir string) Config {
 		DataDir:           dataDir,
 		DatabasePath:      filepath.Join(dataDir, "visitortrace.sqlite3"),
 		GeoIPPath:         filepath.Join(dataDir, "geoip.mmdb"),
+		GeoIPProvider:     string(geoip.ProviderDBIP),
 		GeoIPUpdate:       "monthly",
 		GeoIPUpdateURL:    "https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz",
 		BackupDir:         filepath.Join(dataDir, "backups"),
@@ -146,6 +150,13 @@ func (c Config) Validate() error {
 	if c.DataDir == "" || c.DatabasePath == "" || c.GeoIPPath == "" || c.BackupDir == "" {
 		return errors.New("data_dir, database_path, geoip_path, and backup_dir are required")
 	}
+	provider, err := geoip.NormalizeProvider(c.GeoIPProvider)
+	if err != nil {
+		return err
+	}
+	if c.GeoIPProvider != provider {
+		return fmt.Errorf("geoip_provider must be one of dbip, maxmind, or ip2location")
+	}
 	if c.Listen == "" {
 		return errors.New("listen is required")
 	}
@@ -220,6 +231,11 @@ func BasePath(baseURL string) string {
 }
 
 func (c *Config) normalize() error {
+	provider, err := geoip.NormalizeProvider(c.GeoIPProvider)
+	if err != nil {
+		return err
+	}
+	c.GeoIPProvider = provider
 	baseURL, err := NormalizeBaseURL(c.BaseURL)
 	if err != nil {
 		return err
@@ -229,13 +245,20 @@ func (c *Config) normalize() error {
 }
 
 func (c *Config) applyDefaults() {
+	if strings.TrimSpace(c.GeoIPProvider) == "" {
+		c.GeoIPProvider = string(geoip.ProviderDBIP)
+	}
 	if c.BackupDir == "" && c.DataDir != "" {
 		c.BackupDir = filepath.Join(c.DataDir, "backups")
 	}
 	if c.GeoIPUpdate == "" {
-		c.GeoIPUpdate = "monthly"
+		if c.GeoIPProvider == string(geoip.ProviderDBIP) {
+			c.GeoIPUpdate = "monthly"
+		} else {
+			c.GeoIPUpdate = "disabled"
+		}
 	}
-	if c.GeoIPUpdateURL == "" {
+	if c.GeoIPProvider == string(geoip.ProviderDBIP) && c.GeoIPUpdateURL == "" {
 		c.GeoIPUpdateURL = "https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz"
 	}
 	if c.UpdateManifestURL == "" {

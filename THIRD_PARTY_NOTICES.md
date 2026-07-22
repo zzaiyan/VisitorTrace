@@ -12,6 +12,6 @@ VisitorTrace includes a generated world basemap derived from Natural Earth 1:110
 
 Natural Earth vector and raster map data is in the public domain. See <https://www.naturalearthdata.com/about/terms-of-use/>.
 
-VisitorTrace can download the DB-IP IP to City Lite MMDB by default; the database is not included in this repository. DB-IP City Lite is updated monthly and licensed under the Creative Commons Attribution 4.0 International License. Keep the link attribution to DB-IP when using this data. See <https://db-ip.com/db/download/ip-to-city-lite>.
+VisitorTrace supports user-supplied MMDB files from DB-IP City Lite, MaxMind GeoLite2 City, and IP2Location LITE DB11. No GeoIP database is included in this repository. DB-IP City Lite is the default provider and can be downloaded monthly; MaxMind and IP2Location are supported as manually installed providers by default. Each database remains subject to its own license, terms, and attribution requirements. See the provider documentation: <https://db-ip.com/db/lite.php>, <https://dev.maxmind.com/geoip/geolite2-free-geolocation-data/>, and <https://lite.ip2location.com/ip2location-lite>.
 
 The interactive Public Analytics charts use Apache ECharts 6.1.0 under the Apache License 2.0. Release artifacts include a browser bundle generated from the ECharts source. See <https://echarts.apache.org/>.

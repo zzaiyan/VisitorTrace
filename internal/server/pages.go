@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/config"
+	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 	"github.com/zzaiyan/VisitorTrace/internal/maprender"
 	"github.com/zzaiyan/VisitorTrace/internal/operations"
 	"github.com/zzaiyan/VisitorTrace/internal/password"
@@ -131,6 +132,7 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string,
 		"operationWarning": func(value string) string { return operationWarning(value, lang) },
 		"operationLabel":   func(value string) string { return operationLabel(value, lang) },
 		"operationState":   func(value string) string { return operationState(value, lang) },
+		"geoAttribution":   func() geoip.Attribution { return geoip.AttributionForProvider(s.Config.GeoIPProvider) },
 		"geoLabel":         geoLabel,
 		"metricPercent": func(value, total int64) string {
 			if total <= 0 {

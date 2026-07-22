@@ -60,9 +60,11 @@ func New(cfg config.Config, st *store.Store, logger *slog.Logger) *Runner {
 	}
 	return &Runner{
 		Config: cfg, Store: st, Logger: logger, Client: client, Now: time.Now,
-		Validate: geoip.Validate,
+		Validate: func(path string) error {
+			return geoip.ValidateWithProvider(cfg.GeoIPProvider, path)
+		},
 		Probe: func(path string) error {
-			resolver, err := geoip.Open(path)
+			resolver, err := geoip.OpenWithProvider(cfg.GeoIPProvider, path)
 			if err != nil {
 				return err
 			}

@@ -171,13 +171,33 @@ URL 参数只覆写当前请求，不会改变保存的 Map Preset。
 
 ## GeoIP
 
-生产环境需要有效的 DB-IP City Lite MMDB。默认配置会在启动时检查数据库，并每天检查一次；当本地文件缺失、无效或不是当月版本时，下载：
+VisitorTrace 同时只启用一个本地 MMDB 后端，并把不同数据库结构统一映射为国家代码/名称、地区代码/名称、城市、纬度和经度。通过 `geoip_provider` 选择后端：
+
+| 后端 | 数据库格式 | 默认更新方式 |
+| --- | --- | --- |
+| `dbip` | DB-IP City Lite | 每月自动更新 |
+| `maxmind` | MaxMind GeoLite2 City | 手动安装 |
+| `ip2location` | IP2Location LITE DB11 | 手动安装 |
+
+默认后端是 `dbip`。MaxMind 配置示例：
+
+```json
+{
+  "geoip_provider": "maxmind",
+  "geoip_path": "/var/lib/visitortrace/GeoLite2-City.mmdb",
+  "geoip_update": "disabled"
+}
+```
+
+IP2Location 使用 `"geoip_provider": "ip2location"`，并将 `geoip_path` 指向 LITE DB11 MMDB。后端名称会参与配置校验；不支持的名称会被服务拒绝。
+
+DB-IP 默认会在启动时检查，并每天检查一次；当本地文件缺失、无效或不是当月版本时，下载：
 
 ```text
 https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz
 ```
 
-下载完成后，VisitorTrace 会限制压缩包和解压后文件大小、验证完整 MMDB 搜索树与数据区、确认数据库类型为 City/Location，再原子替换当前文件并热加载。上一版保存在 `<geoip_path>.previous`，激活失败时自动回滚。
+下载完成后，VisitorTrace 会限制压缩包和解压后文件大小、验证完整 MMDB 搜索树与数据区、校验当前后端对应的数据库结构，再原子替换当前文件并热加载。上一版保存在 `<geoip_path>.previous`，激活失败时自动回滚。三种后端共享相同的解析器交换和 ready 检查路径。
 
 可人工检查并更新：
 
@@ -204,7 +224,7 @@ https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz
 
 命令输出格式化 JSON，包括数据库元数据、命中的 CIDR、`found` 状态和未修改的 MMDB `record` 字段树。它不会应用 VisitorTrace 的城市级标签规范化。地址未命中时返回 `found: false` 和 `null` 的 `record`。在已部署的服务器上，也可以直接使用已安装的可执行文件，例如 `sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip query --config /etc/visitortrace/config.json 1.2.3.4`。
 
-国内镜像可在配置文件中设置：
+内置更新器本身不绑定具体后端，只要镜像提供兼容的压缩文件和可选 SHA-256 sidecar，就可以使用 HTTPS 镜像。MaxMind 和 IP2Location 的官方下载通常需要账户凭据或受许可证约束的访问，因此这两个后端默认关闭自动更新。若要使用私有或国内镜像，可显式配置：
 
 ```json
 {
@@ -216,7 +236,7 @@ https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz
 
 `geoip_checksum_url` 可省略；配置后会在解压前校验压缩文件 SHA-256。远程源必须使用 HTTPS，本机回环测试地址例外。设置 `"geoip_update": "disabled"` 可关闭下载。
 
-GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/health/ready` 返回不可用，新 Pageview 不会获得地理位置。DB-IP City Lite 每月更新并采用 CC BY 4.0，VisitorTrace 在地图悬浮提示、后台预览和 Public Analytics 中保留 DB-IP 归因链接。对于中国记录，VisitorTrace 会在数据库提供足够层级信息时清理 DB-IP 返回的区、街道等限定词，使用城市级显示名称，不宣称街道级精度。
+GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/health/ready` 返回不可用，新 Pageview 不会获得地理位置。地图悬浮提示、后台预览和 Public Analytics 会展示当前后端的归因信息。DB-IP 中国城市标签规范化只作用于 DB-IP 记录；MaxMind 和 IP2Location 的城市名称按数据库原值映射。
 
 ## 备份与恢复
 

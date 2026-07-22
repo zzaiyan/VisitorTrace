@@ -72,7 +72,8 @@ func runInit(args []string) int {
 	configPath := fs.String("config", config.DefaultConfigPath(), "protected config path")
 	passwordFile := fs.String("password-file", "", "protected file containing the administrator password")
 	geoIPPath := fs.String("geoip", "", "existing GeoIP MMDB path")
-	geoIPUpdate := fs.String("geoip-update", "monthly", "GeoIP update mode: monthly or disabled")
+	geoIPProvider := fs.String("geoip-provider", string(geoip.ProviderDBIP), "GeoIP provider: dbip, maxmind, or ip2location")
+	geoIPUpdate := fs.String("geoip-update", "", "GeoIP update mode: monthly or disabled; defaults to provider policy")
 	geoIPUpdateURL := fs.String("geoip-update-url", "", "GeoIP download URL template override")
 	geoIPChecksumURL := fs.String("geoip-checksum-url", "", "optional SHA-256 sidecar URL template")
 	if err := fs.Parse(args); err != nil {
@@ -83,7 +84,11 @@ func runInit(args []string) int {
 	if *geoIPPath != "" {
 		cfg.GeoIPPath = *geoIPPath
 	}
+	cfg.GeoIPProvider = *geoIPProvider
 	cfg.GeoIPUpdate = *geoIPUpdate
+	if *geoIPProvider != string(geoip.ProviderDBIP) && *geoIPUpdateURL == "" {
+		cfg.GeoIPUpdateURL = ""
+	}
 	if *geoIPUpdateURL != "" {
 		cfg.GeoIPUpdateURL = *geoIPUpdateURL
 	}
@@ -188,7 +193,7 @@ func runServe(args []string) int {
 		return 1
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	geoResolver, geoErr := geoip.Open(cfg.GeoIPPath)
+	geoResolver, geoErr := geoip.OpenWithProvider(cfg.GeoIPProvider, cfg.GeoIPPath)
 	if geoErr != nil {
 		logger.Warn("GeoIP database is unavailable", "path", cfg.GeoIPPath, "error", geoErr)
 	}
@@ -202,7 +207,7 @@ func runServe(args []string) int {
 	maintenanceDone := maintenance.New(st, logger).Start(stopCtx)
 	geoUpdater := geoipupdate.New(cfg, st, logger)
 	geoUpdater.Activate = func(path string) error {
-		resolver, err := geoip.Open(path)
+		resolver, err := geoip.OpenWithProvider(cfg.GeoIPProvider, path)
 		if err != nil {
 			return err
 		}
@@ -337,7 +342,7 @@ func runDoctor(args []string) int {
 	} else {
 		fmt.Println("backup: warning (no local snapshot)")
 	}
-	if err := geoip.Validate(cfg.GeoIPPath); err != nil {
+	if err := geoip.ValidateWithProvider(cfg.GeoIPProvider, cfg.GeoIPPath); err != nil {
 		fmt.Printf("geoip: failed (%v)\n", err)
 		return 1
 	}

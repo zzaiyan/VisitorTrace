@@ -10,6 +10,7 @@
 - 增加 `scripts/update-systemd-binary.sh`，用于从已经下载的本地二进制执行带校验的手动更新，包括升级前备份、原子版本切换、服务重启和可执行文件自动回滚。
 - tracker 会记录 hostname；对于部署在多个域名上的同一 Site，UV 按 hostname 独立计算。hostname 可用于 Pageview Record、筛选、CSV 导出、Public Analytics、Admin Analytics 和聚合导出。
 - 增加 DB-IP 中国城市标签规范化：在 City Lite 记录提供足够层级信息时移除区、街道等限定词。
+- 增加 DB-IP、MaxMind GeoLite2 City 和 IP2Location LITE DB11 多套 GeoIP 后端，统一提供国家、地区、城市、纬度和经度字段，并提供按后端校验和归因信息。非 DB-IP 后端默认手动安装数据库。
 - 本次尚未发布的改动将 SQLite Schema 升级到 9。已有安装会自动迁移；历史明细的 hostname 为空，历史聚合无法反推出 hostname。
 
 ## 0.1.1 - 2026-07-23

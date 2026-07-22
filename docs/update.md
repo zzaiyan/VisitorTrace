@@ -10,6 +10,7 @@ This file records user-facing changes for each published VisitorTrace release.
 - Added `scripts/update-systemd-binary.sh` for verified manual updates from an already-downloaded local binary, including a pre-update backup, atomic release switch, service restart, and automatic executable rollback.
 - Added tracker hostname capture and hostname-scoped UV counting for Sites deployed on multiple domains. Hostnames are available in Pageview Records, filters, CSV exports, Public Analytics, Admin Analytics, and aggregate exports.
 - Added DB-IP Chinese city-label normalization to remove district/subdistrict qualifiers where the City Lite record provides enough hierarchy information.
+- Added pluggable GeoIP backends for DB-IP, MaxMind GeoLite2 City, and IP2Location LITE DB11, with unified country, region, city, latitude, and longitude fields, provider-aware validation, and provider-specific attribution. Non-DB-IP providers default to manual database installation.
 - This upcoming change advances the SQLite schema to 9. Existing installations are migrated automatically; historical records retain an empty hostname and historical aggregates cannot be reconstructed by hostname.
 
 ## 0.1.1 - 2026-07-23

@@ -48,7 +48,7 @@ func (s *Server) adminRunGeoIPUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	runner := geoipupdate.New(s.Config, s.Store, s.logger)
 	runner.Activate = func(path string) error {
-		resolver, err := geoip.Open(path)
+		resolver, err := geoip.OpenWithProvider(s.Config.GeoIPProvider, path)
 		if err != nil {
 			return err
 		}

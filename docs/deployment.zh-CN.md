@@ -45,7 +45,7 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
   --config /etc/visitortrace/config.json
 ```
 
-默认配置监听 `127.0.0.1:8790`，把 SQLite 和 GeoIP 数据保存在 `/var/lib/visitortrace`，并在启动时下载当月 DB-IP City Lite。配置文件权限应保持为 `0600`。
+默认配置监听 `127.0.0.1:8790`，把 SQLite 和 GeoIP 数据保存在 `/var/lib/visitortrace`，并使用 DB-IP City Lite 作为自动更新后端。配置文件权限应保持为 `0600`。系统也支持 MaxMind GeoLite2 City 和 IP2Location LITE DB11；在 `geoip_provider` 中选择后，除非配置兼容的私有镜像，否则应手动安装对应 MMDB。
 
 接入反向代理前，在 `/etc/visitortrace/config.json` 中把本机回环地址加入 `trusted_proxies`：
 
@@ -258,7 +258,7 @@ curl -sS https://stats.example.com/health/ready
 {"checks":{"geoip":true,"schema":true,"sqlite":true},"status":"ready"}
 ```
 
-首次 GeoIP 下载在部分网络中可能失败或长时间不可用，此时 ready 返回 HTTP 503。使用不带 `-f` 的 `curl` 保留诊断 JSON，然后检查并重试 GeoIP：
+首次 GeoIP 下载在部分网络中可能失败或长时间不可用；非 DB-IP 后端则可能在 MMDB 复制到 `geoip_path` 前保持不可用，此时 ready 返回 HTTP 503。使用不带 `-f` 的 `curl` 保留诊断 JSON，然后检查并重试 GeoIP：
 
 ```sh
 sudo journalctl -u visitortrace -n 100 --no-pager
@@ -270,7 +270,7 @@ sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip u
 sudo systemctl restart visitortrace
 ```
 
-命令行 GeoIP 更新运行在服务进程之外，因此手动更新成功后必须重启服务。若服务器无法访问 DB-IP，可通过其他可信网络或镜像取得有效的 DB-IP City Lite MMDB，以 `visitortrace` 所有者和 `0600` 权限放到 `/var/lib/visitortrace/geoip.mmdb`，然后重启服务。关闭自动更新并不能取消本地有效 MMDB 的要求。
+命令行 GeoIP 更新运行在服务进程之外，因此手动更新成功后必须重启服务。若自动更新被关闭或不可用，应通过可信网络或镜像取得与当前后端匹配的有效 MMDB，以 `visitortrace` 所有者和 `0600` 权限放到配置的 `geoip_path`，然后重启服务。关闭自动更新并不能取消本地有效 MMDB 的要求。
 
 根路径部署时，访问 `https://stats.example.com/` 会跳转到 `/admin`；后台入口是 `https://stats.example.com/admin/login`，公开 Site 使用 `/public/<SITE-ID>/analytics`。子路径部署时，在这些路径前加上已经设置的前缀即可。若希望裸域名直接跳转到子路径后台，可在代理规则旁添加精确匹配：
 

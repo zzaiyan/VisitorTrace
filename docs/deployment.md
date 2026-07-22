@@ -45,7 +45,7 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
   --config /etc/visitortrace/config.json
 ```
 
-The default configuration listens on `127.0.0.1:8790`, stores SQLite and GeoIP data under `/var/lib/visitortrace`, and downloads the current DB-IP City Lite database on startup. Keep the configuration at mode `0600`.
+The default configuration listens on `127.0.0.1:8790`, stores SQLite and GeoIP data under `/var/lib/visitortrace`, and uses DB-IP City Lite as its automatically updated provider. Keep the configuration at mode `0600`. MaxMind GeoLite2 City and IP2Location LITE DB11 are also supported; select them with `geoip_provider` and install their MMDB manually unless you configure a compatible private mirror.
 
 Before placing a reverse proxy in front of the service, add its loopback addresses to `trusted_proxies` in `/etc/visitortrace/config.json`:
 
@@ -258,7 +258,7 @@ The two live checks isolate systemd from the BT Panel proxy: if both return `{"s
 {"checks":{"geoip":true,"schema":true,"sqlite":true},"status":"ready"}
 ```
 
-The first GeoIP download may fail or remain unavailable on some networks. In that case, readiness returns HTTP 503. Use `curl` without `-f` to retain its diagnostic JSON, then inspect and retry the GeoIP operation:
+The first GeoIP download may fail or remain unavailable on some networks. For a non-DB-IP provider, readiness may instead remain unavailable until its MMDB is copied into `geoip_path`. In either case, readiness returns HTTP 503. Use `curl` without `-f` to retain its diagnostic JSON, then inspect and retry the GeoIP operation:
 
 ```sh
 sudo journalctl -u visitortrace -n 100 --no-pager
@@ -270,7 +270,7 @@ sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip u
 sudo systemctl restart visitortrace
 ```
 
-A command-line GeoIP update runs outside the serving process, so restart the service after a successful manual update. If the server cannot reach DB-IP, download a valid DB-IP City Lite MMDB through another trusted network or mirror, place it at `/var/lib/visitortrace/geoip.mmdb` with owner `visitortrace`, mode `0600`, and restart the service. Disabling automatic updates does not remove the requirement for a valid local MMDB.
+A command-line GeoIP update runs outside the serving process, so restart the service after a successful manual update. If automatic updates are disabled or unavailable, obtain a valid MMDB for the configured provider through a trusted network or mirror, place it at the configured `geoip_path` with owner `visitortrace`, mode `0600`, and restart the service. Disabling automatic updates does not remove the requirement for a valid local MMDB.
 
 For a root deployment, `https://stats.example.com/` redirects to `/admin`; the Administrator entry point is `https://stats.example.com/admin/login`, and a public Site uses `/public/<SITE-ID>/analytics`. For a subpath deployment, use the same paths below the configured prefix. If desired, add an exact Nginx location to redirect the bare domain directly to the login page:
 

@@ -16,7 +16,7 @@ Package responsibilities:
 - `internal/maprender`: SVG map rendering without an external runtime dependency;
 - `internal/backup`: consistent snapshots, archive verification, and restoration;
 - `internal/maintenance`: in-process scheduling and bounded cleanup;
-- `internal/geoip`: local MMDB lookup.
+- `internal/geoip`: provider-aware local MMDB lookup and unified location mapping for DB-IP, MaxMind, and IP2Location.
 - `internal/geoipupdate`: monthly download, verification, atomic activation, hot reload, and rollback.
 - `internal/selfupdate`: signed manifests, candidate checks, release switching, readiness confirmation, and rollback.
 
@@ -61,9 +61,9 @@ The Administrator password is stored as an Argon2id hash. Both the Admin Console
 
 A Site-data reset first disables ingestion and publication in the same transaction, then removes records, visitor registrations, aggregates, and map locations and rotates the Site HMAC key. Permanent deletion also disables external behavior before foreign-key cascading cleanup. The HTTP layer additionally requires both the Administrator password and exact Site ID.
 
-The GeoIP updater runs at startup and every 24 hours. `{YYYY-MM}` expands using the UTC month. Compressed input is limited to 1 GiB and the expanded MMDB to 2 GiB. A configured SHA-256 sidecar verifies the downloaded container first; full MMDB verification always follows. The candidate is created on the target filesystem and activated by rename, preserving the prior file as `.previous`. The service swaps resolvers behind a mutex so an old reader is not closed during an active lookup.
+The GeoIP resolver opens one configured provider at a time. DB-IP and MaxMind use the nested country/subdivision/city/location MMDB shape; IP2Location uses its flat country/region/city/latitude/longitude shape. All three are mapped to the same `geoip.Location` fields. `ValidateWithProvider` performs provider-aware MMDB validation, and attribution is selected from the active provider. The GeoIP updater runs at startup and every 24 hours. `{YYYY-MM}` expands using the UTC month. Compressed input is limited to 1 GiB and the expanded MMDB to 2 GiB. A configured SHA-256 sidecar verifies the downloaded container first; full MMDB verification always follows. The candidate is created on the target filesystem and activated by rename, preserving the prior file as `.previous`. The service swaps resolvers behind a mutex so an old reader is not closed during an active lookup.
 
-DB-IP City Lite's `city.names` can contain a city together with a district or subdistrict qualifier, while its Lite schema does not expose a feature code for selecting an administrative level. `internal/geoip.CityLevelName` removes the qualifier for Chinese labels, uses a city component after a comma when DB-IP provides one, and uses the broad subdivision for Beijing, Shanghai, Tianjin, and Chongqing. The result is used for new Pageview locations and maps; it intentionally does not claim street-level precision.
+DB-IP City Lite's `city.names` can contain a city together with a district or subdistrict qualifier, while its Lite schema does not expose a feature code for selecting an administrative level. `internal/geoip.CityLevelName` removes the qualifier for Chinese labels, uses a city component after a comma when DB-IP provides one, and uses the broad subdivision for Beijing, Shanghai, Tianjin, and Chongqing. This normalization is intentionally limited to DB-IP; MaxMind and IP2Location city names are preserved after schema mapping.
 
 Pageview Record lists use a compound `(occurred_at, id)` cursor with server-controlled ordering. Each cursor carries a fingerprint of normalized filters and cannot be reused across a changed filter set. Responses contain no more than 200 rows. Record and aggregate exports iterate SQLite rows directly into `encoding/csv` without temporary export files; sensitive exports exist only on authenticated Administrator routes and send `Cache-Control: no-store`.
 
