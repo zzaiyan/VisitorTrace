@@ -120,6 +120,7 @@ jobs:
       - name: Create or refresh draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -eu
           version="${GITHUB_REF_NAME#v}"
@@ -154,6 +155,7 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -eu
           version="${GITHUB_REF_NAME#v}"
