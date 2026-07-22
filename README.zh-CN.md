@@ -55,7 +55,7 @@ make build
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-配置、Site 创建、网站接入和地图参数请参阅[用户指南](./docs/user-guide.zh-CN.md)；systemd 与宝塔的生产环境安装步骤见[部署指南](./docs/deployment.zh-CN.md)。
+配置、Site 创建、网站接入和地图参数请参阅[用户指南](./docs/user-guide.zh-CN.md)；systemd 与宝塔 Nginx/SSL 配置见[部署指南](./docs/deployment.zh-CN.md)。
 
 ## 许可证
 

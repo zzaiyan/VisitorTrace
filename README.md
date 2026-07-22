@@ -55,7 +55,7 @@ Published versions provide `visitortrace-<version>-linux-amd64` and `visitortrac
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-See the [User Guide](./docs/user-guide.md) for configuration, Site creation, website integration, and map parameters. Production setup for systemd and BT Panel is covered by the [Deployment Guide](./docs/deployment.md).
+See the [User Guide](./docs/user-guide.md) for configuration, Site creation, website integration, and map parameters. Production setup with systemd and BT Panel's Nginx/SSL features is covered by the [Deployment Guide](./docs/deployment.md).
 
 ## License
 

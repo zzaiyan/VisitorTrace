@@ -2,13 +2,13 @@
 
 [Chinese](./deployment.zh-CN.md)
 
-This guide deploys one VisitorTrace process behind an HTTPS reverse proxy. The application listens only on loopback; the reverse proxy is the only public entry point.
+This guide runs VisitorTrace exclusively through systemd under a dedicated service account. BT Panel is used only to manage the domain, TLS certificate, and Nginx reverse proxy. The application listens on loopback, and Nginx is its only public entry point.
 
 ## Prerequisites
 
 - A 64-bit Linux server using AMD64 or ARM64.
 - A domain such as `stats.example.com` pointing to the server.
-- Nginx or another reverse proxy with a valid HTTPS certificate.
+- BT Panel with Nginx installed.
 - Root access for the initial installation.
 
 Only ports 80 and 443 need to be public. Do not expose the VisitorTrace port to the Internet.
@@ -149,9 +149,30 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now visitortrace-backup.timer
 ```
 
-## Nginx Reverse Proxy
+## BT Panel: HTTPS and Reverse Proxy
 
-Terminate HTTPS at Nginx and proxy the complete domain to VisitorTrace:
+Do not create a VisitorTrace project in BT Panel's Go Project Manager. The panel may restrict project users to accounts such as `www` or `root`; neither account should run VisitorTrace. The `visitortrace` account does not need to appear in a BT Panel user selector because systemd is the only application supervisor. Do not run the same service under both systemd and BT Panel.
+
+### Website and SSL
+
+1. Point `stats.example.com` to the server and create that website in BT Panel.
+2. No PHP or Go runtime is required for the website. Do not place VisitorTrace data in its document root.
+3. Open the website's **SSL** settings and issue a Let's Encrypt certificate or install an existing certificate.
+4. Enable HTTPS and, if appropriate, redirect HTTP to HTTPS.
+
+### Reverse Proxy
+
+Under the website settings, open **Reverse Proxy** and add one rule with values equivalent to:
+
+| Setting | Value |
+|---|---|
+| Proxy path | `/` |
+| Target URL | `http://127.0.0.1:8790` |
+| Host | Preserve the original host |
+| Cache | Disabled |
+| Content replacement | Empty |
+
+BT Panel versions use different field labels. Check the generated Nginx configuration and ensure the effective location contains these headers:
 
 ```nginx
 location / {
@@ -164,63 +185,47 @@ location / {
 }
 ```
 
-Do not enable proxy caching for ingestion, Admin, health, or analytics routes. Static browser assets and SVG responses already send their own cache headers.
+`X-Forwarded-For` supplies the original visitor IP, while `X-Forwarded-Proto` lets secure Admin cookies work behind HTTPS. VisitorTrace accepts them only from the loopback CIDRs configured in `trusted_proxies`. Do not enable proxy caching for ingestion, Admin, health, or analytics routes; static assets and SVG responses already send their own cache headers.
 
-After reloading Nginx, verify:
+The current BT Panel navigation and reverse-proxy fields are documented in the [official reverse-proxy guide](https://docs.bt.cn/user-guide/site/php/site-config/reverse-proxy).
+
+## Verify and Troubleshoot
+
+Verify the service directly and through the public HTTPS endpoint:
 
 ```sh
 curl -fsS http://127.0.0.1:8790/health/live
 curl -fsS https://stats.example.com/health/live
-curl -fsS https://stats.example.com/health/ready
+curl -sS https://stats.example.com/health/ready
 ```
 
-The readiness check can remain unavailable until the first GeoIP download finishes. Inspect the service logs if it does not become ready.
+The two live checks isolate systemd from the BT Panel proxy: if both return `{"status":"ok"}`, process supervision, Nginx, DNS, and TLS are working. A fully ready response is:
 
-## BT Panel
-
-BT Panel is an optional process-management and reverse-proxy interface. VisitorTrace does not call a BT Panel API and uses the same executable, configuration, data, health checks, and update contract as the systemd deployment.
-
-### Process Management
-
-Install and initialize VisitorTrace using the common steps above. In the Go Project Manager, create a project with values equivalent to:
-
-| Setting | Value |
-|---|---|
-| Project directory | `/var/lib/visitortrace` |
-| Executable | `/var/lib/visitortrace/releases/current/visitortrace` |
-| Arguments or startup command | `serve --config /etc/visitortrace/config.json` |
-| Listening port | `8790` |
-| Run user | `visitortrace` |
-| Restart policy | Restart after every process exit |
-
-Panel versions use different labels for executable and argument fields. The resulting operating-system command must be:
-
-```sh
-/var/lib/visitortrace/releases/current/visitortrace serve --config /etc/visitortrace/config.json
+```json
+{"checks":{"geoip":true,"schema":true,"sqlite":true},"status":"ready"}
 ```
 
-If the manager cannot run an existing executable or cannot restart after a clean exit, use the systemd unit above and use BT Panel only for Nginx, TLS, and log viewing. Do not run both supervisors for the same process.
-
-If the panel forces its own process account, grant that account ownership of `/var/lib/visitortrace` and read access to `/etc/visitortrace/config.json`; do not make the configuration world-readable.
-
-### Website and Reverse Proxy
-
-1. Create a website for `stats.example.com` and issue its SSL certificate.
-2. Under the website settings, open **Reverse Proxy** and add a rule for `/`.
-3. Set the target URL to `http://127.0.0.1:8790`.
-4. Preserve the original host, disable proxy caching, and leave content replacement empty.
-5. Confirm that `X-Forwarded-For` and `X-Forwarded-Proto` are passed by the generated Nginx configuration.
-
-The current BT Panel navigation and reverse-proxy fields are documented in the [official reverse-proxy guide](https://docs.bt.cn/user-guide/site/php/site-config/reverse-proxy).
-
-Create a daily Shell task in **Scheduled Tasks** for:
+The first GeoIP download may fail or remain unavailable on some networks. In that case, readiness returns HTTP 503. Use `curl` without `-f` to retain its diagnostic JSON, then inspect and retry the GeoIP operation:
 
 ```sh
-sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace backup \
+sudo journalctl -u visitortrace -n 100 --no-pager
+sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace doctor \
   --config /etc/visitortrace/config.json
+sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip update \
+  --config /etc/visitortrace/config.json \
+  --force
+sudo systemctl restart visitortrace
 ```
 
-Use either this task or the systemd timer, not both.
+A command-line GeoIP update runs outside the serving process, so restart the service after a successful manual update. If the server cannot reach DB-IP, download a valid DB-IP City Lite MMDB through another trusted network or mirror, place it at `/var/lib/visitortrace/geoip.mmdb` with owner `visitortrace`, mode `0600`, and restart the service. Disabling automatic updates does not remove the requirement for a valid local MMDB.
+
+VisitorTrace intentionally has no route at `/`, so `https://stats.example.com/` returns `404 page not found`. The Administrator entry point is `https://stats.example.com/admin/login`; a public Site uses `/public/<SITE-ID>/analytics`. To redirect the bare domain to the login page, add an exact Nginx location alongside the proxy rule:
+
+```nginx
+location = / {
+    return 302 /admin/login;
+}
+```
 
 ## Post-Deployment
 

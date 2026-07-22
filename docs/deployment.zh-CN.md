@@ -2,13 +2,13 @@
 
 [英文版](./deployment.md)
 
-本指南将一个 VisitorTrace 进程部署在 HTTPS 反向代理之后。应用仅监听本机回环地址，反向代理是唯一的公网入口。
+本指南只使用 systemd 和专用服务账户运行 VisitorTrace；宝塔仅管理域名、SSL 证书和 Nginx 反向代理。应用监听本机回环地址，Nginx 是唯一的公网入口。
 
 ## 前置条件
 
 - 使用 AMD64 或 ARM64 的 64 位 Linux 服务器；
 - 已将 `stats.example.com` 等域名解析到服务器；
-- 安装 Nginx 或其他反向代理，并配置有效的 HTTPS 证书；
+- 宝塔已安装 Nginx；
 - 首次安装时具备 root 权限。
 
 公网只需开放 80 和 443 端口，不要把 VisitorTrace 的监听端口暴露到互联网。
@@ -149,9 +149,30 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now visitortrace-backup.timer
 ```
 
-## Nginx 反向代理
+## 宝塔：HTTPS 与反向代理
 
-由 Nginx 终止 HTTPS，并把完整域名代理到 VisitorTrace：
+不要在宝塔 Go 项目管理器中创建 VisitorTrace 项目。部分宝塔版本只允许选择 `www`、`root` 等预设账户，这些账户都不应直接运行 VisitorTrace。应用只由 systemd 托管，因此 `visitortrace` 无需出现在宝塔的用户下拉框中；也不要让 systemd 和宝塔同时启动同一服务。
+
+### 网站与 SSL
+
+1. 把 `stats.example.com` 解析到服务器，并在宝塔中创建该网站；
+2. 网站不需要 PHP 或 Go 运行环境，也不要把 VisitorTrace 数据放进网站根目录；
+3. 进入网站的“SSL”设置，申请 Let's Encrypt 证书或安装已有证书；
+4. 开启 HTTPS，并按需设置 HTTP 自动跳转 HTTPS。
+
+### 反向代理
+
+进入网站设置中的“反向代理”，添加一条与下表等价的规则：
+
+| 设置 | 值 |
+|---|---|
+| 代理目录 | `/` |
+| 目标 URL | `http://127.0.0.1:8790` |
+| Host | 保留原始 Host |
+| 缓存 | 关闭 |
+| 内容替换 | 留空 |
+
+不同宝塔版本的字段名称可能不同。检查生成的 Nginx 配置，确认最终生效的 location 包含以下请求头：
 
 ```nginx
 location / {
@@ -164,63 +185,47 @@ location / {
 }
 ```
 
-不要为采集、后台、健康检查或分析路由开启代理缓存。浏览器静态资源和 SVG 响应已经自行发送缓存头。
+`X-Forwarded-For` 用于传递真实访客 IP，`X-Forwarded-Proto` 用于让后台在 HTTPS 反向代理后正确设置安全 Cookie。VisitorTrace 只接受 `trusted_proxies` 中回环地址提供的这些请求头。不要为采集、后台、健康检查或分析路由开启代理缓存；静态资源和 SVG 响应已经自行发送缓存头。
 
-重新加载 Nginx 后检查：
+当前宝塔导航和反向代理字段可参考[宝塔官方反向代理文档](https://docs.bt.cn/user-guide/site/php/site-config/reverse-proxy)。
+
+## 验证与排障
+
+分别检查应用本机端点和公网 HTTPS 端点：
 
 ```sh
 curl -fsS http://127.0.0.1:8790/health/live
 curl -fsS https://stats.example.com/health/live
-curl -fsS https://stats.example.com/health/ready
+curl -sS https://stats.example.com/health/ready
 ```
 
-首次 GeoIP 下载完成前，ready 检查可能暂时不可用；若持续失败，应查看服务日志。
+两个 live 检查可以区分 systemd 与宝塔代理问题：若都返回 `{"status":"ok"}`，说明进程管理、Nginx、DNS 和 SSL 已经正常。完全就绪时返回：
 
-## 宝塔部署
-
-宝塔只是可选的进程管理和反向代理界面。VisitorTrace 不调用宝塔 API，仍使用与 systemd 场景相同的二进制、配置、数据、健康检查和更新约定。
-
-### 进程管理
-
-先按前述通用步骤安装并初始化 VisitorTrace。在 Go 项目管理器中创建项目，并填写与下表等价的内容：
-
-| 设置 | 值 |
-|---|---|
-| 项目目录 | `/var/lib/visitortrace` |
-| 可执行文件 | `/var/lib/visitortrace/releases/current/visitortrace` |
-| 参数或启动命令 | `serve --config /etc/visitortrace/config.json` |
-| 监听端口 | `8790` |
-| 运行用户 | `visitortrace` |
-| 重启策略 | 进程每次退出后都重新启动 |
-
-不同面板版本对“可执行文件”和“参数”的字段命名可能不同，最终操作系统命令必须等价于：
-
-```sh
-/var/lib/visitortrace/releases/current/visitortrace serve --config /etc/visitortrace/config.json
+```json
+{"checks":{"geoip":true,"schema":true,"sqlite":true},"status":"ready"}
 ```
 
-如果管理器不能运行已有二进制，或不能在状态码 0 时重新启动，请改用前面的 systemd 单元，只让宝塔管理 Nginx、TLS 和日志。不要同时使用两个管理器守护同一进程。
-
-若面板强制使用自己的进程账户，应把 `/var/lib/visitortrace` 的所有权授予该账户，并允许其读取 `/etc/visitortrace/config.json`；不要把配置文件改成所有用户可读。
-
-### 网站与反向代理
-
-1. 为 `stats.example.com` 创建网站并签发 SSL 证书；
-2. 进入网站设置中的“反向代理”，添加代理目录 `/`；
-3. 目标 URL 设置为 `http://127.0.0.1:8790`；
-4. 保留原始 Host、关闭代理缓存，内容替换留空；
-5. 检查生成的 Nginx 配置是否传递 `X-Forwarded-For` 和 `X-Forwarded-Proto`。
-
-当前宝塔导航和反向代理字段可参考[宝塔官方反向代理文档](https://docs.bt.cn/user-guide/site/php/site-config/reverse-proxy)。
-
-在“计划任务”中创建每日 Shell 任务：
+首次 GeoIP 下载在部分网络中可能失败或长时间不可用，此时 ready 返回 HTTP 503。使用不带 `-f` 的 `curl` 保留诊断 JSON，然后检查并重试 GeoIP：
 
 ```sh
-sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace backup \
+sudo journalctl -u visitortrace -n 100 --no-pager
+sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace doctor \
   --config /etc/visitortrace/config.json
+sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip update \
+  --config /etc/visitortrace/config.json \
+  --force
+sudo systemctl restart visitortrace
 ```
 
-systemd timer 和宝塔计划任务二选一，不要重复执行。
+命令行 GeoIP 更新运行在服务进程之外，因此手动更新成功后必须重启服务。若服务器无法访问 DB-IP，可通过其他可信网络或镜像取得有效的 DB-IP City Lite MMDB，以 `visitortrace` 所有者和 `0600` 权限放到 `/var/lib/visitortrace/geoip.mmdb`，然后重启服务。关闭自动更新并不能取消本地有效 MMDB 的要求。
+
+VisitorTrace 有意不提供 `/` 路由，因此访问 `https://stats.example.com/` 会返回 `404 page not found`。后台入口是 `https://stats.example.com/admin/login`，公开 Site 使用 `/public/<SITE-ID>/analytics`。若希望裸域名跳转到后台，可在代理规则旁添加精确匹配：
+
+```nginx
+location = / {
+    return 302 /admin/login;
+}
+```
 
 ## 部署后操作
 

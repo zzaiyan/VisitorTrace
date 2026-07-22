@@ -74,7 +74,7 @@ install -Dm700 visitortrace-0.1.0-linux-amd64 "$HOME/.local/bin/visitortrace"
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-使用 systemd、Nginx 或宝塔部署生产环境时，请继续阅读[部署指南](./deployment.zh-CN.md)。
+使用 systemd 运行服务，并使用宝塔管理 Nginx/SSL 时，请继续阅读[部署指南](./deployment.zh-CN.md)。
 
 默认监听 `127.0.0.1:8790`。生产环境应由反向代理终止 HTTPS，并且只有显式配置的 `trusted_proxies` 才能提供转发客户端 IP 和 HTTPS 协议信息。
 
@@ -166,7 +166,7 @@ https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-使用 `--force` 可忽略当月文件状态重新下载。命令行更新发生在另一个进程中，若服务正在运行，更新后需要由宝塔或其他进程管理器重启服务；服务内置的自动更新会直接热加载。
+使用 `--force` 可忽略当月文件状态重新下载。命令行更新发生在另一个进程中，若服务正在运行，更新后需要通过 systemd 重启服务；服务内置的自动更新会直接热加载。
 
 国内镜像可在配置文件中设置：
 
@@ -193,7 +193,7 @@ GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/he
 
 备份默认保存在配置中的 `backup_dir`，未显式配置时为数据目录下的 `backups`。每个 `.vtbackup` 归档都有配套的 `.sha256` 文件，归档内的数据库和配置也分别记录 SHA-256。命令会执行 SQLite 完整性检查，并默认只保留最近三份；可使用 `--output` 和 `--keep` 覆写。
 
-恢复前必须先在宝塔或其他进程管理器中停止 VisitorTrace：
+恢复前必须先通过 systemd 停止 VisitorTrace：
 
 ```sh
 ./bin/visitortrace restore \
@@ -260,7 +260,7 @@ GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/he
 $HOME/.local/share/visitortrace/releases/current/visitortrace
 ```
 
-将宝塔或其他进程管理器的启动命令改为该稳定路径，并保持“进程退出后自动重启”。这只是通用进程管理契约，VisitorTrace 不依赖宝塔 API。
+将 systemd 服务的启动路径改为该稳定路径，并保持“进程退出后自动重启”。宝塔只负责 Nginx 和 SSL，VisitorTrace 不依赖宝塔 API。
 
 随后可在服务器检查或应用更新：
 

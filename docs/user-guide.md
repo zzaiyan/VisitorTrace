@@ -74,7 +74,7 @@ Changing the visitor deduplication window schedules a new rule for the next midn
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-For a production installation with systemd, Nginx, or BT Panel, continue with the [Deployment Guide](./deployment.md).
+For a production installation with systemd and BT Panel's Nginx/SSL features, continue with the [Deployment Guide](./deployment.md).
 
 The default listener is `127.0.0.1:8790`. In production, terminate HTTPS at a reverse proxy. Only explicitly configured `trusted_proxies` may provide forwarded client IP and HTTPS scheme information.
 
@@ -166,7 +166,7 @@ Check and update manually with:
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-Use `--force` to download again despite a current-month file. A command-line update runs in a separate process, so restart a running service through aaPanel or another supervisor afterward. The built-in automatic update hot-loads the new database directly.
+Use `--force` to download again despite a current-month file. A command-line update runs in a separate process, so restart a running systemd service afterward. The built-in automatic update hot-loads the new database directly.
 
 Configure a domestic mirror in the configuration file:
 
@@ -193,7 +193,7 @@ Create a consistent SQLite snapshot and configuration archive:
 
 Backups are written to `backup_dir`, which defaults to `backups` inside the data directory. Every `.vtbackup` archive has a `.sha256` sidecar, while the database and configuration entries also carry individual SHA-256 digests in the archive manifest. The command runs a SQLite integrity check and retains the latest three archives by default. Use `--output` and `--keep` to override those defaults.
 
-Stop VisitorTrace in aaPanel or another process supervisor before restoring:
+Stop VisitorTrace through systemd before restoring:
 
 ```sh
 ./bin/visitortrace restore \
@@ -260,7 +260,7 @@ The command prints a stable executable path similar to:
 $HOME/.local/share/visitortrace/releases/current/visitortrace
 ```
 
-Configure aaPanel or another process supervisor to run that stable path and restart the process after it exits. This is a generic process-supervision contract; VisitorTrace does not depend on an aaPanel API.
+Configure the systemd service to run that stable path and restart the process after it exits. BT Panel is only used for Nginx and TLS; VisitorTrace does not depend on a BT Panel API.
 
 You can then check or apply releases on the server:
 
