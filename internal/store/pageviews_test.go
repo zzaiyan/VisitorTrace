@@ -112,6 +112,53 @@ func TestRecordPageviewRejectsInvalidDigestAtomically(t *testing.T) {
 	}
 }
 
+func TestRecordPageviewScopesUniqueVisitorsByHostname(t *testing.T) {
+	ctx := context.Background()
+	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	site, err := st.CreateSite(ctx, CreateSiteParams{Name: "Domains", AllowedOrigins: []string{"https://one.example", "https://two.example"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := bytes.Repeat([]byte{7}, 32)
+	base := time.Date(2026, time.July, 22, 8, 0, 0, 0, time.UTC)
+	for _, hostname := range []string{"one.example", "one.example", "two.example"} {
+		result, err := st.RecordPageview(ctx, PageviewObservation{
+			SiteID: site.ID, Hostname: hostname, OccurredAt: base, Path: "/", VisitorDigest: digest,
+			OriginalIP: "192.0.2.7", OperatingSystem: "Linux", Browser: "Firefox",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if hostname == "one.example" && result.NewOverallVisitor != (result.ID == 1) {
+			t.Fatalf("same-host visitor result = %#v", result)
+		}
+		if hostname == "two.example" && !result.NewOverallVisitor {
+			t.Fatalf("cross-host visitor result = %#v", result)
+		}
+	}
+	var pageviews, uniqueVisitors int
+	if err := st.DB.QueryRowContext(ctx, `
+		SELECT pageviews, unique_visitors FROM daily_aggregates
+		WHERE site_id = ? AND dimension_kind = 'overall' AND dimension_value = '*'
+	`, site.ID).Scan(&pageviews, &uniqueVisitors); err != nil {
+		t.Fatal(err)
+	}
+	if pageviews != 3 || uniqueVisitors != 2 {
+		t.Fatalf("overall aggregate = PV %d UV %d, want PV 3 UV 2", pageviews, uniqueVisitors)
+	}
+	var hostRows int
+	if err := st.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM daily_aggregates WHERE site_id = ? AND dimension_kind = 'hostname'`, site.ID).Scan(&hostRows); err != nil {
+		t.Fatal(err)
+	}
+	if hostRows != 2 {
+		t.Fatalf("hostname aggregate rows = %d, want 2", hostRows)
+	}
+}
+
 func TestDeduplicationWindowChangeStartsAtNextLocalMidnight(t *testing.T) {
 	ctx := context.Background()
 	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")

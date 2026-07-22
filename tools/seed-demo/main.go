@@ -80,6 +80,7 @@ func main() {
 			occurredAt := now.Add(-time.Duration((index*2+repeat)%28) * 24 * time.Hour).Add(-time.Duration(index*repeat+repeat) * time.Hour)
 			observation := store.PageviewObservation{
 				SiteID:          id,
+				Hostname:        []string{"www.example.com", "blog.example.com"}[index%2],
 				OccurredAt:      occurredAt,
 				Path:            demoPath(index, repeat),
 				CountryCode:     city.country,

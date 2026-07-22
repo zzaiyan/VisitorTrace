@@ -12,6 +12,7 @@ A tiny self-hosted visitor map and Pageview tracker for personal homepages, blog
 ## Features
 
 - Site-isolated Pageview ingestion
+- Hostname-separated statistics for multi-domain Sites
 - SQLite Pageview Records and durable aggregates
 - Local GeoIP lookup and SVG visitor maps
 - Date-linked Public Analytics with zoomable trends and an interactive map

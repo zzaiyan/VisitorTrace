@@ -22,7 +22,7 @@ func TestPageviewRecordFiltersAndCursorPagination(t *testing.T) {
 	base := time.Date(2026, time.July, 22, 8, 0, 0, 0, time.UTC)
 	for i := 0; i < 5; i++ {
 		_, err := st.RecordPageview(ctx, PageviewObservation{
-			SiteID: site.ID, OccurredAt: base.Add(time.Duration(i) * time.Minute), Path: []string{"/", "/notes"}[i%2],
+			SiteID: site.ID, Hostname: []string{"one.example", "two.example"}[i%2], OccurredAt: base.Add(time.Duration(i) * time.Minute), Path: []string{"/", "/notes"}[i%2],
 			CountryCode: "CN", RegionCode: "HB", City: "Wuhan", VisitorDigest: bytes.Repeat([]byte{byte(i + 1)}, 32),
 			OriginalIP: []string{"192.0.2.1", "192.0.2.2"}[i%2], OperatingSystem: "Linux", Browser: []string{"Firefox", "Chrome"}[i%2],
 		})
@@ -59,6 +59,13 @@ func TestPageviewRecordFiltersAndCursorPagination(t *testing.T) {
 	}
 	if len(filtered.Records) != 2 {
 		t.Fatalf("filtered records = %d, want 2", len(filtered.Records))
+	}
+	hostFiltered, err := st.PageviewRecords(ctx, PageviewFilters{SiteID: site.ID, Hostname: "two.example"}, nil, "older", 100)
+	if err != nil || len(hostFiltered.Records) != 2 {
+		t.Fatalf("hostname-filtered records = %#v, %v", hostFiltered, err)
+	}
+	if hostFiltered.Records[0].Hostname != "two.example" {
+		t.Fatalf("hostname-filtered record = %#v", hostFiltered.Records[0])
 	}
 }
 

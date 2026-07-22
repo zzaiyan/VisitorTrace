@@ -47,9 +47,13 @@ Migrations are embedded in `internal/store/migrations.go` and applied in version
 
 The Pageview ingestion transaction stores the individual record, visitor-window registrations, and durable aggregates together. Expiring an individual record must not reverse its durable aggregate contributions.
 
+Accepted ingestion derives a normalized `hostname` from the validated `Origin` header; the embedded tracker also reports `window.location.hostname`, and the server rejects a non-empty report that disagrees. The hostname is stored on each Pageview Record and added to the durable aggregate dimensions. Visitor registrations are internally scoped by `(Site, hostname, window, dimension, visitor)`, so the same visitor digest is counted independently on different hostnames even when they share one configured Site. Migration 9 adds the Pageview column and index; pre-migration detailed rows have an empty hostname and pre-migration aggregates cannot be reconstructed by hostname.
+
 `site_deduplication_rules` stores counting-rule history as Site-local dates. A window change upserts a rule for the next local date. Ingestion selects the latest rule effective on the Pageview's local date and calculates windows from that rule's effective-date anchor. Existing `visitor_registrations.window_end` values remain unchanged; they can only delay cleanup of temporary registrations and cannot affect counting under the new rule.
 
 Public and administrative aggregate queries share Site-local date boundaries. Public queries first enforce publication state and never read the path family; authenticated administrative queries can read path aggregates even when publication is disabled. Browser JSON is generated only from the already-authorized aggregate result and contains no individual records, original IPs, or Visitor Digests.
+
+Hostname aggregates are non-sensitive and are available to both Public Analytics and Admin Analytics. Administrative Pageview filters and CSV exports include the stored hostname; aggregate exports accept the `hostname` dimension.
 
 `serve` starts a lightweight maintenance loop that runs on startup and hourly. `visitortrace maintenance` exposes the same cleanup flow for diagnostics and external schedulers. Every deletion transaction has a bounded batch size; `operation_status` retains the latest maintenance outcome for the operational dashboard.
 
@@ -58,6 +62,8 @@ The Administrator password is stored as an Argon2id hash. Both the Admin Console
 A Site-data reset first disables ingestion and publication in the same transaction, then removes records, visitor registrations, aggregates, and map locations and rotates the Site HMAC key. Permanent deletion also disables external behavior before foreign-key cascading cleanup. The HTTP layer additionally requires both the Administrator password and exact Site ID.
 
 The GeoIP updater runs at startup and every 24 hours. `{YYYY-MM}` expands using the UTC month. Compressed input is limited to 1 GiB and the expanded MMDB to 2 GiB. A configured SHA-256 sidecar verifies the downloaded container first; full MMDB verification always follows. The candidate is created on the target filesystem and activated by rename, preserving the prior file as `.previous`. The service swaps resolvers behind a mutex so an old reader is not closed during an active lookup.
+
+DB-IP City Lite's `city.names` can contain a city together with a district or subdistrict qualifier, while its Lite schema does not expose a feature code for selecting an administrative level. `internal/geoip.CityLevelName` removes the qualifier for Chinese labels, uses a city component after a comma when DB-IP provides one, and uses the broad subdivision for Beijing, Shanghai, Tianjin, and Chongqing. The result is used for new Pageview locations and maps; it intentionally does not claim street-level precision.
 
 Pageview Record lists use a compound `(occurred_at, id)` cursor with server-controlled ordering. Each cursor carries a fingerprint of normalized filters and cannot be reused across a changed filter set. Responses contain no more than 200 rows. Record and aggregate exports iterate SQLite rows directly into `encoding/csv` without temporary export files; sensitive exports exist only on authenticated Administrator routes and send `Cache-Control: no-store`.
 

@@ -51,7 +51,7 @@ func TestHealthEndpoints(t *testing.T) {
 func TestPageviewCollection(t *testing.T) {
 	app, st, site := testServer(t)
 	handler := app.Handler()
-	body := `{"path":"/about/","visitor_id":"00112233445566778899aabbccddeeff"}`
+	body := `{"path":"/about/","visitor_id":"00112233445566778899aabbccddeeff","hostname":"example.com"}`
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/sites/"+site.ID+"/pageviews", strings.NewReader(body))
 	request.Header.Set("Origin", "https://example.com")
 	request.Header.Set("Content-Type", "text/plain;charset=UTF-8")
@@ -68,6 +68,13 @@ func TestPageviewCollection(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("Pageview Record count = %d, want 1", count)
+	}
+	var hostname string
+	if err := st.DB.QueryRow(`SELECT hostname FROM pageviews WHERE site_id = ?`, site.ID).Scan(&hostname); err != nil {
+		t.Fatalf("read Pageview hostname: %v", err)
+	}
+	if hostname != "example.com" {
+		t.Fatalf("Pageview hostname = %q, want example.com", hostname)
 	}
 }
 
@@ -91,6 +98,27 @@ func TestPageviewCollectionRejectsDisallowedOrigin(t *testing.T) {
 	}
 }
 
+func TestPageviewCollectionRejectsMismatchedHostname(t *testing.T) {
+	app, st, site := testServer(t)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/sites/"+site.ID+"/pageviews", strings.NewReader(`{"path":"/","hostname":"other.example"}`))
+	request.Header.Set("Origin", "https://example.com")
+	request.Header.Set("Content-Type", "text/plain")
+	request.Header.Set("User-Agent", "Mozilla/5.0 Firefox/128.0")
+	request.RemoteAddr = "192.0.2.11:1234"
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("collection status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+	var count int
+	if err := st.DB.QueryRow(`SELECT COUNT(*) FROM pageviews`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("mismatched hostname created %d records", count)
+	}
+}
+
 func TestTrackerScript(t *testing.T) {
 	app, _, site := testServer(t)
 	request := httptest.NewRequest(http.MethodGet, "/embed/tracker.js?site_id="+site.ID, nil)
@@ -99,7 +127,7 @@ func TestTrackerScript(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("tracker status = %d, body = %q", response.Code, response.Body.String())
 	}
-	if !strings.Contains(response.Body.String(), "window.VisitorTrace.track") {
+	if !strings.Contains(response.Body.String(), "window.VisitorTrace.track") || !strings.Contains(response.Body.String(), "hostname: hostname") {
 		t.Fatal("tracker response does not expose the explicit track API")
 	}
 	var compressed bytes.Buffer

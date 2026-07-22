@@ -20,21 +20,22 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
-var recordFilterKeys = []string{"site_id", "from", "to", "path", "ip", "digest", "country", "region", "city", "browser", "os"}
+var recordFilterKeys = []string{"site_id", "from", "to", "hostname", "path", "ip", "digest", "country", "region", "city", "browser", "os"}
 
 type recordFilterValues struct {
-	SiteID  string
-	From    string
-	To      string
-	Path    string
-	IP      string
-	Digest  string
-	Country string
-	Region  string
-	City    string
-	Browser string
-	OS      string
-	Limit   int
+	SiteID   string
+	From     string
+	To       string
+	Hostname string
+	Path     string
+	IP       string
+	Digest   string
+	Country  string
+	Region   string
+	City     string
+	Browser  string
+	OS       string
+	Limit    int
 }
 
 type recordsPageData struct {
@@ -141,7 +142,7 @@ func (s *Server) adminRecordsCSV(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	writer := csv.NewWriter(w)
 	_ = writer.Write([]string{
-		"id", "site_id", "site_name", "occurred_at_utc", "occurred_at_site_time", "local_date", "path",
+		"id", "site_id", "site_name", "occurred_at_utc", "occurred_at_site_time", "local_date", "hostname", "path",
 		"country_code", "region_code", "city", "latitude", "longitude", "visitor_digest", "original_ip", "operating_system", "browser",
 	})
 	err = s.Store.ExportPageviewRecords(r.Context(), filters, func(record store.PageviewRecord) error {
@@ -207,12 +208,12 @@ func parseRecordFilters(query url.Values) (store.PageviewFilters, recordFilterVa
 	}
 	values := recordFilterValues{
 		SiteID: strings.TrimSpace(query.Get("site_id")), From: strings.TrimSpace(query.Get("from")), To: strings.TrimSpace(query.Get("to")),
-		Path: strings.TrimSpace(query.Get("path")), IP: strings.TrimSpace(query.Get("ip")), Digest: strings.TrimSpace(query.Get("digest")),
+		Hostname: strings.ToLower(strings.TrimSpace(query.Get("hostname"))), Path: strings.TrimSpace(query.Get("path")), IP: strings.TrimSpace(query.Get("ip")), Digest: strings.TrimSpace(query.Get("digest")),
 		Country: strings.ToUpper(strings.TrimSpace(query.Get("country"))), Region: strings.TrimSpace(query.Get("region")),
 		City: strings.TrimSpace(query.Get("city")), Browser: strings.TrimSpace(query.Get("browser")), OS: strings.TrimSpace(query.Get("os")), Limit: limit,
 	}
 	filters := store.PageviewFilters{
-		SiteID: values.SiteID, CountryCode: values.Country, RegionCode: values.Region, City: values.City,
+		SiteID: values.SiteID, Hostname: values.Hostname, CountryCode: values.Country, RegionCode: values.Region, City: values.City,
 		Browser: values.Browser, OperatingSystem: values.OS,
 	}
 	if values.From != "" {
@@ -256,7 +257,7 @@ func parseRecordFilters(query url.Values) (store.PageviewFilters, recordFilterVa
 		filters.VisitorDigest = digest
 		values.Digest = strings.ToLower(values.Digest)
 	}
-	for name, value := range map[string]string{"Site ID": values.SiteID, "国家": values.Country, "地区": values.Region, "城市": values.City, "浏览器": values.Browser, "操作系统": values.OS} {
+	for name, value := range map[string]string{"Site ID": values.SiteID, "访问域名": values.Hostname, "国家": values.Country, "地区": values.Region, "城市": values.City, "浏览器": values.Browser, "操作系统": values.OS} {
 		if len(value) > 200 {
 			return filters, values, fmt.Errorf("%s筛选过长", name)
 		}
@@ -318,7 +319,7 @@ func recordFilterQuery(values recordFilterValues, includeLimit bool) url.Values 
 	input := map[string]string{
 		"site_id": values.SiteID, "from": values.From, "to": values.To, "path": values.Path, "ip": values.IP,
 		"digest": values.Digest, "country": values.Country, "region": values.Region, "city": values.City,
-		"browser": values.Browser, "os": values.OS,
+		"hostname": values.Hostname, "browser": values.Browser, "os": values.OS,
 	}
 	for _, key := range recordFilterKeys {
 		if input[key] != "" {
@@ -361,7 +362,7 @@ func pageviewCSVRow(record store.PageviewRecord) []string {
 	}
 	return []string{
 		strconv.FormatInt(record.ID, 10), csvSafe(record.SiteID), csvSafe(record.SiteName), record.OccurredAt.UTC().Format(time.RFC3339Nano),
-		localTime.Format(time.RFC3339Nano), record.LocalDate, csvSafe(record.Path), csvSafe(record.CountryCode), csvSafe(record.RegionCode),
+		localTime.Format(time.RFC3339Nano), record.LocalDate, csvSafe(record.Hostname), csvSafe(record.Path), csvSafe(record.CountryCode), csvSafe(record.RegionCode),
 		csvSafe(record.City), latitude, longitude, record.VisitorDigest, csvSafe(record.OriginalIP), csvSafe(record.OperatingSystem), csvSafe(record.Browser),
 	}
 }

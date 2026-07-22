@@ -45,3 +45,19 @@ func NormalizeOrigins(values []string) ([]string, error) {
 	sort.Strings(result)
 	return result, nil
 }
+
+func HostnameFromOrigin(raw string) (string, error) {
+	normalized, err := NormalizeOrigin(raw)
+	if err != nil {
+		return "", err
+	}
+	u, err := url.Parse(normalized)
+	if err != nil {
+		return "", fmt.Errorf("parse normalized origin: %w", err)
+	}
+	hostname := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
+	if hostname == "" {
+		return "", fmt.Errorf("origin hostname is empty")
+	}
+	return hostname, nil
+}

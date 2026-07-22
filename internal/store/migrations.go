@@ -146,6 +146,13 @@ var migrations = []migration{
 			 SELECT id, '1970-01-01', dedup_window_days, updated_at FROM sites`,
 		},
 	},
+	{
+		version: 9,
+		statements: []string{
+			`ALTER TABLE pageviews ADD COLUMN hostname TEXT NOT NULL DEFAULT ''`,
+			`CREATE INDEX pageviews_site_hostname_time ON pageviews (site_id, hostname, occurred_at DESC, id DESC)`,
+		},
+	},
 }
 
 func (s *Store) initializeBaseSchema(ctx context.Context, passwordHash string) error {

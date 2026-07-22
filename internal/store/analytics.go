@@ -32,6 +32,7 @@ type PublicAnalyticsData struct {
 	Pageviews          int64
 	UniqueVisitors     int64
 	Daily              []DailyMetric
+	Hostnames          []AnalyticsMetric
 	Countries          []AnalyticsMetric
 	Cities             []AnalyticsMetric
 	Browsers           []AnalyticsMetric
@@ -120,6 +121,7 @@ func (s *Store) analyticsData(ctx context.Context, site Site, startDate, endDate
 		kind string
 		out  *[]AnalyticsMetric
 	}{
+		{kind: "hostname", out: &result.Hostnames},
 		{kind: "country", out: &result.Countries},
 		{kind: "browser", out: &result.Browsers},
 		{kind: "os", out: &result.OperatingSystems},
@@ -318,6 +320,7 @@ type PageviewRecord struct {
 	SiteTimezone    string
 	OccurredAt      time.Time
 	LocalDate       string
+	Hostname        string
 	Path            string
 	CountryCode     string
 	RegionCode      string

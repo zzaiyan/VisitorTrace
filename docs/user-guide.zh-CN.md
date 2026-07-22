@@ -107,11 +107,13 @@ Site 管理页的“聚合分析”使用相同日期范围和交互组件，并
 
 后台“访问明细”页面显示全部 Site 的 Pageview Record，默认每页 100 条，可选择 50 或 200 条。页面使用与当前筛选绑定的游标向较早或较新记录翻页，避免数据持续写入时页码偏移。
 
-可组合使用以下精确筛选：Site、UTC 起止时间、规范化路径、原始 IP、Visitor Digest、国家代码、地区代码、城市、浏览器和操作系统。页面时间按对应 Site 时区显示，悬浮可查看 UTC 时间。
+可组合使用以下精确筛选：Site、访问 hostname、UTC 起止时间、规范化路径、原始 IP、Visitor Digest、国家代码、地区代码、城市、浏览器和操作系统。页面时间按对应 Site 时区显示，悬浮可查看 UTC 时间。
 
 “导出当前筛选 CSV”会流式输出所有符合条件的记录，不受当前页大小影响。文件同时包含 UTC 时间和 Site 本地时间，以及经纬度、原始 IP 和 Visitor Digest 等全部明细字段。以 `=`、`+`、`-` 或 `@` 开头的文本会增加前导单引号，避免电子表格将外部数据解释为公式。
 
-聚合导出要求选择一个 Site，可按整体、路径、国家、地区、城市、浏览器或操作系统分别导出，并可限制 Site 本地日期范围。
+聚合导出要求选择一个 Site，可按整体、hostname、路径、国家、地区、城市、浏览器或操作系统分别导出，并可限制 Site 本地日期范围。
+
+同一个配置 Site 如果用于多个域名，每个 hostname 都会作为独立聚合行显示。Pageview Record 也会保存 tracker 上报且服务端从 Allowed Origin 确认的 hostname，因此不同域名上的同一访客会分别计入各自的 UV。
 
 ## 网站接入
 
@@ -132,6 +134,8 @@ Site 管理页的“聚合分析”使用相同日期范围和交互组件，并
 ```html
 <script async src="https://stats.example.com/embed/tracker.js?site_id=SITE_ID"></script>
 ```
+
+Tracker 会上报当前页面 hostname。服务端以已经通过 Origin 校验的 hostname 为权威值，因此共享一个 Site 的不同域名会在 hostname 统计和独立访客计数中保持隔离。
 
 分离式接入区域同时提供可复制的地图控件代码，适合懒加载。地图可单独作为图片加载：
 
@@ -196,7 +200,7 @@ https://download.db-ip.com/free/dbip-city-lite-{YYYY-MM}.mmdb.gz
 
 `geoip_checksum_url` 可省略；配置后会在解压前校验压缩文件 SHA-256。远程源必须使用 HTTPS，本机回环测试地址例外。设置 `"geoip_update": "disabled"` 可关闭下载。
 
-GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/health/ready` 返回不可用，新 Pageview 不会获得地理位置。DB-IP City Lite 每月更新并采用 CC BY 4.0，VisitorTrace 在地图悬浮提示、后台预览和 Public Analytics 中保留 DB-IP 归因链接。
+GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/health/ready` 返回不可用，新 Pageview 不会获得地理位置。DB-IP City Lite 每月更新并采用 CC BY 4.0，VisitorTrace 在地图悬浮提示、后台预览和 Public Analytics 中保留 DB-IP 归因链接。对于中国记录，VisitorTrace 会在数据库提供足够层级信息时清理 DB-IP 返回的区、街道等限定词，使用城市级显示名称，不宣称街道级精度。
 
 ## 备份与恢复
 

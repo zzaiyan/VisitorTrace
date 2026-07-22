@@ -22,6 +22,7 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/maprender"
 	"github.com/zzaiyan/VisitorTrace/internal/pageview"
 	"github.com/zzaiyan/VisitorTrace/internal/ratelimit"
+	visitorsite "github.com/zzaiyan/VisitorTrace/internal/site"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 	"github.com/zzaiyan/VisitorTrace/internal/useragent"
 	"github.com/zzaiyan/VisitorTrace/internal/visitor"
@@ -35,6 +36,7 @@ const maxIngestionBody = 2 * 1024
 type pageviewPayload struct {
 	Path      string `json:"path"`
 	VisitorID string `json:"visitor_id"`
+	Hostname  string `json:"hostname"`
 }
 
 type Server struct {
@@ -237,6 +239,11 @@ func (s *Server) collectPageview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "origin is not allowed", http.StatusForbidden)
 		return
 	}
+	hostname, err := visitorsite.HostnameFromOrigin(origin)
+	if err != nil {
+		http.Error(w, "origin hostname is invalid", http.StatusBadRequest)
+		return
+	}
 	w.Header().Set("Access-Control-Allow-Origin", origin)
 	w.Header().Add("Vary", "Origin")
 
@@ -285,6 +292,10 @@ func (s *Server) collectPageview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid page path", http.StatusBadRequest)
 		return
 	}
+	if payload.Hostname != "" && normalizeReportedHostname(payload.Hostname) != hostname {
+		http.Error(w, "reported hostname does not match origin", http.StatusBadRequest)
+		return
+	}
 	digest, err := visitor.Digest(configuredSite.HMACKey, payload.VisitorID, address.String(), userAgentValue)
 	if err != nil {
 		http.Error(w, "invalid visitor identity", http.StatusBadRequest)
@@ -298,6 +309,7 @@ func (s *Server) collectPageview(w http.ResponseWriter, r *http.Request) {
 	s.geoMu.RUnlock()
 	_, err = s.Store.RecordPageview(r.Context(), store.PageviewObservation{
 		SiteID:          siteID,
+		Hostname:        hostname,
 		Path:            path,
 		CountryCode:     location.CountryCode,
 		RegionCode:      location.RegionCode,
@@ -319,6 +331,14 @@ func (s *Server) collectPageview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func normalizeReportedHostname(value string) string {
+	value = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(value)), ".")
+	if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
+		value = value[1 : len(value)-1]
+	}
+	return value
 }
 
 func (s *Server) trackerScript(w http.ResponseWriter, r *http.Request) {

@@ -107,3 +107,37 @@ func TestMigrateFromSchemaV1(t *testing.T) {
 		t.Fatalf("sites table is unavailable: %v", err)
 	}
 }
+
+func TestMigrateFromSchemaV8AddsHostname(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "visitortrace.sqlite3")
+	ctx := context.Background()
+	st, err := open(ctx, path)
+	if err != nil {
+		t.Fatalf("open() error = %v", err)
+	}
+	defer st.Close()
+	if err := st.initializeBaseSchema(ctx, "test-hash"); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range migrations[:len(migrations)-1] {
+		if err := st.applyMigration(ctx, item); err != nil {
+			t.Fatalf("apply migration %d: %v", item.version, err)
+		}
+	}
+	if version, err := st.SchemaVersion(ctx); err != nil || version != 8 {
+		t.Fatalf("pre-migration schema = %d, %v", version, err)
+	}
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatalf("Migrate() error = %v", err)
+	}
+	var columns int
+	if err := st.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('pageviews') WHERE name = 'hostname'`).Scan(&columns); err != nil {
+		t.Fatal(err)
+	}
+	if columns != 1 {
+		t.Fatalf("hostname columns = %d, want 1", columns)
+	}
+	if err := st.SchemaReady(ctx); err != nil {
+		t.Fatal(err)
+	}
+}

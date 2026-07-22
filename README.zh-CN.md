@@ -12,6 +12,7 @@
 ## 功能
 
 - 按 Site 隔离的 Pageview 采集
+- 多域名 Site 按访问 hostname 独立统计
 - SQLite 逐条记录和持久化聚合
 - 本地 GeoIP 查询与 SVG 访客地图
 - 支持日期联动、趋势缩放和交互地图的公开分析页

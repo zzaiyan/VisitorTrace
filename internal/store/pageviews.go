@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -13,6 +14,7 @@ var ErrCollectionDisabled = errors.New("Pageview collection is disabled for this
 type PageviewObservation struct {
 	SiteID          string
 	OccurredAt      time.Time
+	Hostname        string
 	Path            string
 	CountryCode     string
 	RegionCode      string
@@ -45,6 +47,13 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 		observation.OccurredAt = time.Now().UTC()
 	} else {
 		observation.OccurredAt = observation.OccurredAt.UTC()
+	}
+	observation.Hostname = strings.ToLower(strings.TrimSpace(observation.Hostname))
+	if observation.Hostname == "" {
+		observation.Hostname = "unknown"
+	}
+	if len(observation.Hostname) > 253 {
+		return RecordPageviewResult{}, fmt.Errorf("Pageview hostname is too long")
 	}
 
 	s.writeMu.Lock()
@@ -94,10 +103,10 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO pageviews (
-			site_id, occurred_at, local_date, path, country_code, region_code, city,
+			site_id, occurred_at, local_date, hostname, path, country_code, region_code, city,
 			latitude, longitude, visitor_digest, original_ip, operating_system, browser
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, observation.SiteID, observation.OccurredAt.Format(time.RFC3339Nano), localDate, observation.Path,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, observation.SiteID, observation.OccurredAt.Format(time.RFC3339Nano), localDate, observation.Hostname, observation.Path,
 		observation.CountryCode, observation.RegionCode, observation.City, observation.Latitude, observation.Longitude,
 		observation.VisitorDigest, observation.OriginalIP, observation.OperatingSystem, observation.Browser)
 	if err != nil {
@@ -134,7 +143,7 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 				site_id, window_start, dimension_kind, dimension_value, visitor_digest, created_at, window_end
 			) VALUES (?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT DO NOTHING
-		`, observation.SiteID, windowStart, dimension.kind, dimension.value, observation.VisitorDigest, observation.OccurredAt.Format(time.RFC3339Nano), windowEnd)
+		`, observation.SiteID, windowStart, dimension.kind, scopedVisitorDimension(observation.Hostname, dimension.value), observation.VisitorDigest, observation.OccurredAt.Format(time.RFC3339Nano), windowEnd)
 		if err != nil {
 			return RecordPageviewResult{}, fmt.Errorf("register Unique Visitor: %w", err)
 		}
@@ -179,6 +188,7 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 func aggregateDimensions(observation PageviewObservation) []aggregateDimension {
 	result := []aggregateDimension{
 		{kind: "overall", value: "*"},
+		{kind: "hostname", value: observation.Hostname},
 		{kind: "path", value: observation.Path},
 		{kind: "browser", value: fallbackDimension(observation.Browser)},
 		{kind: "os", value: fallbackDimension(observation.OperatingSystem)},
@@ -191,6 +201,10 @@ func aggregateDimensions(observation PageviewObservation) []aggregateDimension {
 		result = append(result, aggregateDimension{kind: "city", value: observation.CountryCode + "|" + observation.RegionCode + "|" + observation.City})
 	}
 	return result
+}
+
+func scopedVisitorDimension(hostname, value string) string {
+	return fmt.Sprintf("%d:%s%s", len(hostname), hostname, value)
 }
 
 func fallbackDimension(value string) string {

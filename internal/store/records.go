@@ -12,6 +12,7 @@ type PageviewFilters struct {
 	SiteID          string
 	OccurredFrom    *time.Time
 	OccurredTo      *time.Time
+	Hostname        string
 	Path            string
 	OriginalIP      string
 	VisitorDigest   []byte
@@ -102,7 +103,7 @@ func (s *Store) ExportPageviewRecords(ctx context.Context, filters PageviewFilte
 
 func pageviewRecordQuery(filters PageviewFilters) (string, []any) {
 	query := `
-		SELECT p.id, p.site_id, s.name, s.timezone, p.occurred_at, p.local_date, p.path,
+		SELECT p.id, p.site_id, s.name, s.timezone, p.occurred_at, p.local_date, p.hostname, p.path,
 		       p.country_code, p.region_code, p.city, p.latitude, p.longitude,
 		       p.visitor_digest, p.original_ip, p.operating_system, p.browser
 		FROM pageviews AS p
@@ -126,6 +127,7 @@ func pageviewRecordQuery(filters PageviewFilters) (string, []any) {
 		value     string
 		condition string
 	}{
+		{filters.Hostname, "p.hostname = ?"},
 		{filters.Path, "p.path = ?"},
 		{filters.OriginalIP, "p.original_ip = ?"},
 		{filters.CountryCode, "p.country_code = ?"},
@@ -153,7 +155,7 @@ func scanPageviewRecord(scanner rowScanner) (PageviewRecord, error) {
 	var occurred string
 	var digest []byte
 	if err := scanner.Scan(
-		&item.ID, &item.SiteID, &item.SiteName, &item.SiteTimezone, &occurred, &item.LocalDate, &item.Path,
+		&item.ID, &item.SiteID, &item.SiteName, &item.SiteTimezone, &occurred, &item.LocalDate, &item.Hostname, &item.Path,
 		&item.CountryCode, &item.RegionCode, &item.City, &item.Latitude, &item.Longitude,
 		&digest, &item.OriginalIP, &item.OperatingSystem, &item.Browser,
 	); err != nil {
@@ -243,7 +245,7 @@ func (s *Store) ExportAggregates(ctx context.Context, siteID, startDate, endDate
 }
 
 func ValidAggregateDimension(value string) bool {
-	return map[string]bool{"overall": true, "path": true, "country": true, "region": true, "city": true, "browser": true, "os": true}[value]
+	return map[string]bool{"overall": true, "hostname": true, "path": true, "country": true, "region": true, "city": true, "browser": true, "os": true}[value]
 }
 
 func ValidateAggregateDates(startDate, endDate string) error {

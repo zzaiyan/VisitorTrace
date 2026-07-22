@@ -10,6 +10,7 @@
     <label class="field"><span>Site</span><select name="site_id"><option value="">{{t "all_sites"}}</option>{{range .Sites}}<option value="{{.ID}}" {{if selected $.Filters.SiteID .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
     <label class="field"><span>{{t "from_utc"}}</span><input type="datetime-local" name="from" value="{{.Filters.From}}"></label>
     <label class="field"><span>{{t "to_utc"}}</span><input type="datetime-local" name="to" value="{{.Filters.To}}"></label>
+    <label class="field"><span>{{t "hostname"}}</span><input type="text" name="hostname" value="{{.Filters.Hostname}}" placeholder="www.example.com" spellcheck="false"></label>
     <label class="field"><span>{{t "path"}}</span><input type="text" name="path" value="{{.Filters.Path}}" placeholder="/research"></label>
     <label class="field"><span>{{t "original_ip"}}</span><input type="text" name="ip" value="{{.Filters.IP}}" spellcheck="false"></label>
     <label class="field"><span>Visitor Digest</span><input type="text" name="digest" value="{{.Filters.Digest}}" spellcheck="false"></label>
@@ -26,8 +27,8 @@
 <section class="section-block">
   <div class="section-heading"><div><p class="eyebrow">RESULTS</p><h2>{{t "row_records"}}</h2></div><span class="muted">{{t "this_page"}} {{len .Records}} {{t "items"}}</span></div>
   <div class="table-wrap">
-    <table><thead><tr><th>Site</th><th>{{t "time"}}</th><th>{{t "path"}}</th><th>{{t "country"}} / {{t "region"}} / {{t "city"}}</th><th>{{t "original_ip"}}</th><th>{{t "system"}}</th><th>{{t "browsers"}}</th><th>Visitor Digest</th></tr></thead>
-      <tbody>{{range .Records}}<tr><td>{{.SiteName}}<br><code>{{.SiteID}}</code></td><td><time datetime="{{formatUTC .OccurredAt}}" title="{{formatUTC .OccurredAt}}">{{formatRecordTime .}}</time></td><td><code>{{.Path}}</code></td><td>{{if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}} / {{if .RegionCode}}{{.RegionCode}}{{else}}-{{end}} / {{if .City}}{{.City}}{{else}}-{{end}}</td><td><code>{{.OriginalIP}}</code></td><td>{{.OperatingSystem}}</td><td>{{.Browser}}</td><td><code class="digest">{{.VisitorDigest}}</code></td></tr>{{else}}<tr><td colspan="8" class="empty-cell">{{t "no_matching_records"}}</td></tr>{{end}}</tbody>
+    <table><thead><tr><th>Site</th><th>{{t "time"}}</th><th>{{t "hostname"}}</th><th>{{t "path"}}</th><th>{{t "country"}} / {{t "region"}} / {{t "city"}}</th><th>{{t "original_ip"}}</th><th>{{t "system"}}</th><th>{{t "browsers"}}</th><th>Visitor Digest</th></tr></thead>
+      <tbody>{{range .Records}}<tr><td>{{.SiteName}}<br><code>{{.SiteID}}</code></td><td><time datetime="{{formatUTC .OccurredAt}}" title="{{formatUTC .OccurredAt}}">{{formatRecordTime .}}</time></td><td><code>{{.Hostname}}</code></td><td><code>{{.Path}}</code></td><td>{{if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}} / {{if .RegionCode}}{{.RegionCode}}{{else}}-{{end}} / {{if .City}}{{.City}}{{else}}-{{end}}</td><td><code>{{.OriginalIP}}</code></td><td>{{.OperatingSystem}}</td><td>{{.Browser}}</td><td><code class="digest">{{.VisitorDigest}}</code></td></tr>{{else}}<tr><td colspan="9" class="empty-cell">{{t "no_matching_records"}}</td></tr>{{end}}</tbody>
     </table>
   </div>
   <nav class="pagination" aria-label="{{t "records"}}"><span>{{if .NewerURL}}<a class="button ghost" href="{{.NewerURL}}">{{t "newer_records"}}</a>{{end}}</span><span>{{if .OlderURL}}<a class="button ghost" href="{{.OlderURL}}">{{t "older_records"}}</a>{{end}}</span></nav>
@@ -37,7 +38,7 @@
   <div class="section-heading"><div><p class="eyebrow">AGGREGATES</p><h2>{{t "export_aggregates"}}</h2></div></div>
   <form method="get" action="{{appPath "/admin/aggregates.csv"}}" class="aggregate-export">
     <label class="field"><span>Site</span><select name="site_id" required><option value="">{{t "choose_site"}}</option>{{range .Sites}}<option value="{{.ID}}" {{if selected $.Filters.SiteID .ID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
-    <label class="field"><span>{{t "dimension"}}</span><select name="dimension"><option value="overall">{{t "overall"}}</option><option value="path">{{t "path"}}</option><option value="country">{{t "country"}}</option><option value="region">{{t "region"}}</option><option value="city">{{t "city"}}</option><option value="browser">{{t "browsers"}}</option><option value="os">{{t "operating_systems"}}</option></select></label>
+    <label class="field"><span>{{t "dimension"}}</span><select name="dimension"><option value="overall">{{t "overall"}}</option><option value="hostname">{{t "hostnames"}}</option><option value="path">{{t "path"}}</option><option value="country">{{t "country"}}</option><option value="region">{{t "region"}}</option><option value="city">{{t "city"}}</option><option value="browser">{{t "browsers"}}</option><option value="os">{{t "operating_systems"}}</option></select></label>
     <label class="field"><span>{{t "start_date"}}</span><input type="date" name="start"></label>
     <label class="field"><span>{{t "end_date"}}</span><input type="date" name="end"></label>
     <button class="button ghost" type="submit">{{t "download_aggregate_csv"}}</button>

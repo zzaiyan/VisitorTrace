@@ -27,3 +27,16 @@ func TestNormalizeOriginRejectsPath(t *testing.T) {
 		t.Fatal("NormalizeOrigin accepted an origin with a path")
 	}
 }
+
+func TestHostnameFromOrigin(t *testing.T) {
+	tests := map[string]string{
+		"https://WWW.Example.com:8443": "www.example.com",
+		"http://[2001:db8::1]:8080":    "2001:db8::1",
+	}
+	for input, want := range tests {
+		got, err := HostnameFromOrigin(input)
+		if err != nil || got != want {
+			t.Errorf("HostnameFromOrigin(%q) = %q, %v; want %q", input, got, err, want)
+		}
+	}
+}

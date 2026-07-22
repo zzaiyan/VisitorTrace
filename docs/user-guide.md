@@ -107,11 +107,13 @@ The top of the Admin dashboard reports application version and uptime, SQLite ve
 
 The Admin Console's Pageview Records view covers every Site. It shows 100 rows by default, with 50 and 200 row options. Filter-bound cursors move toward older or newer records without the drift of offset page numbers while ingestion continues.
 
-Exact filters can be combined for Site, UTC start/end time, normalized path, original IP, Visitor Digest, country code, region code, city, browser, and operating system. On-screen timestamps use each record's Site timezone; hovering reveals UTC.
+Exact filters can be combined for Site, hostname, UTC start/end time, normalized path, original IP, Visitor Digest, country code, region code, city, browser, and operating system. On-screen timestamps use each record's Site timezone; hovering reveals UTC.
 
 Export current filters streams every matching record to CSV and is not limited by the current page size. The file contains UTC and Site-local timestamps plus every detailed field, including coordinates, original IP, and Visitor Digest. Text beginning with `=`, `+`, `-`, or `@` receives a leading apostrophe so spreadsheet software does not interpret external data as a formula.
 
-Aggregate export requires one Site and separately exports overall, path, country, region, city, browser, or operating-system families, optionally bounded by Site-local dates.
+Aggregate export requires one Site and separately exports overall, hostname, path, country, region, city, browser, or operating-system families, optionally bounded by Site-local dates.
+
+When one configured Site is used on multiple domains, each hostname appears as an independent aggregate row. Pageview Records also retain the hostname that the tracker reported and the server confirmed from the allowed Origin; the same visitor is therefore counted independently on different hostnames.
 
 ## Website Integration
 
@@ -132,6 +134,8 @@ The separated Tracker records a Pageview without rendering a map:
 ```html
 <script async src="https://stats.example.com/embed/tracker.js?site_id=SITE_ID"></script>
 ```
+
+The tracker reports the current page hostname. The server derives the authoritative hostname from the validated request Origin, so different domains sharing one Site remain separate in hostname statistics and Unique Visitor counting.
 
 The separated integration area also provides a copyable map control snippet for lazy loading. The map can be loaded independently as an image:
 
@@ -196,7 +200,7 @@ Configure a domestic mirror in the configuration file:
 
 `geoip_checksum_url` is optional. When present, VisitorTrace verifies the compressed file's SHA-256 before extraction. Remote sources must use HTTPS, except loopback test endpoints. Set `"geoip_update": "disabled"` to disable downloads.
 
-Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. DB-IP City Lite is updated monthly under CC BY 4.0; VisitorTrace retains the DB-IP attribution link in map hover details, Admin previews, and Public Analytics.
+Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. DB-IP City Lite is updated monthly under CC BY 4.0; VisitorTrace retains the DB-IP attribution link in map hover details, Admin previews, and Public Analytics. For Chinese records, VisitorTrace removes DB-IP district/subdistrict qualifiers from city labels where the database provides enough hierarchy information; the result is a city-level display label rather than a street-level claim.
 
 ## Backup and Restore
 

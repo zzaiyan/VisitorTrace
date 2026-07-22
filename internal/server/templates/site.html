@@ -88,8 +88,8 @@
 <section class="section-block" id="records">
     <div class="section-heading"><div><p class="eyebrow">PAGEVIEW RECORDS</p><h2>{{t "recent_records"}}</h2></div><a class="text-link" href="{{appPath (printf "/admin/records?site_id=%s" .Site.ID)}}">{{t "filter_page_export"}}</a></div>
   <div class="table-wrap">
-    <table><thead><tr><th>{{t "time"}}</th><th>{{t "path"}}</th><th>{{t "location"}}</th><th>{{t "original_ip"}}</th><th>{{t "system"}}</th><th>{{t "browsers"}}</th><th>Visitor Digest</th></tr></thead>
-      <tbody>{{range .Recent}}<tr><td><time datetime="{{formatUTC .OccurredAt}}">{{formatTime .OccurredAt}}</time></td><td><code>{{.Path}}</code></td><td>{{if .City}}{{.City}}{{else if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}}</td><td><code>{{.OriginalIP}}</code></td><td>{{.OperatingSystem}}</td><td>{{.Browser}}</td><td><code class="digest">{{.VisitorDigest}}</code></td></tr>{{else}}<tr><td colspan="7" class="empty-cell">{{t "no_pageview_records"}}</td></tr>{{end}}</tbody>
+    <table><thead><tr><th>{{t "time"}}</th><th>{{t "hostname"}}</th><th>{{t "path"}}</th><th>{{t "location"}}</th><th>{{t "original_ip"}}</th><th>{{t "system"}}</th><th>{{t "browsers"}}</th><th>Visitor Digest</th></tr></thead>
+      <tbody>{{range .Recent}}<tr><td><time datetime="{{formatUTC .OccurredAt}}">{{formatTime .OccurredAt}}</time></td><td><code>{{.Hostname}}</code></td><td><code>{{.Path}}</code></td><td>{{if .City}}{{.City}}{{else if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}}</td><td><code>{{.OriginalIP}}</code></td><td>{{.OperatingSystem}}</td><td>{{.Browser}}</td><td><code class="digest">{{.VisitorDigest}}</code></td></tr>{{else}}<tr><td colspan="8" class="empty-cell">{{t "no_pageview_records"}}</td></tr>{{end}}</tbody>
     </table>
   </div>
 </section>

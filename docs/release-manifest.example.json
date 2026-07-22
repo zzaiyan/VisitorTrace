@@ -2,7 +2,7 @@
   "format_version": 1,
   "version": "0.2.0",
   "published_at": "2026-07-22T00:00:00Z",
-  "schema_version": 8,
+  "schema_version": 9,
   "assets": {
     "linux-amd64": {
       "url": "visitortrace-0.2.0-linux-amd64",

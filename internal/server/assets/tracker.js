@@ -47,10 +47,11 @@
 
   function send(path) {
     path = normalizePath(path);
-    var key = siteID + "|" + path;
+    var hostname = window.location.hostname;
+    var key = siteID + "|" + hostname + "|" + path;
     if (siteState.sent[key]) return;
     siteState.sent[key] = true;
-    var body = JSON.stringify({ path: path, visitor_id: getVisitorID() });
+    var body = JSON.stringify({ path: path, visitor_id: getVisitorID(), hostname: hostname });
     var blob = new Blob([body], { type: "text/plain" });
     if (navigator.sendBeacon && navigator.sendBeacon(endpoint, blob)) return;
     if (window.fetch) {

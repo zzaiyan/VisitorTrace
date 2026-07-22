@@ -79,12 +79,12 @@ func (r *Resolver) Lookup(address netip.Addr) Location {
 	result := Location{
 		CountryCode: record.Country.ISOCode,
 		CountryName: localizedName(record.Country.Names),
-		City:        localizedName(record.City.Names),
 	}
 	if len(record.Subdivisions) > 0 {
 		result.RegionCode = record.Subdivisions[0].ISOCode
 		result.RegionName = localizedName(record.Subdivisions[0].Names)
 	}
+	result.City = CityLevelName(result.CountryCode, localizedName(record.City.Names), result.RegionName)
 	if record.Location.Latitude != 0 || record.Location.Longitude != 0 {
 		latitude := record.Location.Latitude
 		longitude := record.Location.Longitude
@@ -92,6 +92,64 @@ func (r *Resolver) Lookup(address netip.Addr) Location {
 		result.Longitude = &longitude
 	}
 	return result
+}
+
+// CityLevelName removes DB-IP's lower-level qualifier from Chinese locality
+// labels. DB-IP City Lite exposes a city name and broad subdivisions, but no
+// feature code that can distinguish a city from a district or subdistrict.
+func CityLevelName(countryCode, city, region string) string {
+	city = strings.TrimSpace(city)
+	if city == "" || strings.ToUpper(strings.TrimSpace(countryCode)) != "CN" {
+		return city
+	}
+	region = strings.TrimSpace(region)
+	if isChinaMunicipality(region) {
+		return region
+	}
+	if open := strings.Index(city, " ("); open > 0 && strings.HasSuffix(city, ")") {
+		base := strings.TrimSpace(city[:open])
+		detail := strings.TrimSpace(city[open+2 : len(city)-1])
+		parts := strings.Split(detail, ",")
+		if len(parts) > 1 {
+			candidate := strings.TrimSpace(parts[len(parts)-1])
+			if candidate != "" && !looksLikeFinePlace(candidate) {
+				return candidate
+			}
+		}
+		if strings.HasSuffix(strings.ToLower(base), " old town") {
+			return strings.TrimSpace(base[:len(base)-len(" old town")])
+		}
+		if looksLikeFinePlace(base) {
+			return ""
+		}
+		return base
+	}
+	if strings.HasSuffix(strings.ToLower(city), " old town") {
+		return strings.TrimSpace(city[:len(city)-len(" old town")])
+	}
+	if looksLikeFinePlace(city) {
+		return ""
+	}
+	return city
+}
+
+func isChinaMunicipality(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "beijing", "shanghai", "tianjin", "chongqing":
+		return true
+	default:
+		return false
+	}
+}
+
+func looksLikeFinePlace(value string) bool {
+	lower := strings.ToLower(strings.TrimSpace(value))
+	for _, suffix := range []string{" district", " subdistrict", " residential district", " county", " town", " village", " street", "区", "街道", "镇", "乡", "村", "县"} {
+		if strings.HasSuffix(lower, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Resolver) Close() error {

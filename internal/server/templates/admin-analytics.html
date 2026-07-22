@@ -25,6 +25,7 @@
 </section>
 
 <section class="dimension-grid admin-geo-tables">
+  <div class="data-panel"><div class="section-heading"><h2>{{t "hostnames"}}</h2></div><table><thead><tr><th>{{t "hostname"}}</th><th>PV</th><th>UV</th></tr></thead><tbody>{{range .Analytics.Hostnames}}<tr><td><code>{{.Value}}</code></td><td>{{formatCount .Pageviews}}</td><td>{{formatCount .UniqueVisitors}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">{{t "no_data"}}</td></tr>{{end}}</tbody></table></div>
   <div class="data-panel"><div class="section-heading"><h2>{{t "countries_regions"}}</h2></div><table><thead><tr><th>{{t "code"}}</th><th>PV</th><th>UV</th></tr></thead><tbody>{{range .Analytics.Countries}}<tr><td>{{.Value}}</td><td>{{formatCount .Pageviews}}</td><td>{{formatCount .UniqueVisitors}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">{{t "no_data"}}</td></tr>{{end}}</tbody></table></div>
   <div class="data-panel"><div class="section-heading"><h2>{{t "cities"}}</h2></div><table><thead><tr><th>{{t "city"}}</th><th>PV</th><th>UV</th></tr></thead><tbody>{{range .Analytics.Cities}}<tr><td>{{geoLabel .Value}}</td><td>{{formatCount .Pageviews}}</td><td>{{formatCount .UniqueVisitors}}</td></tr>{{else}}<tr><td colspan="3" class="empty-cell">{{t "no_data"}}</td></tr>{{end}}</tbody></table></div>
 </section>
