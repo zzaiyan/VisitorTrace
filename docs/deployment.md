@@ -55,6 +55,16 @@ Before placing a reverse proxy in front of the service, add its loopback address
 
 Only add addresses that are actual trusted proxies. This setting controls whether forwarded client IP and HTTPS headers are accepted.
 
+### Automated systemd setup
+
+When the release binary is already installed, the repository includes a one-step setup script:
+
+```sh
+sudo ./scripts/install-systemd.sh --binary /usr/local/bin/visitortrace
+```
+
+The script creates or reuses the dedicated service account, creates protected directories, runs `init` when no configuration exists, bootstraps the stable self-update path, writes the systemd unit, and starts the service. It prompts for the Administrator password during initialization. It does not download a binary or GeoIP file, create backups, configure a reverse proxy, or configure BT Panel. Use the manual steps below when you need to review each operation.
+
 ### Base URL and a subpath
 
 The optional `base_url` is the public URL used in integration snippets and generated links. It also enables subpath routing. For example:
@@ -104,7 +114,7 @@ ProtectControlGroups=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 LockPersonality=true
-ReadWritePaths=/var/lib/visitortrace
+ReadWritePaths=/var/lib/visitortrace /etc/visitortrace
 
 [Install]
 WantedBy=multi-user.target

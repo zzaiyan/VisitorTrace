@@ -133,7 +133,7 @@ The separated Tracker records a Pageview without rendering a map:
 <script async src="https://stats.example.com/embed/tracker.js?site_id=SITE_ID"></script>
 ```
 
-The map can be loaded independently as an image:
+The separated integration area also provides a copyable map control snippet for lazy loading. The map can be loaded independently as an image:
 
 ```html
 <img loading="lazy"

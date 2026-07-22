@@ -170,7 +170,7 @@ tbody tr:hover { background: #f6f9f7; }
 .update-form .field { flex: 1; }
 .button:disabled { cursor: not-allowed; opacity: .45; }
 .snippet-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.snippet-heading h3 { margin: 0; }
+.snippet-heading h3, .snippet-heading h4 { margin: 0; }
 .icon-button { display: inline-grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: white; color: var(--muted); cursor: pointer; }
 .icon-button:hover, .icon-button:focus-visible { border-color: var(--green); color: var(--green); outline: none; }
 .icon-button.copied { border-color: var(--green); background: #e2f0e9; color: var(--green-dark); }
@@ -215,7 +215,7 @@ tbody tr:hover { background: #f6f9f7; }
 .interactive-chart { display: none; width: 100%; }
 .analytics-enhancing .interactive-chart, .analytics-enhanced .interactive-chart { display: block; }
 .analytics-enhanced .chart-fallback { display: none; }
-.geo-chart { height: 400px; background: #f7f9f8; }
+.geo-chart { aspect-ratio: 2.4; width: 100%; height: auto; background: #f7f9f8; }
 .trend-chart-interactive { height: 330px; }
 .admin-range-nav { justify-content: flex-end; margin: -18px 0 28px; }
 .admin-chart-visible { display: block; }

@@ -133,7 +133,7 @@ Site 管理页的“聚合分析”使用相同日期范围和交互组件，并
 <script async src="https://stats.example.com/embed/tracker.js?site_id=SITE_ID"></script>
 ```
 
-地图可单独作为图片加载：
+分离式接入区域同时提供可复制的地图控件代码，适合懒加载。地图可单独作为图片加载：
 
 ```html
 <img loading="lazy"

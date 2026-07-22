@@ -359,7 +359,7 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	sitePage.AddCookie(cookies[0])
 	sitePageResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(sitePageResponse, sitePage)
-	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) {
+	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) {
 		t.Fatalf("admin Site page = status %d, body = %q", sitePageResponse.Code, sitePageResponse.Body.String())
 	}
 }

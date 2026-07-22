@@ -78,6 +78,8 @@
     <div class="snippet-card">
       <div class="snippet-heading"><h3>{{t "separate_tracker"}}</h3><button class="icon-button copy-button" type="button" data-copy-target="tracker-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
       <pre><code id="tracker-snippet">&lt;script async src="{{.BaseURL}}/embed/tracker.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre>
+      <div class="snippet-heading"><h4>{{t "map_control"}}</h4><button class="icon-button copy-button" type="button" data-copy-target="map-control-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
+      <pre><code id="map-control-snippet">&lt;img loading="lazy" src="{{.BaseURL}}/api/v1/sites/{{.Site.ID}}/map.svg" alt="Visitor map"&gt;</code></pre>
       <div class="endpoint-row"><code class="endpoint" id="map-endpoint">{{.BaseURL}}/api/v1/sites/{{.Site.ID}}/map.svg</code><button class="icon-button copy-button" type="button" data-copy-target="map-endpoint" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
     </div>
   </div>

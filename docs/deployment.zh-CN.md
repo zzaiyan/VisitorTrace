@@ -55,6 +55,16 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
 
 只应添加真实可信的代理地址；该设置决定服务是否接受代理提供的客户端 IP 和 HTTPS 协议头。
 
+### 一键配置 systemd
+
+如果已经将发布二进制放置到服务器，可以使用仓库中的一键脚本：
+
+```sh
+sudo ./scripts/install-systemd.sh --binary /usr/local/bin/visitortrace
+```
+
+脚本会创建或复用专用服务账户，创建受保护目录；在配置不存在时执行 `init`；初始化自更新稳定路径；写入 systemd 单元并启动服务。初始化时会提示输入管理员密码。脚本不会下载二进制或 GeoIP 文件，不会创建备份，也不会配置反向代理或宝塔。需要逐项检查命令时，再使用下面的手动步骤。
+
 ### Base URL 与子路径部署
 
 可选配置项 `base_url` 用于生成接入代码和公开链接，同时启用子路径路由。例如：
@@ -104,7 +114,7 @@ ProtectControlGroups=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 LockPersonality=true
-ReadWritePaths=/var/lib/visitortrace
+ReadWritePaths=/var/lib/visitortrace /etc/visitortrace
 
 [Install]
 WantedBy=multi-user.target

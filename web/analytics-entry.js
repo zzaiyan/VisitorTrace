@@ -24,7 +24,7 @@ echarts.use([
   TooltipComponent,
   SVGRenderer,
 ]);
-echarts.registerMap("visitortrace-world", worldMap);
+echarts.registerMap("visitortrace-world", repairWorldMap(worldMap));
 
 const dataElement = document.getElementById("analytics-data");
 const trendElement = document.getElementById("trend-chart-interactive");
@@ -148,6 +148,8 @@ function mapOptions(points, labels) {
     },
     geo: {
       map: "visitortrace-world",
+      aspectScale: 1,
+      boundingCoords: [[-170, 90], [190, -60]],
       roam: true,
       top: 6,
       bottom: 6,
@@ -167,6 +169,107 @@ function mapOptions(points, labels) {
       emphasis: { scale: 1.35, itemStyle: { opacity: 1 } },
     }],
   };
+}
+
+// The Natural Earth source contains polygons that cross the chosen Bering Strait seam.
+// ECharts draws GeoJSON on a plane, so split those rings before registering the map.
+function repairWorldMap(source) {
+  const features = source.features.map((feature) => {
+    const geometry = repairGeometry(feature.geometry);
+    return geometry ? { ...feature, geometry } : null;
+  }).filter(Boolean);
+  return { ...source, features };
+}
+
+function repairGeometry(geometry) {
+  if (!geometry || (geometry.type !== "Polygon" && geometry.type !== "MultiPolygon")) return geometry;
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+  const repaired = polygons.flatMap((polygon) => repairPolygon(polygon));
+  if (!repaired.length) return null;
+  return {
+    type: repaired.length === 1 ? "Polygon" : "MultiPolygon",
+    coordinates: repaired.length === 1 ? repaired[0] : repaired,
+  };
+}
+
+function repairPolygon(polygon) {
+  if (!polygon.length) return [];
+  const outer = splitRingAtSeam(polygon[0]);
+  if (outer.length === 1) {
+    const holes = polygon.slice(1).flatMap((ring) => splitRingAtSeam(ring));
+    return [[outer[0], ...holes]];
+  }
+  // The bundled world data has no holes in seam-crossing countries. Keeping each
+  // clipped outer ring independent avoids assigning a hole to the wrong piece.
+  return outer.map((ring) => [ring]);
+}
+
+function splitRingAtSeam(ring) {
+  const seam = -170;
+  const points = ring.length > 1 && samePoint(ring[0], ring[ring.length - 1])
+    ? ring.slice(0, -1)
+    : ring.slice();
+  if (points.length < 3) return [];
+
+  const unwrapped = [[points[0][0], points[0][1]]];
+  for (let index = 1; index < points.length; index += 1) {
+    let longitude = points[index][0];
+    const previous = unwrapped[index - 1][0];
+    while (longitude - previous > 180) longitude -= 360;
+    while (longitude - previous < -180) longitude += 360;
+    unwrapped.push([longitude, points[index][1]]);
+  }
+
+  const longitudes = unwrapped.map(([longitude]) => longitude);
+  const firstBand = Math.floor((Math.min(...longitudes) - seam) / 360) - 1;
+  const lastBand = Math.floor((Math.max(...longitudes) - seam) / 360) + 1;
+  const pieces = [];
+  for (let band = firstBand; band <= lastBand; band += 1) {
+    const clipped = clipVertical(clipVertical(unwrapped, seam + band * 360, true), seam + (band + 1) * 360, false);
+    if (Math.abs(ringArea(clipped)) < 0.000001) continue;
+    const normalized = closeRing(clipped.map(([longitude, latitude]) => [longitude - band * 360, latitude]));
+    if (normalized.length >= 4) pieces.push(normalized);
+  }
+  return pieces;
+}
+
+function clipVertical(points, boundary, keepGreater) {
+  if (!points.length) return [];
+  const result = [];
+  let previous = points[points.length - 1];
+  let previousInside = keepGreater ? previous[0] >= boundary : previous[0] <= boundary;
+  for (const current of points) {
+    const currentInside = keepGreater ? current[0] >= boundary : current[0] <= boundary;
+    if (currentInside !== previousInside) {
+      const delta = current[0] - previous[0];
+      const ratio = delta === 0 ? 0 : (boundary - previous[0]) / delta;
+      result.push([boundary, previous[1] + (current[1] - previous[1]) * ratio]);
+    }
+    if (currentInside) result.push(current);
+    previous = current;
+    previousInside = currentInside;
+  }
+  return result;
+}
+
+function closeRing(points) {
+  if (!points.length) return points;
+  const result = points.slice();
+  if (!samePoint(result[0], result[result.length - 1])) result.push(result[0]);
+  return result;
+}
+
+function samePoint(left, right) {
+  return left[0] === right[0] && left[1] === right[1];
+}
+
+function ringArea(ring) {
+  let area = 0;
+  for (let index = 0; index < ring.length; index += 1) {
+    const next = (index + 1) % ring.length;
+    area += ring[index][0] * ring[next][1] - ring[next][0] * ring[index][1];
+  }
+  return area / 2;
 }
 
 function barOptions(items, labels) {
