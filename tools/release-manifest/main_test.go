@@ -39,6 +39,10 @@ func TestGenerateAndSignManifest(t *testing.T) {
 	if err := sign([]string{"--private-key", privatePath, "--manifest", unsignedPath, "--output", signedPath}); err != nil {
 		t.Fatalf("sign: %v", err)
 	}
+	encodedPublicKey := base64.RawStdEncoding.EncodeToString(publicKey)
+	if err := verify([]string{"--public-key", encodedPublicKey, "--manifest", signedPath}); err != nil {
+		t.Fatalf("verify: %v", err)
+	}
 	data, err := os.ReadFile(signedPath)
 	if err != nil {
 		t.Fatal(err)

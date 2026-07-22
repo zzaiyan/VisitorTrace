@@ -35,6 +35,8 @@ func main() {
 		err = generate(os.Args[2:])
 	case "sign":
 		err = sign(os.Args[2:])
+	case "verify":
+		err = verify(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -191,6 +193,34 @@ func sign(args []string) error {
 	return nil
 }
 
+func verify(args []string) error {
+	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
+	publicKeyValue := fs.String("public-key", "", "Base64 RawStdEncoding Ed25519 public key")
+	manifestPath := fs.String("manifest", "", "signed manifest JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *publicKeyValue == "" || *manifestPath == "" {
+		return fmt.Errorf("verify: --public-key and --manifest are required")
+	}
+	publicKey, err := selfupdate.DecodePublicKey(*publicKeyValue)
+	if err != nil {
+		return fmt.Errorf("verify: %w", err)
+	}
+	data, err := os.ReadFile(*manifestPath)
+	if err != nil {
+		return fmt.Errorf("verify: read manifest: %w", err)
+	}
+	manifest, err := selfupdate.DecodeManifest(data)
+	if err != nil {
+		return fmt.Errorf("verify: %w", err)
+	}
+	if err := selfupdate.VerifyManifest(manifest, publicKey); err != nil {
+		return fmt.Errorf("verify: %w", err)
+	}
+	return nil
+}
+
 func checksumFile(path string) (string, int64, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -241,5 +271,5 @@ func writeNewFile(path string, data []byte, mode os.FileMode) error {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: go run ./tools/release-manifest <keygen|generate|sign> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: go run ./tools/release-manifest <keygen|generate|sign|verify> [flags]")
 }

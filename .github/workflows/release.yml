@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and sign
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
+    env:
+      UPDATE_PUBLIC_KEY: ${{ vars.UPDATE_PUBLIC_KEY }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Validate release inputs
+        env:
+          UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
+        run: |
+          set -eu
+          test -n "$UPDATE_PUBLIC_KEY" || { echo "Repository variable UPDATE_PUBLIC_KEY is required" >&2; exit 1; }
+          test -n "$UPDATE_PRIVATE_KEY" || { echo "Repository secret UPDATE_PRIVATE_KEY is required" >&2; exit 1; }
+          version="${GITHUB_REF_NAME#v}"
+          test "$version" != "$GITHUB_REF_NAME" || { echo "Release tag must start with v" >&2; exit 1; }
+          build_time="$(git show -s --format=%cI "$GITHUB_SHA")"
+          printf 'VERSION=%s\n' "$version" >> "$GITHUB_ENV"
+          printf 'BUILD_TIME=%s\n' "$build_time" >> "$GITHUB_ENV"
+          umask 077
+          printf '%s\n' "$UPDATE_PRIVATE_KEY" > "$RUNNER_TEMP/update.ed25519"
+      - name: Test tagged source
+        run: |
+          go mod verify
+          go test ./...
+          go vet ./...
+      - name: Build release executables
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          set -eu
+          mkdir dist
+          ldflags="-s -w -X github.com/zzaiyan/VisitorTrace/internal/buildinfo.Version=$VERSION -X github.com/zzaiyan/VisitorTrace/internal/buildinfo.Commit=$GITHUB_SHA -X github.com/zzaiyan/VisitorTrace/internal/buildinfo.BuildTime=$BUILD_TIME -X github.com/zzaiyan/VisitorTrace/internal/buildinfo.UpdatePublicKey=$UPDATE_PUBLIC_KEY"
+          GOOS=linux GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags "$ldflags" -o dist/visitortrace-linux-amd64 ./cmd/visitortrace
+          GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags "$ldflags" -o dist/visitortrace-linux-arm64 ./cmd/visitortrace
+          dist/visitortrace-linux-amd64 version --json
+      - name: Create and verify signed manifest
+        run: |
+          set -eu
+          go run ./tools/release-manifest generate \
+            --version "$VERSION" \
+            --published-at "$BUILD_TIME" \
+            --asset linux-amd64=dist/visitortrace-linux-amd64 \
+            --asset linux-arm64=dist/visitortrace-linux-arm64 \
+            --output "$RUNNER_TEMP/manifest.unsigned.json"
+          go run ./tools/release-manifest sign \
+            --private-key "$RUNNER_TEMP/update.ed25519" \
+            --manifest "$RUNNER_TEMP/manifest.unsigned.json" \
+            --output dist/manifest.json
+          go run ./tools/release-manifest verify \
+            --public-key "$UPDATE_PUBLIC_KEY" \
+            --manifest dist/manifest.json
+          sha256sum dist/visitortrace-linux-amd64 dist/visitortrace-linux-arm64 dist/manifest.json > dist/checksums.txt
+      - name: Stage release assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-assets
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release assets
+        uses: actions/download-artifact@v8
+        with:
+          name: release-assets
+          path: dist
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          prerelease=""
+          case "$version" in
+            *-*) prerelease="--prerelease" ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" \
+            dist/visitortrace-linux-amd64 \
+            dist/visitortrace-linux-arm64 \
+            dist/manifest.json \
+            dist/checksums.txt \
+            --draft \
+            --verify-tag \
+            --generate-notes \
+            --title "VisitorTrace $GITHUB_REF_NAME" \
+            $prerelease
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          latest=""
+          case "$version" in
+            *-*) ;;
+            *) latest="--latest" ;;
+          esac
+          gh release edit "$GITHUB_REF_NAME" --draft=false $latest
