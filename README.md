@@ -4,7 +4,7 @@
 
 A tiny self-hosted visitor map and Pageview tracker.
 
-[中文用户指南](./docs/user-guide.zh-CN.md) · [English User Guide](./docs/user-guide.en.md) · [Third-Party Notices](./THIRD_PARTY_NOTICES.md)
+[中文用户指南](./docs/user-guide.zh-CN.md) · [English User Guide](./docs/user-guide.en.md) · [中文开发指南](./docs/development.zh-CN.md) · [English Development Guide](./docs/development.en.md) · [Third-Party Notices](./THIRD_PARTY_NOTICES.md)
 
 ## 中文
 

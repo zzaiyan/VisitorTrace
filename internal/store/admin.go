@@ -110,6 +110,15 @@ func (s *Store) DeleteExpiredAdministratorSessions(ctx context.Context, now time
 	return nil
 }
 
+func (s *Store) RevokeAdministratorSessions(ctx context.Context) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if _, err := s.DB.ExecContext(ctx, `DELETE FROM administrator_sessions`); err != nil {
+		return fmt.Errorf("revoke administrator sessions: %w", err)
+	}
+	return nil
+}
+
 func HashSessionToken(token string) []byte {
 	sum := sha256.Sum256([]byte(token))
 	return sum[:]

@@ -116,6 +116,30 @@ URL 参数只覆写当前请求，不会改变保存的 Map Preset。
 
 生产环境需要有效的 DB-IP City Lite MMDB。GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/health/ready` 返回不可用，新 Pageview 不会获得地理位置。
 
+## 备份与恢复
+
+创建一致性 SQLite 快照和配置归档：
+
+```sh
+./bin/visitortrace backup \
+  --config "$HOME/.config/visitortrace/config.json"
+```
+
+备份默认保存在配置中的 `backup_dir`，未显式配置时为数据目录下的 `backups`。每个 `.vtbackup` 归档都有配套的 `.sha256` 文件，归档内的数据库和配置也分别记录 SHA-256。命令会执行 SQLite 完整性检查，并默认只保留最近三份；可使用 `--output` 和 `--keep` 覆写。
+
+恢复前必须先在宝塔或其他进程管理器中停止 VisitorTrace：
+
+```sh
+./bin/visitortrace restore \
+  --config "$HOME/.config/visitortrace/config.json" \
+  --from /path/to/visitortrace-20260722T033000.000000000Z.vtbackup \
+  --confirm
+```
+
+恢复命令会先在 `backup_dir/pre-restore` 中创建当前数据库的安全快照，然后验证归档外校验和、归档内文件校验和与数据库完整性。恢复的数据库会迁移到当前版本并撤销所有管理员 Session。归档包含初始化时的配置副本，但常规恢复不会覆盖当前配置文件。
+
+如需定时备份，可由系统计划任务每天调用 `visitortrace backup`；服务本身不依赖特定面板或定时任务实现。
+
 ## 当前状态
 
-当前版本已经实现 Pageview 采集、聚合统计、SVG 地图、Public Analytics、管理员认证和 Map Preset。自动记录清理、备份恢复、GeoIP 自动更新、密码重置和一键自更新仍在后续里程碑中。
+当前版本已经实现 Pageview 采集、聚合统计、SVG 地图、Public Analytics、管理员认证、Map Preset，以及带校验和完整性检查的备份恢复。自动记录清理、GeoIP 自动更新、密码重置和一键自更新仍在后续里程碑中。

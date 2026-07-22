@@ -122,6 +122,61 @@ func (s *Store) SQLiteVersion(ctx context.Context) (string, error) {
 	return version, nil
 }
 
+func (s *Store) SchemaVersion(ctx context.Context) (int, error) {
+	return s.currentSchemaVersion(ctx)
+}
+
+// OnlineBackup creates a transactionally consistent SQLite snapshot while the
+// source database remains available to readers and writers.
+func (s *Store) OnlineBackup(ctx context.Context, destination string) error {
+	if destination == "" {
+		return fmt.Errorf("backup destination is required")
+	}
+	if _, err := os.Stat(destination); err == nil {
+		return fmt.Errorf("backup destination already exists: %s", destination)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("check backup destination: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
+		return fmt.Errorf("create backup directory: %w", err)
+	}
+	// VACUUM INTO produces a compact, point-in-time copy without modifying the
+	// source database or requiring the service to stop ingestion.
+	if _, err := s.DB.ExecContext(ctx, `VACUUM INTO ?`, destination); err != nil {
+		return fmt.Errorf("create SQLite snapshot: %w", err)
+	}
+	if err := os.Chmod(destination, 0o600); err != nil {
+		return fmt.Errorf("protect SQLite snapshot: %w", err)
+	}
+	return nil
+}
+
+func IntegrityCheckFile(ctx context.Context, path string) error {
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return fmt.Errorf("open database for integrity check: %w", err)
+	}
+	defer db.Close()
+	rows, err := db.QueryContext(ctx, `PRAGMA integrity_check`)
+	if err != nil {
+		return fmt.Errorf("run database integrity check: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var result string
+		if err := rows.Scan(&result); err != nil {
+			return fmt.Errorf("read database integrity result: %w", err)
+		}
+		if result != "ok" {
+			return fmt.Errorf("database integrity check failed: %s", result)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate database integrity results: %w", err)
+	}
+	return nil
+}
+
 func SQLiteVersionAtLeast(actual, minimum string) bool {
 	a, ok := parseVersion(actual)
 	if !ok {

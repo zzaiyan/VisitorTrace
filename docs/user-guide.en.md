@@ -116,6 +116,30 @@ URL parameters override one response without changing the saved Map Preset.
 
 Production requires a valid DB-IP City Lite MMDB. Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location.
 
+## Backup and Restore
+
+Create a consistent SQLite snapshot and configuration archive:
+
+```sh
+./bin/visitortrace backup \
+  --config "$HOME/.config/visitortrace/config.json"
+```
+
+Backups are written to `backup_dir`, which defaults to `backups` inside the data directory. Every `.vtbackup` archive has a `.sha256` sidecar, while the database and configuration entries also carry individual SHA-256 digests in the archive manifest. The command runs a SQLite integrity check and retains the latest three archives by default. Use `--output` and `--keep` to override those defaults.
+
+Stop VisitorTrace in aaPanel or another process supervisor before restoring:
+
+```sh
+./bin/visitortrace restore \
+  --config "$HOME/.config/visitortrace/config.json" \
+  --from /path/to/visitortrace-20260722T033000.000000000Z.vtbackup \
+  --confirm
+```
+
+The restore command first creates a safety snapshot in `backup_dir/pre-restore`, then verifies the archive checksum, entry checksums, and SQLite integrity. It migrates the restored database to the current version and revokes all Administrator sessions. The archive includes the configuration captured at backup time, but a normal restore does not overwrite the active configuration file.
+
+For scheduled backups, configure the operating system to run `visitortrace backup` daily. The service does not depend on a specific control panel or scheduler.
+
 ## Current Status
 
-The current milestone implements Pageview ingestion, aggregate statistics, SVG maps, Public Analytics, Administrator authentication, and Map Presets. Automatic record cleanup, backup and restore, automatic GeoIP updates, password reset, and one-click self-update remain follow-up work.
+The current milestone implements Pageview ingestion, aggregate statistics, SVG maps, Public Analytics, Administrator authentication, Map Presets, and checksum-verified backup and restore. Automatic record cleanup, automatic GeoIP updates, password reset, and one-click self-update remain follow-up work.

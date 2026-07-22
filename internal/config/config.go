@@ -19,6 +19,7 @@ type Config struct {
 	DataDir        string   `json:"data_dir"`
 	DatabasePath   string   `json:"database_path"`
 	GeoIPPath      string   `json:"geoip_path"`
+	BackupDir      string   `json:"backup_dir,omitempty"`
 	Listen         string   `json:"listen"`
 	TrustedProxies []string `json:"trusted_proxies,omitempty"`
 }
@@ -45,6 +46,7 @@ func Default(dataDir string) Config {
 		DataDir:      dataDir,
 		DatabasePath: filepath.Join(dataDir, "visitortrace.sqlite3"),
 		GeoIPPath:    filepath.Join(dataDir, "geoip.mmdb"),
+		BackupDir:    filepath.Join(dataDir, "backups"),
 		Listen:       "127.0.0.1:8790",
 	}
 }
@@ -70,6 +72,7 @@ func Load(path string) (Config, error) {
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return Config{}, errors.New("decode config: trailing content")
 	}
+	cfg.applyDefaults()
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -77,6 +80,7 @@ func Load(path string) (Config, error) {
 }
 
 func Save(path string, cfg Config) error {
+	cfg.applyDefaults()
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
@@ -122,8 +126,8 @@ func (c Config) Validate() error {
 	if c.Version != CurrentVersion {
 		return fmt.Errorf("unsupported config version %d", c.Version)
 	}
-	if c.DataDir == "" || c.DatabasePath == "" || c.GeoIPPath == "" {
-		return errors.New("data_dir, database_path, and geoip_path are required")
+	if c.DataDir == "" || c.DatabasePath == "" || c.GeoIPPath == "" || c.BackupDir == "" {
+		return errors.New("data_dir, database_path, geoip_path, and backup_dir are required")
 	}
 	if c.Listen == "" {
 		return errors.New("listen is required")
@@ -134,4 +138,10 @@ func (c Config) Validate() error {
 		}
 	}
 	return nil
+}
+
+func (c *Config) applyDefaults() {
+	if c.BackupDir == "" && c.DataDir != "" {
+		c.BackupDir = filepath.Join(c.DataDir, "backups")
+	}
 }

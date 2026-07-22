@@ -39,3 +39,19 @@ func TestLoadRejectsUnknownFields(t *testing.T) {
 		t.Fatal("Load() accepted an unknown field")
 	}
 }
+
+func TestLoadDefaultsBackupDirectoryForExistingConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "visitortrace.json")
+	dataDir := filepath.Join(t.TempDir(), "data")
+	value := `{"version":1,"data_dir":"` + dataDir + `","database_path":"` + filepath.Join(dataDir, "visitortrace.sqlite3") + `","geoip_path":"` + filepath.Join(dataDir, "geoip.mmdb") + `","listen":"127.0.0.1:8790"}`
+	if err := os.WriteFile(path, []byte(value), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.BackupDir != filepath.Join(dataDir, "backups") {
+		t.Fatalf("BackupDir = %q", got.BackupDir)
+	}
+}
