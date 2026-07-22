@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,9 +14,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/selfupdate"
+	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
 func main() {
@@ -26,6 +31,8 @@ func main() {
 	switch os.Args[1] {
 	case "keygen":
 		err = keygen(os.Args[2:])
+	case "generate":
+		err = generate(os.Args[2:])
 	case "sign":
 		err = sign(os.Args[2:])
 	default:
@@ -36,6 +43,15 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+type assetFlags []string
+
+func (values *assetFlags) String() string { return strings.Join(*values, ",") }
+
+func (values *assetFlags) Set(value string) error {
+	*values = append(*values, value)
+	return nil
 }
 
 func keygen(args []string) error {
@@ -60,6 +76,62 @@ func keygen(args []string) error {
 		return fmt.Errorf("keygen public key: %w", err)
 	}
 	fmt.Printf("generated Ed25519 release key pair\nprivate: %s\npublic: %s\nUPDATE_PUBLIC_KEY=%s\n", *privatePath, *publicPath, base64.RawStdEncoding.EncodeToString(publicKey))
+	return nil
+}
+
+func generate(args []string) error {
+	fs := flag.NewFlagSet("generate", flag.ContinueOnError)
+	version := fs.String("version", "", "release semantic version without a v prefix")
+	publishedAt := fs.String("published-at", "", "release publication time in RFC3339 format")
+	schemaVersion := fs.Int("schema-version", store.SupportedSchemaVersion(), "release database schema version")
+	outputPath := fs.String("output", "", "unsigned manifest output")
+	var assetValues assetFlags
+	fs.Var(&assetValues, "asset", "release asset as platform=path; repeat for every platform")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *version == "" || *publishedAt == "" || *outputPath == "" || len(assetValues) == 0 {
+		return fmt.Errorf("generate: --version, --published-at, --output, and at least one --asset are required")
+	}
+	publicationTime, err := time.Parse(time.RFC3339, *publishedAt)
+	if err != nil {
+		return fmt.Errorf("generate: parse published-at: %w", err)
+	}
+	manifest := selfupdate.Manifest{
+		FormatVersion: selfupdate.ManifestFormatVersion,
+		Version:       *version,
+		PublishedAt:   publicationTime.UTC(),
+		SchemaVersion: *schemaVersion,
+		Assets:        make(map[string]selfupdate.Asset, len(assetValues)),
+	}
+	for _, value := range assetValues {
+		platform, path, ok := strings.Cut(value, "=")
+		platform = strings.TrimSpace(platform)
+		path = strings.TrimSpace(path)
+		if !ok || platform == "" || path == "" {
+			return fmt.Errorf("generate: asset %q must use platform=path", value)
+		}
+		if _, exists := manifest.Assets[platform]; exists {
+			return fmt.Errorf("generate: duplicate asset platform %q", platform)
+		}
+		checksum, size, err := checksumFile(path)
+		if err != nil {
+			return fmt.Errorf("generate: asset %s: %w", platform, err)
+		}
+		manifest.Assets[platform] = selfupdate.Asset{
+			URL: filepath.Base(path), SHA256: checksum, Size: size,
+		}
+	}
+	if err := selfupdate.ValidateUnsignedManifest(manifest); err != nil {
+		return fmt.Errorf("generate: %w", err)
+	}
+	output, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return fmt.Errorf("generate: encode manifest: %w", err)
+	}
+	if err := writeNewFile(*outputPath, append(output, '\n'), 0o644); err != nil {
+		return fmt.Errorf("generate: write manifest: %w", err)
+	}
 	return nil
 }
 
@@ -119,6 +191,30 @@ func sign(args []string) error {
 	return nil
 }
 
+func checksumFile(path string) (string, int64, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", 0, err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return "", 0, err
+	}
+	if !info.Mode().IsRegular() {
+		return "", 0, fmt.Errorf("not a regular file")
+	}
+	hash := sha256.New()
+	written, err := io.Copy(hash, file)
+	if err != nil {
+		return "", 0, err
+	}
+	if written != info.Size() {
+		return "", 0, fmt.Errorf("read %s of %s bytes", strconv.FormatInt(written, 10), strconv.FormatInt(info.Size(), 10))
+	}
+	return hex.EncodeToString(hash.Sum(nil)), written, nil
+}
+
 func writeNewFile(path string, data []byte, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
@@ -145,5 +241,5 @@ func writeNewFile(path string, data []byte, mode os.FileMode) error {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: go run ./tools/release-manifest <keygen|sign> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: go run ./tools/release-manifest <keygen|generate|sign> [flags]")
 }

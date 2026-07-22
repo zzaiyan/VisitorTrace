@@ -54,6 +54,16 @@ func DecodeManifest(data []byte) (Manifest, error) {
 }
 
 func ValidateManifest(manifest Manifest) error {
+	if err := ValidateUnsignedManifest(manifest); err != nil {
+		return err
+	}
+	if manifest.Signature == "" {
+		return fmt.Errorf("release manifest signature is required")
+	}
+	return nil
+}
+
+func ValidateUnsignedManifest(manifest Manifest) error {
 	if manifest.FormatVersion != ManifestFormatVersion {
 		return fmt.Errorf("unsupported release manifest format %d", manifest.FormatVersion)
 	}
@@ -82,9 +92,6 @@ func ValidateManifest(manifest Manifest) error {
 		if _, err := hex.DecodeString(asset.SHA256); err != nil {
 			return fmt.Errorf("release asset %s has an invalid SHA-256", platform)
 		}
-	}
-	if manifest.Signature == "" {
-		return fmt.Errorf("release manifest signature is required")
 	}
 	return nil
 }
@@ -130,8 +137,7 @@ func SignManifest(manifest Manifest, privateKey ed25519.PrivateKey) (Manifest, e
 	if len(privateKey) != ed25519.PrivateKeySize {
 		return Manifest{}, fmt.Errorf("Ed25519 private key is invalid")
 	}
-	manifest.Signature = base64.RawStdEncoding.EncodeToString(make([]byte, ed25519.SignatureSize))
-	if err := ValidateManifest(manifest); err != nil {
+	if err := ValidateUnsignedManifest(manifest); err != nil {
 		return Manifest{}, err
 	}
 	payload, err := SigningPayload(manifest)
