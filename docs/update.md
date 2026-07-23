@@ -6,6 +6,7 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+- Aligned controls in multi-column forms when only one field includes helper text, including Site counting/retention and Administrator password settings.
 - Added the missing `/admin/sites` management route, separated Site listing from creation and the operations dashboard, and returned deleted Sites to the list.
 - Reorganized each Site page around integration, settings, Map Preset, recent records, and destructive operations. Site settings now use consistent identity, counting/retention, and collection/publication groups.
 - Made the integrated and separated integration modes structurally consistent: Widget, Tracker, and Map SVG resources each expose an embed snippet, resource URL, and integrated copy control.
