@@ -4,7 +4,7 @@
 
 本文记录各个 VisitorTrace 发布版本面向用户的变更。
 
-## 尚未发布
+## 0.1.2 - 2026-07-23
 
 - Site 页面新增地理信息刷新操作，可使用当前 GeoIP 数据库更新保留期内的 Pageview 明细，并在同一事务中重算对应的国家、地区和城市 PV/UV；已经没有明细的历史日期保持不变。
 - 在管理员设置中增加图形化 GeoIP 管理：选择后端、自动/仅手动策略、官方源或自定义镜像、凭证替换与清除且不回显秘密、更新状态、立即检查和强制下载。
@@ -13,7 +13,7 @@
 - tracker 会记录 hostname；对于部署在多个域名上的同一 Site，UV 按 hostname 独立计算。hostname 可用于 Pageview Record、筛选、CSV 导出、Public Analytics、Admin Analytics 和聚合导出。
 - 增加 DB-IP 中国城市标签规范化：在 City Lite 记录提供足够层级信息时移除区、街道等限定词。清理逻辑现为 DB-IP provider adapter 私有，不会作用于 MaxMind 或 IP2Location 记录。
 - 将 DB-IP、MaxMind GeoLite2 City 和 IP2Location LITE DB11 作为平等的一等 GeoIP 后端，统一提供地理字段，并分别提供校验、归因、内置官方下载源、凭据处理和自动更新。更新器现可解包原始 MMDB、gzip MMDB、tar.gz 和 ZIP。
-- 本次尚未发布的改动将 SQLite Schema 升级到 9。已有安装会自动迁移；历史明细的 hostname 为空，历史聚合无法反推出 hostname。
+- 本版本将 SQLite Schema 从 8 升级到 9。已有安装会自动迁移；历史明细的 hostname 为空，历史聚合无法反推出 hostname。从 0.1.1 自动升级到 0.1.2 应使用签名自更新流程；离线 `update-systemd-binary.sh` 会按设计拒绝跨 Schema 更新。
 
 ## 0.1.1 - 2026-07-23
 

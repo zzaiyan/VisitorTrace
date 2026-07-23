@@ -33,15 +33,15 @@ make build
 
 ## 安装发布版
 
-正式版本在 GitHub Releases 提供带版本号且无需 Go 环境的 Linux 二进制。根据服务器架构选择 `visitortrace-<版本>-linux-amd64` 或 `visitortrace-<版本>-linux-arm64`，同时下载 `checksums.txt`。例如，校验 `0.1.1` 的 AMD64 版本：
+正式版本在 GitHub Releases 提供带版本号且无需 Go 环境的 Linux 二进制。根据服务器架构选择 `visitortrace-<版本>-linux-amd64` 或 `visitortrace-<版本>-linux-arm64`，同时下载 `checksums.txt`。例如，校验 `0.1.2` 的 AMD64 版本：
 
 ```sh
-grep ' visitortrace-0.1.1-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-0.1.1-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.1.2-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.1.2-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-实际安装时将 `0.1.1` 替换为下载的版本号；ARM64 服务器使用 `linux-arm64` 文件名。每个 Release 还会提供 GPL 文本和来自同一标签的对应源码归档。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
+实际安装时将 `0.1.2` 替换为下载的版本号；ARM64 服务器使用 `linux-arm64` 文件名。每个 Release 还会提供 GPL 文本和来自同一标签的对应源码归档。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
 
 ## 初始化
 
@@ -350,7 +350,7 @@ visitortrace update apply --config "$HOME/.config/visitortrace/config.json"
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.1.1-linux-amd64 \
+  --binary ./visitortrace-0.1.2-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 

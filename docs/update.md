@@ -4,7 +4,7 @@
 
 This file records user-facing changes for each published VisitorTrace release.
 
-## Unreleased
+## 0.1.2 - 2026-07-23
 
 - Added a Site-page action that refreshes retained Pageview geography from the active GeoIP database and atomically rebuilds the corresponding country, region, and city PV/UV aggregates. Historical dates without detailed records remain untouched.
 - Added graphical GeoIP management to Administrator Settings: provider selection, automatic/manual-only policy, official or custom sources, credential replacement/removal without secret echo, update status, immediate checks, and forced downloads.
@@ -13,7 +13,7 @@ This file records user-facing changes for each published VisitorTrace release.
 - Added tracker hostname capture and hostname-scoped UV counting for Sites deployed on multiple domains. Hostnames are available in Pageview Records, filters, CSV exports, Public Analytics, Admin Analytics, and aggregate exports.
 - Added DB-IP Chinese city-label normalization to remove district/subdistrict qualifiers where the City Lite record provides enough hierarchy information. The cleanup is now private to the DB-IP provider adapter and is never applied to MaxMind or IP2Location records.
 - Added equal first-class GeoIP backends for DB-IP, MaxMind GeoLite2 City, and IP2Location LITE DB11, with unified location fields, provider-specific validation/attribution, built-in official download sources, credential handling, and automatic updates. The updater now extracts raw MMDB, gzip MMDB, tar.gz, and ZIP containers.
-- This upcoming change advances the SQLite schema to 9. Existing installations are migrated automatically; historical records retain an empty hostname and historical aggregates cannot be reconstructed by hostname.
+- This release advances the SQLite schema from 8 to 9. Existing installations are migrated automatically; historical records retain an empty hostname and historical aggregates cannot be reconstructed by hostname. Use the signed updater for an automatic 0.1.1 to 0.1.2 upgrade; the offline `update-systemd-binary.sh` intentionally rejects cross-schema updates.
 
 ## 0.1.1 - 2026-07-23
 
