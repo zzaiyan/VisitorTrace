@@ -6,6 +6,9 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+- Reorganized Administrator Settings into service configuration, GeoIP data operations, account security, and application update. Public Base URL and all GeoIP source/credential fields now save atomically with one password confirmation and one supervised restart.
+- Styled the full GeoIP task summary, added content-revision URLs for embedded CSS/JavaScript to prevent stale post-upgrade assets, and made configuration-save failures point to the required systemd `ReadWritePaths` directory.
+- Avoided redundant directory/file `chmod` calls when protected configuration modes are already correct, while retaining strict `0700`/`0600` enforcement for nonconforming paths.
 - Added a local-file option to Administrator Settings self-update. Administrators can upload the signed `manifest.json` and matching platform binary from one Release while retaining Ed25519, size, SHA-256, candidate identity, schema, backup, and rollback checks.
 - Documented the local signed workflow, its distinction from the same-schema manual systemd script, and the reverse-proxy upload-size setting.
 

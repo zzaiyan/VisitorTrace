@@ -147,6 +147,38 @@ sudo journalctl -u visitortrace -f
 
 这里必须使用 `Restart=always`：后台发起的自更新会以状态码 0 退出，但仍需要 systemd 启动新版本。执行 `systemctl stop visitortrace` 主动停止时不会被重新拉起。
 
+### 保存配置时提示只读文件系统
+
+后台通过“在同目录创建受保护临时文件，再原子重命名”的方式写入 `config.json`，因此 systemd 沙箱中必须允许写入整个配置目录，而不只是已有配置文件。旧版 unit 可能启用了 `ProtectSystem=strict`，但没有把配置目录加入 `ReadWritePaths`。先检查实际生效内容：
+
+```sh
+sudo systemctl cat visitortrace
+sudo systemctl show visitortrace -p ReadWritePaths
+```
+
+如果输出中没有 `/etc/visitortrace`，添加一个 drop-in；不需要覆盖原有的数据目录条目：
+
+```sh
+sudo systemctl edit visitortrace
+```
+
+```ini
+[Service]
+ReadWritePaths=/etc/visitortrace
+```
+
+然后应用设置：
+
+```sh
+sudo chown visitortrace:visitortrace /etc/visitortrace /etc/visitortrace/config.json
+sudo chmod 700 /etc/visitortrace
+sudo chmod 600 /etc/visitortrace/config.json
+sudo systemctl daemon-reload
+sudo systemctl restart visitortrace
+```
+
+当前的 `install-systemd.sh` 和 unit 示例已经包含配置目录。若已有目录和文件权限分别为 `0700`、`0600`，VisitorTrace 也不会再执行多余的 `chmod`。
+
 ### 每日备份
 
 VisitorTrace 可以按需创建带校验的本地备份。需要每日执行时，创建 `/etc/systemd/system/visitortrace-backup.service`：

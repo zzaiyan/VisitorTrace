@@ -147,6 +147,38 @@ sudo journalctl -u visitortrace -f
 
 `Restart=always` is intentional: an Admin-initiated update exits with status 0 and still needs systemd to start the new executable. An explicit `systemctl stop visitortrace` remains stopped.
 
+### Configuration save reports a read-only filesystem
+
+The Admin Console writes `config.json` atomically by creating a protected temporary file beside it and renaming that file into place. The entire configuration directory, not only the existing file, must therefore be writable inside the systemd sandbox. Older units may have `ProtectSystem=strict` without the configuration directory in `ReadWritePaths`. Inspect the effective unit:
+
+```sh
+sudo systemctl cat visitortrace
+sudo systemctl show visitortrace -p ReadWritePaths
+```
+
+If `/etc/visitortrace` is absent, add a drop-in without replacing the existing data-directory entry:
+
+```sh
+sudo systemctl edit visitortrace
+```
+
+```ini
+[Service]
+ReadWritePaths=/etc/visitortrace
+```
+
+Then apply it:
+
+```sh
+sudo chown visitortrace:visitortrace /etc/visitortrace /etc/visitortrace/config.json
+sudo chmod 700 /etc/visitortrace
+sudo chmod 600 /etc/visitortrace/config.json
+sudo systemctl daemon-reload
+sudo systemctl restart visitortrace
+```
+
+The current `install-systemd.sh` and unit example already include the configuration directory. VisitorTrace also avoids redundant `chmod` calls when the existing directory and file already have modes `0700` and `0600`.
+
 ### Daily Backups
 
 VisitorTrace creates verified local backups on demand. To schedule one daily, create `/etc/systemd/system/visitortrace-backup.service`:
