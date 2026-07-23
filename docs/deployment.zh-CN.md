@@ -65,7 +65,7 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
 sudo ./scripts/install-systemd.sh --binary /usr/local/bin/visitortrace
 ```
 
-脚本会创建或复用专用服务账户，创建受保护目录；在配置不存在时执行 `init`；初始化自更新稳定路径；写入 systemd 单元并启动服务。初始化时会提示输入管理员密码。脚本不会下载二进制或 GeoIP 文件，不会创建备份，也不会配置反向代理或宝塔。需要逐项检查命令时，再使用下面的手动步骤。
+脚本会创建或复用专用服务账户，创建受保护目录；在配置不存在时执行 `init`；初始化自更新稳定路径；写入 systemd 单元并启动服务。在 `ProtectSystem=strict` 下，生成的 unit 会同时开放数据目录和整个配置目录的写权限；执行 `daemon-reload` 后，脚本还会检查 systemd 最终生效的 `ReadWritePaths`，任一路径缺失都会明确报错并停止。初始化时会提示输入管理员密码。脚本不会下载二进制或 GeoIP 文件，不会创建备份，也不会配置反向代理或宝塔。需要逐项检查命令时，再使用下面的手动步骤。
 
 ### Base URL 与子路径部署
 

@@ -6,6 +6,7 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+- Made the systemd installer verify that both the data and configuration directories are present in the effective `ReadWritePaths` before starting VisitorTrace.
 - Reorganized Administrator Settings into service configuration, GeoIP data operations, account security, and application update. Public Base URL and all GeoIP source/credential fields now save atomically with one password confirmation and one supervised restart.
 - Styled the full GeoIP task summary, added content-revision URLs for embedded CSS/JavaScript to prevent stale post-upgrade assets, and made configuration-save failures point to the required systemd `ReadWritePaths` directory.
 - Avoided redundant directory/file `chmod` calls when protected configuration modes are already correct, while retaining strict `0700`/`0600` enforcement for nonconforming paths.
