@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -10,35 +11,40 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 )
 
-const maxGeoIPSettingsBody = 32 * 1024
+const maxConfigurationSettingsBody = 40 * 1024
 
-func (s *Server) adminUpdateGeoIPSettings(w http.ResponseWriter, r *http.Request) {
+func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request) {
 	session, ok := s.requireAdmin(w, r)
 	if !ok {
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxGeoIPSettingsBody)
+	r.Body = http.MaxBytesReader(w, r.Body, maxConfigurationSettingsBody)
 	if !s.validCSRF(r, session) {
 		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
 		return
 	}
 	if s.ConfigPath == "" {
-		s.redirectWithError(w, r, "/admin/settings#geoip", "服务配置路径不可用。")
+		s.redirectWithError(w, r, "/admin/settings#configuration", "服务配置路径不可用。")
 		return
 	}
 	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
-		s.redirectWithError(w, r, "/admin/settings#geoip", "管理员密码不正确。")
+		s.redirectWithError(w, r, "/admin/settings#configuration", "管理员密码不正确。")
+		return
+	}
+	baseURL, err := config.NormalizeBaseURL(r.FormValue("base_url"))
+	if err != nil {
+		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
 		return
 	}
 
 	provider, err := geoip.NormalizeProvider(r.FormValue("geoip_provider"))
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#geoip", err.Error())
+		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
 		return
 	}
 	updateMode := r.FormValue("geoip_update")
 	if updateMode != "automatic" && updateMode != "disabled" {
-		s.redirectWithError(w, r, "/admin/settings#geoip", "GeoIP 更新模式无效。")
+		s.redirectWithError(w, r, "/admin/settings#configuration", "GeoIP 更新模式无效。")
 		return
 	}
 	profile, _ := geoip.UpdateProfileForProvider(provider)
@@ -46,44 +52,49 @@ func (s *Server) adminUpdateGeoIPSettings(w http.ResponseWriter, r *http.Request
 	if r.FormValue("geoip_source") == "custom" {
 		updateURL = strings.TrimSpace(r.FormValue("geoip_update_url"))
 		if updateURL == "" {
-			s.redirectWithError(w, r, "/admin/settings#geoip", "自定义 GeoIP 下载地址不能为空。")
+			s.redirectWithError(w, r, "/admin/settings#configuration", "自定义 GeoIP 下载地址不能为空。")
 			return
 		}
 	} else if r.FormValue("geoip_source") != "official" {
-		s.redirectWithError(w, r, "/admin/settings#geoip", "GeoIP 下载源类型无效。")
+		s.redirectWithError(w, r, "/admin/settings#configuration", "GeoIP 下载源类型无效。")
 		return
 	}
 	checksumURL := strings.TrimSpace(r.FormValue("geoip_checksum_url"))
 	if len(updateURL) > 4096 || len(checksumURL) > 4096 {
-		s.redirectWithError(w, r, "/admin/settings#geoip", "GeoIP 下载地址过长。")
+		s.redirectWithError(w, r, "/admin/settings#configuration", "GeoIP 下载地址过长。")
 		return
 	}
 
 	updated := s.Config
+	updated.BaseURL = baseURL
 	updated.GeoIPProvider = provider
 	updated.GeoIPUpdate = updateMode
 	updated.GeoIPUpdateURL = updateURL
 	updated.GeoIPChecksumURL = checksumURL
 	updated.MaxMindAccountID, updated.MaxMindLicenseKey, err = updatedMaxMindCredentials(r, updated)
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#geoip", err.Error())
+		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
 		return
 	}
 	updated.IP2LocationToken, err = updatedSecret(r.FormValue("ip2location_token"), r.FormValue("clear_ip2location_token") == "1", updated.IP2LocationToken, "IP2Location Token")
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#geoip", err.Error())
+		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
 		return
 	}
 	if err := config.Save(s.ConfigPath, updated); err != nil {
-		s.redirectWithError(w, r, "/admin/settings#geoip", "无法保存 GeoIP 设置："+err.Error())
+		message := fmt.Sprintf(translate(adminLanguage(r), "configuration_save_failed"), err, filepath.Dir(s.ConfigPath))
+		s.redirectWithError(w, r, "/admin/settings#configuration", message)
 		return
 	}
 
 	layout := s.adminLayout(r, session, "正在重启", "settings")
-	reconnectURL := strings.TrimSuffix(s.externalBaseURL(r), "/") + "/admin/settings#geoip"
+	reconnectURL := s.requestOrigin(r) + "/admin/settings#configuration"
+	if baseURL != "" {
+		reconnectURL = strings.TrimSuffix(baseURL, "/") + "/admin/settings#configuration"
+	}
 	s.renderPage(w, r, "settings-restarting", settingsRestartData{
-		pageLayout: layout, ReconnectURL: reconnectURL, Eyebrow: "GEOIP",
-		Message: translate(layout.Lang, "geoip_settings_saved"),
+		pageLayout: layout, ReconnectURL: reconnectURL, Eyebrow: "CONFIGURATION",
+		Message: translate(layout.Lang, "configuration_saved"),
 	})
 	go func() {
 		time.Sleep(300 * time.Millisecond)

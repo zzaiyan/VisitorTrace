@@ -109,10 +109,11 @@ func Save(path string, cfg Config) error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	directory := filepath.Dir(path)
+	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return fmt.Errorf("create config directory: %w", err)
 	}
-	if err := os.Chmod(filepath.Dir(path), 0o700); err != nil {
+	if err := ensureMode(directory, 0o700); err != nil {
 		return fmt.Errorf("protect config directory: %w", err)
 	}
 	data, err := json.MarshalIndent(cfg, "", "  ")
@@ -120,7 +121,7 @@ func Save(path string, cfg Config) error {
 		return fmt.Errorf("encode config: %w", err)
 	}
 	data = append(data, '\n')
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".config-*.tmp")
+	tmp, err := os.CreateTemp(directory, ".config-*.tmp")
 	if err != nil {
 		return fmt.Errorf("create temporary config: %w", err)
 	}
@@ -144,7 +145,21 @@ func Save(path string, cfg Config) error {
 	if err := os.Rename(tmpName, path); err != nil {
 		return fmt.Errorf("activate config: %w", err)
 	}
-	return os.Chmod(path, 0o600)
+	if err := ensureMode(path, 0o600); err != nil {
+		return fmt.Errorf("protect config file: %w", err)
+	}
+	return nil
+}
+
+func ensureMode(path string, mode os.FileMode) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if info.Mode().Perm() == mode.Perm() {
+		return nil
+	}
+	return os.Chmod(path, mode)
 }
 
 func (c Config) Validate() error {

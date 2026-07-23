@@ -33,6 +33,35 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSaveProtectsConfigDirectoryAndFileOnlyWhenNeeded(t *testing.T) {
+	root := t.TempDir()
+	directory := filepath.Join(root, "config")
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, "visitortrace.json")
+	cfg := Default(filepath.Join(root, "data"))
+	if err := Save(path, cfg); err != nil {
+		t.Fatalf("first Save() error = %v", err)
+	}
+	if info, err := os.Stat(directory); err != nil {
+		t.Fatal(err)
+	} else if info.Mode().Perm() != 0o700 {
+		t.Fatalf("config directory permissions = %o, want 700", info.Mode().Perm())
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Save(path, cfg); err != nil {
+		t.Fatalf("second Save() error = %v", err)
+	}
+	if info, err := os.Stat(path); err != nil {
+		t.Fatal(err)
+	} else if info.Mode().Perm() != 0o600 {
+		t.Fatalf("config permissions = %o, want 600", info.Mode().Perm())
+	}
+}
+
 func TestLoadRejectsUnknownFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "visitortrace.json")
 	if err := os.WriteFile(path, []byte(`{"version":1,"data_dir":"/tmp/data","database_path":"/tmp/data.db","geoip_path":"/tmp/geoip.mmdb","listen":"127.0.0.1:8790","unexpected":true}`), 0o600); err != nil {

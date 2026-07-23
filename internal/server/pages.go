@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"embed"
 	"encoding/hex"
@@ -13,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 	"github.com/zzaiyan/VisitorTrace/internal/maprender"
 	"github.com/zzaiyan/VisitorTrace/internal/operations"
@@ -24,6 +24,17 @@ import (
 
 //go:embed templates/*.html assets/admin.css assets/analytics.js assets/analytics.js.gz assets/analytics.js.br
 var pageAssets embed.FS
+
+var pageAssetRevision = func() string {
+	hash := sha256.New()
+	for _, name := range []string{"assets/admin.css", "assets/analytics.js"} {
+		data, err := pageAssets.ReadFile(name)
+		if err == nil {
+			_, _ = hash.Write(data)
+		}
+	}
+	return hex.EncodeToString(hash.Sum(nil)[:8])
+}()
 
 type pageLayout struct {
 	Title       string
@@ -139,6 +150,7 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string,
 		"languageIs":       func(want string) bool { return lang == want },
 		"languageURL":      func(want string) string { return s.appPath(languageURL(r, want)) },
 		"appPath":          s.appPath,
+		"assetPath":        func(value string) string { return s.appPath(value) + "?v=" + pageAssetRevision },
 		"formatCount":      func(value int64) string { return strconv.FormatInt(value, 10) },
 		"formatTime":       func(value time.Time) string { return value.Local().Format("2006-01-02 15:04:05") },
 		"formatUTC":        formatUTCValue,
@@ -247,48 +259,6 @@ type settingsRestartData struct {
 	ReconnectURL string
 	Eyebrow      string
 	Message      string
-}
-
-func (s *Server) adminUpdateBaseURL(w http.ResponseWriter, r *http.Request) {
-	session, ok := s.requireAdmin(w, r)
-	if !ok {
-		return
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
-	if !s.validCSRF(r, session) {
-		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
-		return
-	}
-	if s.ConfigPath == "" {
-		s.redirectWithError(w, r, "/admin/settings", "服务配置路径不可用。")
-		return
-	}
-	baseURL, err := config.NormalizeBaseURL(r.FormValue("base_url"))
-	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings", err.Error())
-		return
-	}
-	updated := s.Config
-	updated.BaseURL = baseURL
-	if err := config.Save(s.ConfigPath, updated); err != nil {
-		s.redirectWithError(w, r, "/admin/settings", "无法保存 Base URL："+err.Error())
-		return
-	}
-	reconnectURL := s.requestOrigin(r) + "/admin/settings"
-	if baseURL != "" {
-		reconnectURL = strings.TrimSuffix(baseURL, "/") + "/admin/settings"
-	}
-	layout := s.adminLayout(r, session, "正在重启", "settings")
-	s.renderPage(w, r, "settings-restarting", settingsRestartData{
-		pageLayout:   layout,
-		ReconnectURL: reconnectURL,
-		Eyebrow:      "PUBLIC URL",
-		Message:      translate(layout.Lang, "base_url_saved"),
-	})
-	go func() {
-		time.Sleep(300 * time.Millisecond)
-		s.RequestRestart()
-	}()
 }
 
 func (s *Server) adminChangePassword(w http.ResponseWriter, r *http.Request) {

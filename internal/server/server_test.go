@@ -214,7 +214,7 @@ func TestSubpathRoutesAndConfiguredBaseURL(t *testing.T) {
 	dashboardResponse := httptest.NewRecorder()
 	handler.ServeHTTP(dashboardResponse, dashboard)
 	body := dashboardResponse.Body.String()
-	if dashboardResponse.Code != http.StatusOK || !strings.Contains(body, `href="/visitortrace/admin/assets/style.css"`) || !strings.Contains(body, `action="/visitortrace/admin/logout"`) {
+	if dashboardResponse.Code != http.StatusOK || !strings.Contains(body, `href="/visitortrace/admin/assets/style.css?v=`) || !strings.Contains(body, `action="/visitortrace/admin/logout"`) {
 		t.Fatalf("subpath dashboard = status %d, body = %q", dashboardResponse.Code, body)
 	}
 	csrfMatch := regexp.MustCompile(`name="csrf" value="([a-f0-9]{64})"`).FindStringSubmatch(body)
@@ -240,8 +240,11 @@ func TestSubpathRoutesAndConfiguredBaseURL(t *testing.T) {
 		t.Fatalf("subpath tracker = status %d, body = %q", tracker.Code, trackerBody)
 	}
 
-	baseForm := url.Values{"csrf": {csrfMatch[1]}, "base_url": {"https://stats.example.com/visitortrace"}}
-	baseRequest := httptest.NewRequest(http.MethodPost, "/visitortrace/admin/settings/base-url", strings.NewReader(baseForm.Encode()))
+	baseForm := url.Values{
+		"csrf": {csrfMatch[1]}, "password": {"correct horse"}, "base_url": {"https://stats.example.com/visitortrace"},
+		"geoip_provider": {"dbip"}, "geoip_update": {"automatic"}, "geoip_source": {"official"},
+	}
+	baseRequest := httptest.NewRequest(http.MethodPost, "/visitortrace/admin/settings/configuration", strings.NewReader(baseForm.Encode()))
 	baseRequest.Host = "stats.example.com"
 	baseRequest.TLS = &tls.ConnectionState{}
 	baseRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -602,7 +605,14 @@ func TestAdminSelfUpdateRequiresEmbeddedKey(t *testing.T) {
 }
 
 func TestAdminGeoIPSettingsDoNotRenderSavedSecrets(t *testing.T) {
-	app, _, _ := testAdminServer(t)
+	app, st, _ := testAdminServer(t)
+	now := time.Now().UTC()
+	if err := st.StartOperation(context.Background(), "geoip_update", now.Add(-time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.FinishOperation(context.Background(), "geoip_update", now, true, "provider=maxmind updated=1"); err != nil {
+		t.Fatal(err)
+	}
 	app.Config.GeoIPProvider = "maxmind"
 	app.Config.GeoIPUpdateURL = ""
 	app.Config.MaxMindAccountID = "account-secret"
@@ -623,7 +633,7 @@ func TestAdminGeoIPSettingsDoNotRenderSavedSecrets(t *testing.T) {
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
 	body := response.Body.String()
-	if response.Code != http.StatusOK || !strings.Contains(body, `name="geoip_provider"`) || !strings.Contains(body, `value="maxmind"`) || !strings.Contains(body, `name="maxmind_license_key"`) {
+	if response.Code != http.StatusOK || !strings.Contains(body, `action="/admin/settings/configuration"`) || !strings.Contains(body, `name="base_url"`) || !strings.Contains(body, `name="geoip_provider"`) || !strings.Contains(body, `value="maxmind"`) || !strings.Contains(body, `name="maxmind_license_key"`) || !strings.Contains(body, `class="settings-jump"`) || !strings.Contains(body, `class="task-summary"`) || !strings.Contains(body, "provider=maxmind updated=1") || strings.Count(body, "保存配置并重启") != 1 {
 		t.Fatalf("GeoIP settings = status %d body %q", response.Code, body)
 	}
 	for _, secret := range []string{"account-secret", "license-secret", "token-secret"} {
@@ -694,29 +704,29 @@ func TestAdminGeoIPSettingsCanClearPartialMaxMindCredentials(t *testing.T) {
 	}
 }
 
-func TestAdminSavesGeoIPSettingsAndRequestsRestart(t *testing.T) {
+func TestAdminSavesCombinedConfigurationAndRequestsOneRestart(t *testing.T) {
 	app, _, _ := testAdminServer(t)
 	app.Config.IP2LocationToken = "retained-token"
 	cookie, csrf := loginAdmin(t, app)
 	form := url.Values{
-		"csrf": {csrf}, "password": {"correct horse"},
+		"csrf": {csrf}, "password": {"correct horse"}, "base_url": {"https://stats.example.com/visitortrace"},
 		"geoip_provider": {"maxmind"}, "geoip_update": {"automatic"}, "geoip_source": {"official"},
 		"maxmind_account_id": {"123456"}, "maxmind_license_key": {"license-key"},
 	}
-	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip", strings.NewReader(form.Encode()))
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/configuration", strings.NewReader(form.Encode()))
 	request.Host = "127.0.0.1:8790"
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "GeoIP 设置已保存") {
-		t.Fatalf("GeoIP save = status %d body %q", response.Code, response.Body.String())
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "服务配置已保存") {
+		t.Fatalf("configuration save = status %d body %q", response.Code, response.Body.String())
 	}
 	loaded, err := config.Load(app.ConfigPath)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if loaded.GeoIPProvider != "maxmind" || loaded.GeoIPUpdate != "automatic" || loaded.MaxMindAccountID != "123456" || loaded.MaxMindLicenseKey != "license-key" || loaded.IP2LocationToken != "retained-token" || !strings.Contains(loaded.GeoIPUpdateURL, "maxmind.com") {
+	if loaded.BaseURL != "https://stats.example.com/visitortrace" || loaded.GeoIPProvider != "maxmind" || loaded.GeoIPUpdate != "automatic" || loaded.MaxMindAccountID != "123456" || loaded.MaxMindLicenseKey != "license-key" || loaded.IP2LocationToken != "retained-token" || !strings.Contains(loaded.GeoIPUpdateURL, "maxmind.com") {
 		t.Fatalf("saved GeoIP config = %#v", loaded)
 	}
 	select {
@@ -726,20 +736,20 @@ func TestAdminSavesGeoIPSettingsAndRequestsRestart(t *testing.T) {
 	}
 }
 
-func TestAdminGeoIPSettingsRejectWrongPassword(t *testing.T) {
+func TestAdminConfigurationRejectsWrongPassword(t *testing.T) {
 	app, _, _ := testAdminServer(t)
 	cookie, csrf := loginAdmin(t, app)
 	form := url.Values{
-		"csrf": {csrf}, "password": {"wrong password"},
+		"csrf": {csrf}, "password": {"wrong password"}, "base_url": {"https://stats.example.com"},
 		"geoip_provider": {"ip2location"}, "geoip_update": {"disabled"}, "geoip_source": {"official"},
 	}
-	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip", strings.NewReader(form.Encode()))
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/configuration", strings.NewReader(form.Encode()))
 	request.Host = "127.0.0.1:8790"
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
-	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") || !strings.HasSuffix(response.Header().Get("Location"), "#geoip") {
+	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") || !strings.HasSuffix(response.Header().Get("Location"), "#configuration") {
 		t.Fatalf("wrong password = status %d location %q", response.Code, response.Header().Get("Location"))
 	}
 	loaded, err := config.Load(app.ConfigPath)

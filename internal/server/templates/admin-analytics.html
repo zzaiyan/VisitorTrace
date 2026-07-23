@@ -32,6 +32,6 @@
 
 <section class="custom-range"><form method="get"><input type="hidden" name="range" value="custom"><label class="field"><span>{{t "start_date"}}</span><input type="date" name="start" value="{{.Analytics.StartDate}}" required></label><label class="field"><span>{{t "end_date"}}</span><input type="date" name="end" value="{{.Analytics.EndDate}}" required></label><button class="button ghost" type="submit">{{t "query"}}</button></form></section>
 <script type="application/json" id="analytics-data">{{.ChartJSON}}</script>
-<script defer src="{{appPath "/assets/analytics.js"}}"></script>
+<script defer src="{{assetPath "/assets/analytics.js"}}"></script>
 <script>(function(){var bars=document.querySelectorAll(".trend-bar"),max=0;bars.forEach(function(bar){max=Math.max(max,Number(bar.dataset.value)||0)});bars.forEach(function(bar){bar.style.height=(max?Math.max(3,Number(bar.dataset.value)/max*100):3)+"%"})}());</script>
 {{end}}
