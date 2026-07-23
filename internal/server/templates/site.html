@@ -59,8 +59,9 @@
       <div class="site-settings-fields">
         <div class="field-grid two">
           <label class="field"><span>{{t "display_name"}}</span><input type="text" name="name" maxlength="100" value="{{.Site.Name}}" required></label>
-          <label class="field"><span>{{t "iana_timezone"}}</span><input type="text" name="timezone" value="{{.Site.Timezone}}" {{if .Site.FirstPageviewAt}}readonly{{end}} required></label>
+          <label class="field"><span>{{t "iana_timezone"}}</span><input type="text" name="timezone" value="{{.Site.Timezone}}" list="iana-timezones" autocomplete="off" spellcheck="false" aria-describedby="site-timezone-help" {{if .Site.FirstPageviewAt}}readonly{{end}} required><small id="site-timezone-help">{{if .Site.FirstPageviewAt}}{{t "iana_timezone_locked_help"}}{{else}}{{t "iana_timezone_help"}}{{end}}</small></label>
         </div>
+        {{template "iana-timezone-list" .}}
         <label class="field"><span>{{t "allowed_origins"}}</span><textarea name="origins" rows="3" spellcheck="false" required>{{.OriginsText}}</textarea><small>{{t "origin_hint"}}</small></label>
       </div>
     </div>

@@ -65,6 +65,8 @@ Initialization asks for an Administrator password containing at least eight char
 
 Each Site has an independent Site ID, Allowed Origins, statistics timezone, visitor deduplication window, Pageview Record retention period, and Map Preset.
 
+The timezone field is a searchable IANA timezone dropdown. Type a city or timezone fragment to narrow the browser-supported list. The statistics timezone is locked after the first Pageview because changing it would shift historical aggregation dates; reset the Site data before choosing a different timezone.
+
 Changing the visitor deduplication window schedules a new rule for the next midnight in the Site timezone and anchors the new sequence at that date. Saving does not alter the current window immediately, and completed aggregates are never recalculated. Administrative aggregate trends mark each effective date.
 
 ## Start the Service

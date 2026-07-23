@@ -65,6 +65,8 @@ install -Dm700 visitortrace-0.1.2-linux-amd64 "$HOME/.local/bin/visitortrace"
 
 每个 Site 都有独立的 Site ID、Allowed Origins、统计时区、访客合并周期、逐条记录保留期和 Map Preset。
 
+时区字段使用可搜索的 IANA 时区下拉框，输入城市或时区片段即可筛选浏览器支持的候选项。首条 Pageview 写入后会锁定统计时区，因为修改时区会改变历史聚合日期；如需更换，应先清空 Site 数据。
+
 修改访客合并周期后，新规则在 Site 时区的下一个午夜生效，并以该日期作为新周期锚点；当前窗口不会在保存设置的瞬间改变，已经完成的聚合也不会重算。管理员聚合趋势会标出规则生效日。
 
 ## 启动服务

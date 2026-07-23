@@ -1,3 +1,44 @@
+{{define "iana-timezone-list"}}
+<datalist id="iana-timezones">
+  <option value="UTC">
+  <option value="Asia/Shanghai">
+  <option value="Asia/Tokyo">
+  <option value="Asia/Seoul">
+  <option value="Asia/Hong_Kong">
+  <option value="Asia/Taipei">
+  <option value="Asia/Singapore">
+  <option value="Asia/Kolkata">
+  <option value="Asia/Dubai">
+  <option value="Europe/London">
+  <option value="Europe/Paris">
+  <option value="Europe/Berlin">
+  <option value="Europe/Moscow">
+  <option value="America/New_York">
+  <option value="America/Chicago">
+  <option value="America/Denver">
+  <option value="America/Los_Angeles">
+  <option value="America/Toronto">
+  <option value="America/Vancouver">
+  <option value="America/Sao_Paulo">
+  <option value="Australia/Sydney">
+  <option value="Pacific/Auckland">
+</datalist>
+<script>
+(function () {
+  var list = document.getElementById("iana-timezones");
+  if (!list || typeof Intl === "undefined" || typeof Intl.supportedValuesOf !== "function") return;
+  var existing = Object.create(null);
+  Array.prototype.forEach.call(list.options, function (option) { existing[option.value] = true; });
+  Intl.supportedValuesOf("timeZone").forEach(function (timezone) {
+    if (existing[timezone]) return;
+    var option = document.createElement("option");
+    option.value = timezone;
+    list.appendChild(option);
+  });
+})();
+</script>
+{{end}}
+
 {{define "layout"}}
 <!doctype html>
 <html lang="{{language}}">

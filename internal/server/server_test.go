@@ -314,7 +314,7 @@ func TestPublicMapRejectsUnknownOption(t *testing.T) {
 }
 
 func TestAdminLoginAndDashboard(t *testing.T) {
-	app, _, site := testAdminServer(t)
+	app, st, site := testAdminServer(t)
 	login := httptest.NewRequest(http.MethodPost, "/admin/login", strings.NewReader(url.Values{"password": {"correct horse"}}.Encode()))
 	login.Host = "127.0.0.1:8790"
 	login.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -342,6 +342,14 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	app.Handler().ServeHTTP(sitesResponse, sitesRequest)
 	if sitesResponse.Code != http.StatusOK || !strings.Contains(sitesResponse.Body.String(), site.Name) || !strings.Contains(sitesResponse.Body.String(), `href="/admin/sites/new"`) || !strings.Contains(sitesResponse.Body.String(), `href="/admin/sites" aria-current="page"`) {
 		t.Fatalf("Sites page status = %d, body = %q", sitesResponse.Code, sitesResponse.Body.String())
+	}
+	newSiteRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/new", nil)
+	newSiteRequest.Host = "127.0.0.1:8790"
+	newSiteRequest.AddCookie(cookies[0])
+	newSiteResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(newSiteResponse, newSiteRequest)
+	if newSiteResponse.Code != http.StatusOK || !strings.Contains(newSiteResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) || !strings.Contains(newSiteResponse.Body.String(), `<datalist id="iana-timezones">`) || !strings.Contains(newSiteResponse.Body.String(), `Intl.supportedValuesOf("timeZone")`) {
+		t.Fatalf("new Site timezone selector = status %d, body = %q", newSiteResponse.Code, newSiteResponse.Body.String())
 	}
 	csrfMatch := regexp.MustCompile(`name="csrf" value="([a-f0-9]{64})"`).FindStringSubmatch(response.Body.String())
 	if len(csrfMatch) != 2 {
@@ -399,11 +407,22 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	sitePage.AddCookie(cookies[0])
 	sitePageResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(sitePageResponse, sitePage)
-	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-endpoint"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) {
+	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-endpoint"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) || !strings.Contains(sitePageResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) {
 		t.Fatalf("admin Site page = status %d, body = %q", sitePageResponse.Code, sitePageResponse.Body.String())
 	}
 	if count := strings.Count(sitePageResponse.Body.String(), `class="copy-control copy-button"`); count != 6 {
 		t.Fatalf("admin Site page copy controls = %d, want 6", count)
+	}
+	if _, err := st.DB.Exec(`UPDATE sites SET first_pageview_at = ? WHERE id = ?`, time.Now().UTC().Format(time.RFC3339Nano), site.ID); err != nil {
+		t.Fatalf("lock Site timezone fixture: %v", err)
+	}
+	lockedSiteRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID, nil)
+	lockedSiteRequest.Host = "127.0.0.1:8790"
+	lockedSiteRequest.AddCookie(cookies[0])
+	lockedSiteResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(lockedSiteResponse, lockedSiteRequest)
+	if lockedSiteResponse.Code != http.StatusOK || !strings.Contains(lockedSiteResponse.Body.String(), `readonly required`) || !strings.Contains(lockedSiteResponse.Body.String(), "统计时区已锁定") {
+		t.Fatalf("locked Site timezone selector = status %d, body = %q", lockedSiteResponse.Code, lockedSiteResponse.Body.String())
 	}
 }
 

@@ -105,6 +105,8 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .field { display: grid; align-content: start; gap: 7px; min-width: 0; color: #48575a; font-size: 12px; font-weight: 700; }
 .field input, .field textarea, .field select { width: 100%; border: 1px solid #cfdad8; border-radius: 4px; outline: none; background: white; color: var(--ink); }
 .field input, .field select { height: 42px; padding: 0 11px; }
+.field input[list] { padding-right: 34px; }
+.field input[readonly] { background: #f2f5f3; color: var(--muted); cursor: not-allowed; }
 .field input[type="file"] { min-height: 42px; height: auto; padding: 6px; color: var(--muted); font-size: 11px; font-weight: 500; }
 .field input[type="file"]::file-selector-button { min-height: 28px; margin-right: 9px; padding: 0 10px; border: 1px solid #c5d2d0; border-radius: 3px; background: #f5f8f7; color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
 .field input[type="file"]::file-selector-button:hover { border-color: #9fb4b0; background: #edf3f1; }

@@ -8,7 +8,8 @@
     <input type="hidden" name="csrf" value="{{.CSRF}}">
     <label class="field"><span>{{t "display_name"}}</span><input type="text" name="name" maxlength="100" value="{{.Name}}" required></label>
     <label class="field"><span>Allowed Origins</span><textarea name="origins" rows="4" spellcheck="false" required>{{.Origins}}</textarea><small>{{t "origin_hint"}}</small></label>
-    <label class="field"><span>{{t "iana_timezone"}}</span><input type="text" name="timezone" value="{{.Timezone}}" required></label>
+    <label class="field"><span>{{t "iana_timezone"}}</span><input type="text" name="timezone" value="{{.Timezone}}" list="iana-timezones" autocomplete="off" spellcheck="false" aria-describedby="new-site-timezone-help" required><small id="new-site-timezone-help">{{t "iana_timezone_help"}}</small></label>
+    {{template "iana-timezone-list" .}}
     <div class="field-grid two">
       <label class="field"><span>{{t "dedup_window"}}</span><div class="input-unit"><input type="number" name="dedup_window_days" min="1" max="30" value="{{.DedupWindowDays}}" required><span>{{t "day"}}</span></div></label>
       <label class="field"><span>{{t "record_retention"}}</span><div class="input-unit"><input type="number" name="retention_days" min="1" max="90" value="{{.RetentionDays}}" required><span>{{t "day"}}</span></div></label>
