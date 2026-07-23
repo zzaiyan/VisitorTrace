@@ -6,6 +6,9 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+- Added the missing `/admin/sites` management route, separated Site listing from creation and the operations dashboard, and returned deleted Sites to the list.
+- Reorganized each Site page around integration, settings, Map Preset, recent records, and destructive operations. Site settings now use consistent identity, counting/retention, and collection/publication groups.
+- Made the integrated and separated integration modes structurally consistent: Widget, Tracker, and Map SVG resources each expose an embed snippet, resource URL, and integrated copy control.
 - Reorganized Administrator Settings into service configuration, GeoIP data operations, account security, and application update. Public Base URL and all GeoIP source/credential fields now save atomically with one password confirmation and one supervised restart.
 - Styled the full GeoIP task summary, added content-revision URLs for embedded CSS/JavaScript to prevent stale post-upgrade assets, and made configuration-save failures point to the required systemd `ReadWritePaths` directory.
 - Avoided redundant directory/file `chmod` calls when protected configuration modes are already correct, while retaining strict `0700`/`0600` enforcement for nonconforming paths.
