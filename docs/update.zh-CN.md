@@ -6,7 +6,6 @@
 
 ## 尚未发布
 
-- systemd 安装脚本现在会在启动 VisitorTrace 前验证数据目录和配置目录均已进入最终生效的 `ReadWritePaths`。
 - 将管理员设置重组为服务配置、GeoIP 数据维护、账户安全和应用更新；公开 Base URL 与全部 GeoIP 下载源/凭证字段现在通过一次密码确认原子保存，并只触发一次受管重启。
 - 为 GeoIP 任务摘要补齐完整样式，给内嵌 CSS/JavaScript 增加内容 revision 以避免升级后命中旧缓存，并让配置保存错误直接提示 systemd `ReadWritePaths` 所需目录。
 - 配置目录和文件已经具有正确保护权限时，不再重复执行 `chmod`；不符合要求时仍严格收紧到 `0700`/`0600`。

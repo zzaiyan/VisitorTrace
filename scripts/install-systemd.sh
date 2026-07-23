@@ -46,22 +46,6 @@ require_absolute_path() {
   esac
 }
 
-require_effective_write_path() {
-  local expected_path="$1"
-  local effective_paths="$2"
-  local configured_path
-  local -a configured_paths=()
-
-  read -r -a configured_paths <<< "$effective_paths"
-  for configured_path in "${configured_paths[@]}"; do
-    case "$configured_path" in
-      "$expected_path"|"+$expected_path"|"-$expected_path") return 0 ;;
-    esac
-  done
-
-  die "systemd did not grant write access to $expected_path (effective ReadWritePaths: ${effective_paths:-<empty>})"
-}
-
 while (($# > 0)); do
   case "$1" in
     --binary)
@@ -188,12 +172,6 @@ EOF
 chmod 644 "$UNIT_PATH"
 
 systemctl daemon-reload
-
-EFFECTIVE_WRITE_PATHS="$(systemctl show "$SERVICE_NAME.service" --property=ReadWritePaths)"
-EFFECTIVE_WRITE_PATHS="${EFFECTIVE_WRITE_PATHS#ReadWritePaths=}"
-require_effective_write_path "$DATA_DIR" "$EFFECTIVE_WRITE_PATHS"
-require_effective_write_path "$CONFIG_DIR" "$EFFECTIVE_WRITE_PATHS"
-
 systemctl enable "$SERVICE_NAME.service"
 systemctl restart "$SERVICE_NAME.service"
 systemctl is-active --quiet "$SERVICE_NAME.service" || {
@@ -205,6 +183,5 @@ printf '\nVisitorTrace is running under systemd.\n'
 printf 'service: %s.service\n' "$SERVICE_NAME"
 printf 'config:  %s\n' "$CONFIG_PATH"
 printf 'data:    %s\n' "$DATA_DIR"
-printf 'writable: %s %s\n' "$DATA_DIR" "$CONFIG_DIR"
 printf 'check:   systemctl status %s.service\n' "$SERVICE_NAME"
 printf 'logs:    journalctl -u %s.service -f\n' "$SERVICE_NAME"

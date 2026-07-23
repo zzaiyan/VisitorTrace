@@ -65,7 +65,7 @@ When the release binary is already installed, the repository includes a one-step
 sudo ./scripts/install-systemd.sh --binary /usr/local/bin/visitortrace
 ```
 
-The script creates or reuses the dedicated service account, creates protected directories, runs `init` when no configuration exists, bootstraps the stable self-update path, writes the systemd unit, and starts the service. The generated unit grants write access to both the data directory and the entire configuration directory under `ProtectSystem=strict`. After `daemon-reload`, the script checks systemd's effective `ReadWritePaths` and stops with an explicit error if either path is missing. It prompts for the Administrator password during initialization. It does not download a binary or GeoIP file, create backups, configure a reverse proxy, or configure BT Panel. Use the manual steps below when you need to review each operation.
+The script creates or reuses the dedicated service account, creates protected directories, runs `init` when no configuration exists, bootstraps the stable self-update path, writes the systemd unit, and starts the service. Under `ProtectSystem=strict`, the generated unit includes both the data directory and the entire configuration directory in `ReadWritePaths`. It prompts for the Administrator password during initialization. It does not download a binary or GeoIP file, create backups, configure a reverse proxy, or configure BT Panel. Use the manual steps below when you need to review each operation.
 
 ### Base URL and a subpath
 
