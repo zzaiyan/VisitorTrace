@@ -569,6 +569,153 @@ func TestAdminSelfUpdateRequiresEmbeddedKey(t *testing.T) {
 	}
 }
 
+func TestAdminGeoIPSettingsDoNotRenderSavedSecrets(t *testing.T) {
+	app, _, _ := testAdminServer(t)
+	app.Config.GeoIPProvider = "maxmind"
+	app.Config.GeoIPUpdateURL = ""
+	app.Config.MaxMindAccountID = "account-secret"
+	app.Config.MaxMindLicenseKey = "license-secret"
+	app.Config.IP2LocationToken = "token-secret"
+	if err := config.Save(app.ConfigPath, app.Config); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	loaded, err := config.Load(app.ConfigPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	app.Config = loaded
+	cookie, _ := loginAdmin(t, app)
+	request := httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	request.Host = "127.0.0.1:8790"
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	body := response.Body.String()
+	if response.Code != http.StatusOK || !strings.Contains(body, `name="geoip_provider"`) || !strings.Contains(body, `value="maxmind"`) || !strings.Contains(body, `name="maxmind_license_key"`) {
+		t.Fatalf("GeoIP settings = status %d body %q", response.Code, body)
+	}
+	for _, secret := range []string{"account-secret", "license-secret", "token-secret"} {
+		if strings.Contains(body, secret) {
+			t.Fatalf("GeoIP settings rendered saved secret %q", secret)
+		}
+	}
+}
+
+func TestAdminGeoIPSettingsCanClearPartialMaxMindCredentials(t *testing.T) {
+	app, _, _ := testAdminServer(t)
+	app.Config.MaxMindAccountID = "partial-account"
+	if err := config.Save(app.ConfigPath, app.Config); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	loaded, err := config.Load(app.ConfigPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	app.Config = loaded
+	cookie, _ := loginAdmin(t, app)
+	request := httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	body := response.Body.String()
+	if response.Code != http.StatusOK || !strings.Contains(body, `name="clear_maxmind_credentials"`) || !strings.Contains(body, "配置不完整") {
+		t.Fatalf("partial MaxMind credentials = status %d body %q", response.Code, body)
+	}
+	if strings.Contains(body, "partial-account") {
+		t.Fatal("partial MaxMind account ID was rendered")
+	}
+}
+
+func TestAdminSavesGeoIPSettingsAndRequestsRestart(t *testing.T) {
+	app, _, _ := testAdminServer(t)
+	app.Config.IP2LocationToken = "retained-token"
+	cookie, csrf := loginAdmin(t, app)
+	form := url.Values{
+		"csrf": {csrf}, "password": {"correct horse"},
+		"geoip_provider": {"maxmind"}, "geoip_update": {"automatic"}, "geoip_source": {"official"},
+		"maxmind_account_id": {"123456"}, "maxmind_license_key": {"license-key"},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip", strings.NewReader(form.Encode()))
+	request.Host = "127.0.0.1:8790"
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "GeoIP 设置已保存") {
+		t.Fatalf("GeoIP save = status %d body %q", response.Code, response.Body.String())
+	}
+	loaded, err := config.Load(app.ConfigPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if loaded.GeoIPProvider != "maxmind" || loaded.GeoIPUpdate != "automatic" || loaded.MaxMindAccountID != "123456" || loaded.MaxMindLicenseKey != "license-key" || loaded.IP2LocationToken != "retained-token" || !strings.Contains(loaded.GeoIPUpdateURL, "maxmind.com") {
+		t.Fatalf("saved GeoIP config = %#v", loaded)
+	}
+	select {
+	case <-app.RestartRequested():
+	case <-time.After(2 * time.Second):
+		t.Fatal("GeoIP settings did not request a restart")
+	}
+}
+
+func TestAdminGeoIPSettingsRejectWrongPassword(t *testing.T) {
+	app, _, _ := testAdminServer(t)
+	cookie, csrf := loginAdmin(t, app)
+	form := url.Values{
+		"csrf": {csrf}, "password": {"wrong password"},
+		"geoip_provider": {"ip2location"}, "geoip_update": {"disabled"}, "geoip_source": {"official"},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip", strings.NewReader(form.Encode()))
+	request.Host = "127.0.0.1:8790"
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") || !strings.HasSuffix(response.Header().Get("Location"), "#geoip") {
+		t.Fatalf("wrong password = status %d location %q", response.Code, response.Header().Get("Location"))
+	}
+	loaded, err := config.Load(app.ConfigPath)
+	if err != nil || loaded.GeoIPProvider != "dbip" {
+		t.Fatalf("config changed after wrong password: %#v, %v", loaded, err)
+	}
+}
+
+func TestAdminManualGeoIPUpdateRunsWhenAutomaticUpdatesAreDisabled(t *testing.T) {
+	downloads := 0
+	downloadServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		downloads++
+		_, _ = io.WriteString(w, "invalid MMDB fixture")
+	}))
+	defer downloadServer.Close()
+	app, st, _ := testAdminServer(t)
+	app.Config.GeoIPUpdate = "disabled"
+	app.Config.GeoIPUpdateURL = downloadServer.URL + "/city.mmdb"
+	cookie, csrf := loginAdmin(t, app)
+	form := url.Values{"csrf": {csrf}, "force": {"1"}}
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip/update", strings.NewReader(form.Encode()))
+	request.Host = "127.0.0.1:8790"
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") || downloads != 1 {
+		t.Fatalf("manual GeoIP update = status %d location %q downloads %d", response.Code, response.Header().Get("Location"), downloads)
+	}
+	statuses, err := st.OperationStatuses(context.Background())
+	if err != nil {
+		t.Fatalf("OperationStatuses() error = %v", err)
+	}
+	foundFailure := false
+	for _, status := range statuses {
+		if status.Operation == "geoip_update" && status.Succeeded != nil && !*status.Succeeded {
+			foundFailure = true
+		}
+	}
+	if !foundFailure {
+		t.Fatalf("manual GeoIP failure was not recorded: %#v", statuses)
+	}
+}
+
 func TestPublicAnalyticsHidesSensitiveFields(t *testing.T) {
 	app, st, site := testServer(t)
 	now := time.Now().UTC()

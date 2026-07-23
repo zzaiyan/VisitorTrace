@@ -86,12 +86,26 @@ type newSiteData struct {
 
 type adminSettingsData struct {
 	pageLayout
-	CurrentVersion        string
-	StableExecutable      string
-	UpdateKeyReady        bool
-	RunningFromStablePath bool
-	BaseURL               string
-	EffectiveBaseURL      string
+	CurrentVersion         string
+	StableExecutable       string
+	UpdateKeyReady         bool
+	RunningFromStablePath  bool
+	BaseURL                string
+	EffectiveBaseURL       string
+	GeoIPProvider          string
+	GeoIPUpdate            string
+	GeoIPUpdateURL         string
+	GeoIPChecksumURL       string
+	GeoIPOfficialSource    bool
+	GeoIPOfficialURL       string
+	DBIPOfficialURL        string
+	MaxMindOfficialURL     string
+	IP2LocationOfficialURL string
+	MaxMindConfigured      bool
+	MaxMindHasCredentials  bool
+	IP2LocationConfigured  bool
+	GeoIPFile              operations.FileStatus
+	GeoIPTask              *operations.TaskStatus
 }
 
 type publicAnalyticsData struct {
@@ -195,20 +209,41 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	manager := selfupdate.New(s.Config, s.ConfigPath, s.Store)
+	profile, _ := geoip.UpdateProfileForProvider(s.Config.GeoIPProvider)
+	dbipProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderDBIP))
+	maxMindProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderMaxMind))
+	ip2LocationProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderIP2Location))
+	operationSnapshot := operations.Collect(r.Context(), s.Config, s.Store, s.Started, time.Now())
 	data := adminSettingsData{
 		pageLayout:     s.adminLayout(r, session, "管理员设置", "settings"),
 		CurrentVersion: manager.CurrentVersion, StableExecutable: manager.StableBinaryPath(),
 		UpdateKeyReady: len(manager.PublicKey) > 0, RunningFromStablePath: manager.RunningFromStablePath(),
 		BaseURL: s.Config.BaseURL, EffectiveBaseURL: s.externalBaseURL(r),
+		GeoIPProvider: s.Config.GeoIPProvider, GeoIPUpdate: s.Config.GeoIPUpdate,
+		GeoIPUpdateURL: s.Config.GeoIPUpdateURL, GeoIPChecksumURL: s.Config.GeoIPChecksumURL,
+		GeoIPOfficialSource: s.Config.GeoIPUpdateURL == profile.URL, GeoIPOfficialURL: profile.URL,
+		DBIPOfficialURL: dbipProfile.URL, MaxMindOfficialURL: maxMindProfile.URL, IP2LocationOfficialURL: ip2LocationProfile.URL,
+		MaxMindConfigured:     s.Config.MaxMindAccountID != "" && s.Config.MaxMindLicenseKey != "",
+		MaxMindHasCredentials: s.Config.MaxMindAccountID != "" || s.Config.MaxMindLicenseKey != "",
+		IP2LocationConfigured: s.Config.IP2LocationToken != "", GeoIPFile: operationSnapshot.GeoIP,
+	}
+	for _, task := range operationSnapshot.Tasks {
+		if task.Operation == "geoip_update" {
+			item := task
+			data.GeoIPTask = &item
+			break
+		}
 	}
 	data.Flash = adminFlash(r)
 	data.Error = r.URL.Query().Get("error")
 	s.renderPage(w, r, "settings", data)
 }
 
-type baseURLRestartData struct {
+type settingsRestartData struct {
 	pageLayout
 	ReconnectURL string
+	Eyebrow      string
+	Message      string
 }
 
 func (s *Server) adminUpdateBaseURL(w http.ResponseWriter, r *http.Request) {
@@ -240,9 +275,12 @@ func (s *Server) adminUpdateBaseURL(w http.ResponseWriter, r *http.Request) {
 	if baseURL != "" {
 		reconnectURL = strings.TrimSuffix(baseURL, "/") + "/admin/settings"
 	}
-	s.renderPage(w, r, "settings-restarting", baseURLRestartData{
-		pageLayout:   s.adminLayout(r, session, "正在重启", "settings"),
+	layout := s.adminLayout(r, session, "正在重启", "settings")
+	s.renderPage(w, r, "settings-restarting", settingsRestartData{
+		pageLayout:   layout,
 		ReconnectURL: reconnectURL,
+		Eyebrow:      "PUBLIC URL",
+		Message:      translate(layout.Lang, "base_url_saved"),
 	})
 	go func() {
 		time.Sleep(300 * time.Millisecond)

@@ -47,6 +47,8 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
 
 默认配置监听 `127.0.0.1:8790`，把 SQLite 和 GeoIP 数据保存在 `/var/lib/visitortrace`，并使用 DB-IP City Lite 作为自动更新后端。MaxMind GeoLite2 City 与 IP2Location LITE DB11 具备同等的自动更新支持，但需要账户凭据。可在初始化命令中加入 `--geoip-provider maxmind --maxmind-account-id ACCOUNT_ID --maxmind-license-key LICENSE_KEY`，或加入 `--geoip-provider ip2location --ip2location-token DOWNLOAD_TOKEN`。配置文件权限应保持为 `0600`；备份包含这些凭据，需要采用同等的访问控制。
 
+安装完成后，可以在“管理员设置 > GeoIP 数据库”修改后端、凭证、下载源和更新策略。表单会原子更新同一份受保护配置并请求由 systemd 拉起服务，因此 systemd 单元需要保留后文所示的 `Restart=always`，并允许写入 `/etc/visitortrace`。
+
 接入反向代理前，在 `/etc/visitortrace/config.json` 中把本机回环地址加入 `trusted_proxies`：
 
 ```json

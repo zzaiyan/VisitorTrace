@@ -89,6 +89,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin", s.adminDashboard)
 	mux.HandleFunc("GET /admin/settings", s.adminSettings)
 	mux.HandleFunc("POST /admin/settings/base-url", s.adminUpdateBaseURL)
+	mux.HandleFunc("POST /admin/settings/geoip", s.adminUpdateGeoIPSettings)
+	mux.HandleFunc("POST /admin/settings/geoip/update", s.adminRunGeoIPUpdateFromSettings)
 	mux.HandleFunc("POST /admin/settings/password", s.adminChangePassword)
 	mux.HandleFunc("POST /admin/settings/update", s.adminRunSelfUpdate)
 	mux.HandleFunc("GET /admin/records", s.adminRecords)

@@ -12,6 +12,50 @@
     <div class="form-actions"><button class="button primary" type="submit">{{t "update_password"}}</button></div>
   </form>
 </section>
+<section class="section-block" id="geoip" data-geoip-settings>
+  <div class="section-heading"><div><p class="eyebrow">GEOIP</p><h2>{{t "geoip_database"}}</h2><p class="subhead">{{t "geoip_settings_help"}}</p></div><span class="status live">{{.GeoIPProvider}}</span></div>
+  <div class="update-status geoip-status">
+    <div><span>{{t "database_file"}}</span><strong>{{if .GeoIPFile.Exists}}{{formatBytes .GeoIPFile.Size}}{{else}}{{t "unavailable"}}{{end}}</strong><small>{{if .GeoIPFile.Exists}}{{t "last_modified"}} {{formatUTC .GeoIPFile.ModifiedAt}}{{else}}{{t "awaiting_download"}}{{end}}</small></div>
+    <div><span>{{t "update_mode"}}</span><strong>{{if eq .GeoIPUpdate "automatic"}}{{t "automatic_updates"}}{{else}}{{t "manual_only"}}{{end}}</strong><small>{{.GeoIPProvider}}</small></div>
+    <div><span>{{t "last_update"}}</span>{{if .GeoIPTask}}<strong><span class="status {{.GeoIPTask.State}}">{{operationState .GeoIPTask.State}}</span></strong><small>{{if .GeoIPTask.CompletedAt}}{{formatUTC .GeoIPTask.CompletedAt}}{{else}}{{t "running"}}{{end}}</small>{{else}}<strong>{{t "never_updated"}}</strong><small>{{t "no_task_runs"}}</small>{{end}}</div>
+  </div>
+  {{if .GeoIPTask}}<div class="geoip-task-summary"><span>{{t "summary"}}</span><code>{{.GeoIPTask.Summary}}</code></div>{{end}}
+  <div class="geoip-manual">
+    <div><h3>{{t "manual_update"}}</h3><p>{{t "manual_update_help"}}</p></div>
+    <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" class="inline-actions">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <button class="button ghost" type="submit" name="force" value="0">{{t "check_now"}}</button>
+      <button class="button primary" type="submit" name="force" value="1">{{t "force_download"}}</button>
+    </form>
+  </div>
+  <form method="post" action="{{appPath "/admin/settings/geoip"}}" class="stack-form geoip-form">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <div class="field-grid two">
+      <label class="field"><span>{{t "geoip_provider"}}</span><select name="geoip_provider" data-provider-select><option value="dbip" data-source-url="{{.DBIPOfficialURL}}" {{if eq .GeoIPProvider "dbip"}}selected{{end}}>DB-IP City Lite</option><option value="maxmind" data-source-url="{{.MaxMindOfficialURL}}" {{if eq .GeoIPProvider "maxmind"}}selected{{end}}>MaxMind GeoLite2 City</option><option value="ip2location" data-source-url="{{.IP2LocationOfficialURL}}" {{if eq .GeoIPProvider "ip2location"}}selected{{end}}>IP2Location LITE DB11</option></select></label>
+      <label class="field"><span>{{t "update_mode"}}</span><select name="geoip_update"><option value="automatic" {{if eq .GeoIPUpdate "automatic"}}selected{{end}}>{{t "automatic_updates"}}</option><option value="disabled" {{if eq .GeoIPUpdate "disabled"}}selected{{end}}>{{t "manual_only"}}</option></select></label>
+    </div>
+    <fieldset class="check-group geoip-source-options"><legend>{{t "download_source"}}</legend><label><input type="radio" name="geoip_source" value="official" {{if .GeoIPOfficialSource}}checked{{end}}> {{t "official_source"}}</label><label><input type="radio" name="geoip_source" value="custom" {{if not .GeoIPOfficialSource}}checked{{end}}> {{t "custom_mirror"}}</label></fieldset>
+    <div class="official-source-row" data-official-source><span>{{t "official_source_url"}}</span><code data-official-url-display>{{.GeoIPOfficialURL}}</code></div>
+    <label class="field" data-custom-source {{if .GeoIPOfficialSource}}hidden{{end}}><span>{{t "custom_download_url"}}</span><input type="url" name="geoip_update_url" value="{{if not .GeoIPOfficialSource}}{{.GeoIPUpdateURL}}{{end}}" placeholder="https://mirror.example.com/city.mmdb.gz" maxlength="4096"></label>
+    <label class="field"><span>{{t "checksum_url"}}</span><input type="url" name="geoip_checksum_url" value="{{.GeoIPChecksumURL}}" placeholder="https://mirror.example.com/city.mmdb.gz.sha256" maxlength="4096"><small>{{t "checksum_url_help"}}</small></label>
+
+    <div class="credential-section-heading"><h3>{{t "provider_credentials"}}</h3></div>
+    <div class="credential-grid">
+    <div class="credential-panel">
+      <div class="credential-heading"><div><h3>MaxMind</h3><p>{{t "credential_blank_keeps"}}</p></div><span class="status {{if .MaxMindConfigured}}live{{else}}paused{{end}}">{{if .MaxMindConfigured}}{{t "configured"}}{{else if .MaxMindHasCredentials}}{{t "incomplete"}}{{else}}{{t "not_configured"}}{{end}}</span></div>
+      <div class="field-grid two"><label class="field"><span>{{t "maxmind_account_id"}}</span><input type="text" name="maxmind_account_id" autocomplete="off" maxlength="512" placeholder="{{if .MaxMindConfigured}}{{t "saved_credential"}}{{else}}Account ID{{end}}"></label><label class="field"><span>{{t "maxmind_license_key"}}</span><input type="password" name="maxmind_license_key" autocomplete="new-password" maxlength="512" placeholder="{{if .MaxMindConfigured}}{{t "saved_credential"}}{{else}}License Key{{end}}"></label></div>
+      {{if .MaxMindHasCredentials}}<label class="toggle-field credential-clear"><span><strong>{{t "clear_maxmind_credentials"}}</strong></span><input type="checkbox" name="clear_maxmind_credentials" value="1"></label>{{end}}
+    </div>
+    <div class="credential-panel">
+      <div class="credential-heading"><div><h3>IP2Location</h3><p>{{t "credential_blank_keeps"}}</p></div><span class="status {{if .IP2LocationConfigured}}live{{else}}paused{{end}}">{{if .IP2LocationConfigured}}{{t "configured"}}{{else}}{{t "not_configured"}}{{end}}</span></div>
+      <label class="field"><span>{{t "ip2location_token"}}</span><input type="password" name="ip2location_token" autocomplete="new-password" maxlength="512" placeholder="{{if .IP2LocationConfigured}}{{t "saved_credential"}}{{else}}Download Token{{end}}"></label>
+      {{if .IP2LocationConfigured}}<label class="toggle-field credential-clear"><span><strong>{{t "clear_ip2location_token"}}</strong></span><input type="checkbox" name="clear_ip2location_token" value="1"></label>{{end}}
+    </div>
+    </div>
+    <label class="field geoip-admin-password"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
+    <div class="form-actions"><button class="button primary" type="submit">{{t "save_geoip_settings"}}</button></div>
+  </form>
+</section>
 <section class="section-block">
   <div class="section-heading"><div><p class="eyebrow">PUBLIC URL</p><h2>{{t "base_url"}}</h2><p class="subhead">{{t "base_url_help"}}</p></div></div>
   <form method="post" action="{{appPath "/admin/settings/base-url"}}" class="stack-form">
@@ -33,4 +77,23 @@
     <button class="button primary" type="submit" {{if or (not .UpdateKeyReady) (not .RunningFromStablePath)}}disabled{{end}}>{{t "check_and_update"}}</button>
   </form>
 </section>
+<script>
+(() => {
+  const root = document.querySelector("[data-geoip-settings]");
+  if (!root) return;
+  const provider = root.querySelector("[data-provider-select]");
+  const officialURL = root.querySelector("[data-official-url-display]");
+  const customSource = root.querySelector("[data-custom-source]");
+  const sourceInputs = root.querySelectorAll('input[name="geoip_source"]');
+  const sync = () => {
+    const selected = provider.selectedOptions[0];
+    officialURL.textContent = selected ? decodeURIComponent(selected.dataset.sourceUrl) : "";
+    const official = root.querySelector('input[name="geoip_source"][value="official"]').checked;
+    customSource.hidden = official;
+  };
+  provider.addEventListener("change", sync);
+  sourceInputs.forEach((input) => input.addEventListener("change", sync));
+  sync();
+})();
+</script>
 {{end}}

@@ -1,5 +1,5 @@
 {{define "content"}}
-<header class="page-header"><div><p class="eyebrow">PUBLIC URL</p><h1>{{t "service_restarting"}}</h1><p class="subhead">{{t "base_url_saved"}}</p></div></header>
+<header class="page-header"><div><p class="eyebrow">{{.Eyebrow}}</p><h1>{{t "service_restarting"}}</h1><p class="subhead">{{.Message}}</p></div></header>
 <section class="restart-state" role="status">
   <div class="restart-indicator" aria-hidden="true"></div>
   <div><h2>{{t "service_restarting"}}</h2><p>{{t "restart_help"}}</p><a class="button ghost" href="{{.ReconnectURL}}">{{t "reconnect"}}</a></div>

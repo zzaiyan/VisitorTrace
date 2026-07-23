@@ -6,6 +6,7 @@
 
 ## 尚未发布
 
+- 在管理员设置中增加图形化 GeoIP 管理：选择后端、自动/仅手动策略、官方源或自定义镜像、凭证替换与清除且不回显秘密、更新状态、立即检查和强制下载。
 - 增加 `visitortrace geoip query` 和 `scripts/query-mmdb.sh`，用于查询单个 IP 并输出格式化的原始 MMDB 元数据、命中网段和记录内容，同时明确表示未命中状态。
 - 增加 `scripts/update-systemd-binary.sh`，用于从已经下载的本地二进制执行带校验的手动更新，包括升级前备份、原子版本切换、服务重启和可执行文件自动回滚。
 - tracker 会记录 hostname；对于部署在多个域名上的同一 Site，UV 按 hostname 独立计算。hostname 可用于 Pageview Record、筛选、CSV 导出、Public Analytics、Admin Analytics 和聚合导出。

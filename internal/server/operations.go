@@ -39,30 +39,55 @@ func (s *Server) adminRunCleanup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adminRunGeoIPUpdate(w http.ResponseWriter, r *http.Request) {
+	s.runGeoIPUpdate(w, r, false)
+}
+
+func (s *Server) adminRunGeoIPUpdateFromSettings(w http.ResponseWriter, r *http.Request) {
+	s.runGeoIPUpdate(w, r, true)
+}
+
+func (s *Server) runGeoIPUpdate(w http.ResponseWriter, r *http.Request, fromSettings bool) {
 	if !s.authorizeOperation(w, r) {
 		return
 	}
-	if s.Config.GeoIPUpdate == "disabled" {
+	target := "/admin"
+	if fromSettings {
+		target = "/admin/settings#geoip"
+	}
+	cfg := s.Config
+	if cfg.GeoIPUpdate == "disabled" && !fromSettings {
 		s.redirectWithError(w, r, "/admin", "GeoIP 自动更新已在配置中关闭。")
 		return
 	}
-	runner := geoipupdate.New(s.Config, s.Store, s.logger)
+	if fromSettings {
+		cfg.GeoIPUpdate = "automatic"
+	}
+	if err := cfg.Validate(); err != nil {
+		s.redirectWithError(w, r, target, "GeoIP 更新设置无效："+err.Error())
+		return
+	}
+	runner := geoipupdate.New(cfg, s.Store, s.logger)
 	runner.Activate = func(path string) error {
-		resolver, err := geoip.OpenWithProvider(s.Config.GeoIPProvider, path)
+		resolver, err := geoip.OpenWithProvider(cfg.GeoIPProvider, path)
 		if err != nil {
 			return err
 		}
 		s.SetGeoIP(resolver)
 		return nil
 	}
-	result, err := runner.RunOnce(r.Context(), false)
+	force := fromSettings && r.FormValue("force") == "1"
+	result, err := runner.RunOnce(r.Context(), force)
 	if err != nil {
-		s.redirectWithError(w, r, "/admin", "GeoIP 更新失败："+err.Error())
+		s.redirectWithError(w, r, target, "GeoIP 更新失败："+err.Error())
 		return
 	}
 	value := "geoip-current"
 	if result.Updated {
 		value = "geoip"
+	}
+	if fromSettings {
+		s.redirect(w, r, "/admin/settings?saved="+value+"#geoip", http.StatusSeeOther)
+		return
 	}
 	s.redirect(w, r, "/admin?saved="+value, http.StatusSeeOther)
 }

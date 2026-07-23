@@ -16,6 +16,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; min-width: 320px; background: var(--paper); color: var(--ink); }
 a { color: inherit; }
 button, input, textarea, select { font: inherit; }
@@ -169,6 +170,27 @@ tbody tr:hover { background: #f6f9f7; }
 .update-form { display: flex; max-width: 620px; align-items: end; gap: 12px; margin-top: 17px; }
 .update-form .field { flex: 1; }
 .button:disabled { cursor: not-allowed; opacity: .45; }
+.geoip-status { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.geoip-status strong { display: block; min-height: 24px; font-size: 15px; }
+.geoip-status small { display: block; margin-top: 6px; font-size: 10px; }
+.geoip-task-summary { display: flex; min-width: 0; gap: 14px; padding: 11px 14px; border: 1px solid var(--line); border-top: 0; background: #f8faf8; font-size: 11px; }
+.geoip-task-summary span { flex: 0 0 auto; color: var(--muted); }
+.geoip-task-summary code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.geoip-manual { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 18px 0 26px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+.geoip-manual h3 { margin-bottom: 5px; }
+.geoip-manual p, .credential-heading p { margin: 0; color: var(--muted); font-size: 11px; }
+.geoip-form { max-width: 900px; }
+.geoip-source-options { align-items: center; }
+.official-source-row { display: grid; gap: 7px; min-width: 0; color: #48575a; font-size: 12px; font-weight: 700; }
+.official-source-row code { overflow: auto; padding: 11px; border: 1px solid var(--line); background: #f2f5f3; color: var(--muted); font-weight: 400; white-space: nowrap; }
+.credential-section-heading { margin-top: 4px; }
+.credential-section-heading h3 { margin: 0; }
+.credential-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.credential-panel { display: grid; gap: 16px; padding: 18px; border-left: 3px solid var(--green); background: #f3f6f4; }
+.credential-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.credential-heading h3 { margin-bottom: 5px; }
+.credential-clear { max-width: 420px; background: white; }
+.geoip-admin-password { max-width: 440px; }
 .snippet-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .snippet-heading h3, .snippet-heading h4 { margin: 0; }
 .icon-button { display: inline-grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: white; color: var(--muted); cursor: pointer; }
@@ -275,9 +297,12 @@ tbody tr:hover { background: #f6f9f7; }
 	.update-status > div { border-right: 0; border-bottom: 1px solid var(--line); }
 	.update-status > div:last-child { border-bottom: 0; }
 	.update-form { align-items: stretch; flex-direction: column; }
+	.geoip-manual { align-items: stretch; flex-direction: column; }
+	.geoip-manual .inline-actions { width: 100%; }
+	.geoip-manual .button { flex: 1; }
   .page-header .button, .header-actions { width: 100%; }
   .header-actions .button { flex: 1; }
-  .site-grid, .field-grid.two, .field-grid.four, .snippet-grid, .dimension-grid, .danger-grid, .records-filter, .aggregate-export, .admin-chart-grid { grid-template-columns: 1fr; }
+	.site-grid, .field-grid.two, .field-grid.four, .snippet-grid, .dimension-grid, .danger-grid, .records-filter, .aggregate-export, .admin-chart-grid, .credential-grid { grid-template-columns: 1fr; }
   .site-card { grid-template-columns: 1fr; }
   .site-map { min-height: 160px; }
   .metric-strip { grid-template-columns: repeat(2, 1fr); }

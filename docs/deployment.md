@@ -47,6 +47,8 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
 
 The default configuration listens on `127.0.0.1:8790`, stores SQLite and GeoIP data under `/var/lib/visitortrace`, and uses DB-IP City Lite as its automatically updated provider. MaxMind GeoLite2 City and IP2Location LITE DB11 have equivalent automatic-update support but require account credentials. Add `--geoip-provider maxmind --maxmind-account-id ACCOUNT_ID --maxmind-license-key LICENSE_KEY` or `--geoip-provider ip2location --ip2location-token DOWNLOAD_TOKEN` to the initialization command. Keep the configuration at mode `0600`; backups include these credentials and require the same access control.
 
+After installation, the provider, credentials, source, and update policy can be changed under **Administrator Settings > GeoIP database**. The form atomically updates the same protected configuration and requests a systemd-supervised restart, so the unit must retain `Restart=always` and write access to `/etc/visitortrace` as shown below.
+
 Before placing a reverse proxy in front of the service, add its loopback addresses to `trusted_proxies` in `/etc/visitortrace/config.json`:
 
 ```json

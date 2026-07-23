@@ -103,6 +103,8 @@ The Admin Console defaults to Simplified Chinese and stores the Chinese or Engli
 
 The top of the Admin dashboard reports application version and uptime, SQLite version/schema/size, available disk space, the GeoIP file, and the latest local backup. A task table retains the latest backup, maintenance cleanup, and GeoIP update outcomes. Low disk, a backup older than 48 hours, GeoIP data older than 35 days, stalled cleanup, or failed operations produce warnings. The page can trigger an immediate backup, cleanup, or GeoIP check.
 
+**Administrator Settings > GeoIP database** provides the provider, update policy, official/custom source, optional checksum URL, and provider credentials. Saved secrets are never rendered back to the browser: an empty credential field retains its value, while the explicit removal checkbox clears it. Saving GeoIP settings requires the Administrator password and restarts the supervised service. The same section can check the current database or force a download even when the update policy is **Manual only**.
+
 ### Pageview Records and Exports
 
 The Admin Console's Pageview Records view covers every Site. It shows 100 rows by default, with 50 and 200 row options. Filter-bound cursors move toward older or newer records without the drift of offset page numbers while ingestion continues.
@@ -250,6 +252,8 @@ The updater can consume an HTTPS mirror that exposes any supported container and
 `geoip_checksum_url` is optional. When present, VisitorTrace verifies the downloaded container's SHA-256 before extraction. Remote sources must use HTTPS, except loopback test endpoints. Set `"geoip_update": "disabled"` to disable downloads. Existing `"monthly"` values are migrated to `"automatic"` when read.
 
 The account credentials are secrets. Keep the configuration at mode `0600`, restrict backup access because backups include the configuration, and do not put credentials in either update URL.
+
+Existing installations can switch providers without rerunning `init`: use **Administrator Settings > GeoIP database**, enter new credentials when required, and save. The service restarts with the new provider. Credentials saved for other providers remain available for a later switch unless explicitly removed.
 
 Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. The map hover details, Admin previews, and Public Analytics show the attribution for the active provider. DB-IP Chinese city-label normalization applies only to DB-IP records; MaxMind and IP2Location city names are mapped as supplied by those databases.
 
