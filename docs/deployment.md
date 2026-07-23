@@ -18,7 +18,7 @@ Only ports 80 and 443 need to be public. Do not expose the VisitorTrace port to 
 Set the release version and architecture, then download the matching executable and checksum file:
 
 ```sh
-VERSION=0.1.2
+VERSION=0.1.3
 ARCH=amd64
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/visitortrace-${VERSION}-linux-${ARCH}"
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/checksums.txt"
@@ -94,7 +94,7 @@ If the new release binary and `checksums.txt` are already on the server, update 
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.1.2-linux-amd64 \
+  --binary ./visitortrace-0.1.3-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 

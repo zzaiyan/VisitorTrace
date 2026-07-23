@@ -33,15 +33,15 @@ make build
 
 ## Install a Release
 
-GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.1.2` on AMD64:
+GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.1.3` on AMD64:
 
 ```sh
-grep ' visitortrace-0.1.2-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-0.1.2-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.1.3-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.1.3-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-Replace `0.1.2` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
+Replace `0.1.3` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
 
 ## Initialize
 
@@ -355,7 +355,7 @@ When a release binary has already been downloaded manually, use the repository s
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.1.2-linux-amd64 \
+  --binary ./visitortrace-0.1.3-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 

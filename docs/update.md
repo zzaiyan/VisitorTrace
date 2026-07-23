@@ -6,16 +6,15 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.1.3 - 2026-07-24
+
+- Reorganized Administrator Settings into service configuration, GeoIP data operations, account security, and application update. Configuration changes now save atomically with one password confirmation and one supervised restart, while protected systemd paths and permission handling are documented and enforced consistently.
+- Added signed local-file self-update from the Admin Console, including manifest and platform binary verification, schema checks, backups, and rollback. Documented the workflow alongside the same-schema systemd update script and reverse-proxy upload limits.
+- Rebuilt Site management around a dedicated `/admin/sites` list, Site settings, integration resources, Map Presets, records, analytics, and destructive operations. Integrated and separated API modes now expose symmetric snippets, resource URLs, and copy controls.
+- Aligned multi-column form controls when only one field contains helper text, including Site counting/retention and Administrator password settings.
 - Replaced free-form IANA timezone fields with searchable browser-native dropdowns on Site creation and settings pages. Sites with Pageviews now explain why the statistics timezone is locked and how to unlock it safely.
-- Aligned controls in multi-column forms when only one field includes helper text, including Site counting/retention and Administrator password settings.
-- Added the missing `/admin/sites` management route, separated Site listing from creation and the operations dashboard, and returned deleted Sites to the list.
-- Reorganized each Site page around integration, settings, Map Preset, recent records, and destructive operations. Site settings now use consistent identity, counting/retention, and collection/publication groups.
-- Made the integrated and separated integration modes structurally consistent: Widget, Tracker, and Map SVG resources each expose an embed snippet, resource URL, and integrated copy control.
-- Reorganized Administrator Settings into service configuration, GeoIP data operations, account security, and application update. Public Base URL and all GeoIP source/credential fields now save atomically with one password confirmation and one supervised restart.
-- Styled the full GeoIP task summary, added content-revision URLs for embedded CSS/JavaScript to prevent stale post-upgrade assets, and made configuration-save failures point to the required systemd `ReadWritePaths` directory.
-- Avoided redundant directory/file `chmod` calls when protected configuration modes are already correct, while retaining strict `0700`/`0600` enforcement for nonconforming paths.
-- Added a local-file option to Administrator Settings self-update. Administrators can upload the signed `manifest.json` and matching platform binary from one Release while retaining Ed25519, size, SHA-256, candidate identity, schema, backup, and rollback checks.
-- Documented the local signed workflow, its distinction from the same-schema manual systemd script, and the reverse-proxy upload-size setting.
 
 ## 0.1.2 - 2026-07-23
 

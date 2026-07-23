@@ -18,7 +18,7 @@
 设置版本和架构，然后下载对应二进制及校验文件：
 
 ```sh
-VERSION=0.1.2
+VERSION=0.1.3
 ARCH=amd64
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/visitortrace-${VERSION}-linux-${ARCH}"
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/checksums.txt"
@@ -94,7 +94,7 @@ sudo -u visitortrace /usr/local/bin/visitortrace update bootstrap \
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.1.2-linux-amd64 \
+  --binary ./visitortrace-0.1.3-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 
