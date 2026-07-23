@@ -1,7 +1,7 @@
 {{define "content"}}
 <header class="page-header">
-  <div><p class="eyebrow">ADMIN CONSOLE</p><h1>{{t "dashboard"}}</h1><p class="subhead">{{len .Sites}} {{t "site_count"}}</p></div>
-  <a class="button primary" href="{{appPath "/admin/sites/new"}}">{{t "add_site"}}</a>
+  <div><p class="eyebrow">ADMIN CONSOLE</p><h1>{{t "dashboard"}}</h1><p class="subhead">{{.SiteCount}} {{t "site_count"}}</p></div>
+  <a class="button ghost" href="{{appPath "/admin/sites"}}">{{t "manage_sites"}}</a>
 </header>
 {{if .Operations.Warnings}}<div class="notice danger" role="alert">{{t "operations_attention"}}: {{range $index, $warning := .Operations.Warnings}}{{if $index}} · {{end}}{{operationWarning $warning}}{{end}}</div>{{end}}
 <section class="operations-band" aria-label="{{t "operations"}}">
@@ -16,32 +16,4 @@
   </dl>
   <div class="operation-table table-wrap"><table><thead><tr><th>{{t "task"}}</th><th>{{t "status"}}</th><th>{{t "completed_at"}}</th><th>{{t "summary"}}</th></tr></thead><tbody>{{range .Operations.Tasks}}<tr><td>{{operationLabel .Operation}}</td><td><span class="status {{.State}}">{{operationState .State}}</span></td><td>{{if .CompletedAt}}{{formatUTC .CompletedAt}}{{else}}{{t "running"}}{{end}}</td><td><code>{{.Summary}}</code></td></tr>{{else}}<tr><td colspan="4" class="empty-cell">{{t "no_task_runs"}}</td></tr>{{end}}</tbody></table></div>
 </section>
-{{if .Sites}}
-<section class="site-grid" aria-label="{{t "site_list"}}">
-  {{range .Sites}}
-  <article class="site-card">
-    <div class="site-card-copy">
-      <div class="status-line">
-        {{if .Site.AcceptPageviews}}<span class="status live">{{t "receiving"}}</span>{{else}}<span class="status paused">{{t "paused"}}</span>{{end}}
-        {{if .Site.PublishPublic}}<span class="status public">{{t "public"}}</span>{{else}}<span class="status private">{{t "private"}}</span>{{end}}
-      </div>
-      <h2><a href="{{appPath (printf "/admin/sites/%s" .Site.ID)}}">{{.Site.Name}}</a></h2>
-      <code>{{.Site.ID}}</code>
-      <dl class="compact-stats">
-        <div><dt>Pageviews</dt><dd>{{formatCount .Overview.Pageviews}}</dd></div>
-        <div><dt>Unique Visitors</dt><dd>{{formatCount .Overview.UniqueVisitors}}</dd></div>
-        <div><dt>Records</dt><dd>{{formatCount .Overview.PageviewRecords}}</dd></div>
-      </dl>
-      <div class="inline-actions">
-        <a class="text-link" href="{{appPath (printf "/admin/sites/%s" .Site.ID)}}">{{t "manage"}}</a>
-        {{if .Site.PublishPublic}}<a class="text-link" href="{{appPath (printf "/public/%s/analytics" .Site.ID)}}" target="_blank" rel="noopener">{{t "public_analytics"}}</a>{{end}}
-      </div>
-    </div>
-    <a class="site-map" href="{{appPath (printf "/admin/sites/%s" .Site.ID)}}" aria-label="{{t "manage_site"}} {{.Site.Name}}"><img src="{{.MapPreviewURL}}" alt="{{.Site.Name}} {{t "visitor_map"}}"></a>
-  </article>
-  {{end}}
-</section>
-{{else}}
-<section class="empty-state"><p class="eyebrow">NO SITES</p><h2>{{t "no_sites"}}</h2><a class="button primary" href="{{appPath "/admin/sites/new"}}">{{t "create_first_site"}}</a></section>
-{{end}}
 {{end}}

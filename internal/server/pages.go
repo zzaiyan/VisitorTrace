@@ -69,8 +69,13 @@ type siteSummary struct {
 
 type adminDashboardData struct {
 	pageLayout
-	Sites      []siteSummary
+	SiteCount  int
 	Operations operations.Snapshot
+}
+
+type adminSitesData struct {
+	pageLayout
+	Sites []siteSummary
 }
 
 type adminSiteData struct {
@@ -198,8 +203,23 @@ func (s *Server) adminDashboard(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusInternalServerError, "无法读取站点。")
 		return
 	}
-	result := adminDashboardData{pageLayout: s.adminLayout(r, session, "管理总览", "dashboard")}
+	result := adminDashboardData{pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "dashboard"), "dashboard"), SiteCount: len(sites)}
 	result.Operations = operations.Collect(r.Context(), s.Config, s.Store, s.Started, time.Now())
+	result.Flash = adminFlash(r)
+	s.renderPage(w, r, "dashboard", result)
+}
+
+func (s *Server) adminSites(w http.ResponseWriter, r *http.Request) {
+	session, ok := s.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+	sites, err := s.Store.ListSites(r.Context())
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "无法读取站点。")
+		return
+	}
+	result := adminSitesData{pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "sites"), "sites")}
 	for _, site := range sites {
 		overview, err := s.Store.SiteOverview(r.Context(), site.ID)
 		if err != nil {
@@ -214,7 +234,7 @@ func (s *Server) adminDashboard(w http.ResponseWriter, r *http.Request) {
 		result.Sites = append(result.Sites, siteSummary{Site: site, Overview: overview, Preset: preset, MapPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview.svg")})
 	}
 	result.Flash = adminFlash(r)
-	s.renderPage(w, r, "dashboard", result)
+	s.renderPage(w, r, "sites", result)
 }
 
 func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
@@ -504,7 +524,7 @@ func (s *Server) adminDeleteSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mapCache.deleteSite(siteID)
-	s.redirect(w, r, "/admin?saved=deleted", http.StatusSeeOther)
+	s.redirect(w, r, "/admin/sites?saved=deleted", http.StatusSeeOther)
 }
 
 func (s *Server) adminPresetPreview(w http.ResponseWriter, r *http.Request) {

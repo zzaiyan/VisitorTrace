@@ -214,7 +214,7 @@ func TestSubpathRoutesAndConfiguredBaseURL(t *testing.T) {
 	dashboardResponse := httptest.NewRecorder()
 	handler.ServeHTTP(dashboardResponse, dashboard)
 	body := dashboardResponse.Body.String()
-	if dashboardResponse.Code != http.StatusOK || !strings.Contains(body, `href="/visitortrace/admin/assets/style.css?v=`) || !strings.Contains(body, `action="/visitortrace/admin/logout"`) {
+	if dashboardResponse.Code != http.StatusOK || !strings.Contains(body, `href="/visitortrace/admin/assets/style.css?v=`) || !strings.Contains(body, `href="/visitortrace/admin/sites"`) || !strings.Contains(body, `action="/visitortrace/admin/logout"`) {
 		t.Fatalf("subpath dashboard = status %d, body = %q", dashboardResponse.Code, body)
 	}
 	csrfMatch := regexp.MustCompile(`name="csrf" value="([a-f0-9]{64})"`).FindStringSubmatch(body)
@@ -332,8 +332,16 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	dashboard.AddCookie(cookies[0])
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, dashboard)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), site.Name) || !strings.Contains(response.Body.String(), "管理总览") {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "管理总览") || !strings.Contains(response.Body.String(), `href="/admin/sites"`) {
 		t.Fatalf("dashboard status = %d, body = %q", response.Code, response.Body.String())
+	}
+	sitesRequest := httptest.NewRequest(http.MethodGet, "/admin/sites", nil)
+	sitesRequest.Host = "127.0.0.1:8790"
+	sitesRequest.AddCookie(cookies[0])
+	sitesResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(sitesResponse, sitesRequest)
+	if sitesResponse.Code != http.StatusOK || !strings.Contains(sitesResponse.Body.String(), site.Name) || !strings.Contains(sitesResponse.Body.String(), `href="/admin/sites/new"`) || !strings.Contains(sitesResponse.Body.String(), `href="/admin/sites" aria-current="page"`) {
+		t.Fatalf("Sites page status = %d, body = %q", sitesResponse.Code, sitesResponse.Body.String())
 	}
 	csrfMatch := regexp.MustCompile(`name="csrf" value="([a-f0-9]{64})"`).FindStringSubmatch(response.Body.String())
 	if len(csrfMatch) != 2 {
@@ -391,8 +399,11 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	sitePage.AddCookie(cookies[0])
 	sitePageResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(sitePageResponse, sitePage)
-	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) {
+	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-endpoint"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) {
 		t.Fatalf("admin Site page = status %d, body = %q", sitePageResponse.Code, sitePageResponse.Body.String())
+	}
+	if count := strings.Count(sitePageResponse.Body.String(), `class="copy-control copy-button"`); count != 6 {
+		t.Fatalf("admin Site page copy controls = %d, want 6", count)
 	}
 }
 
@@ -454,7 +465,7 @@ func TestAdminSiteResetAndDelete(t *testing.T) {
 		t.Fatalf("reset Site = %#v, %v", resetSite, err)
 	}
 	deleted := post("/admin/sites/" + site.ID + "/delete")
-	if deleted.Code != http.StatusSeeOther || deleted.Header().Get("Location") != "/admin?saved=deleted" {
+	if deleted.Code != http.StatusSeeOther || deleted.Header().Get("Location") != "/admin/sites?saved=deleted" {
 		t.Fatalf("delete = status %d location %q", deleted.Code, deleted.Header().Get("Location"))
 	}
 	if _, err := st.GetSite(context.Background(), site.ID); err == nil {

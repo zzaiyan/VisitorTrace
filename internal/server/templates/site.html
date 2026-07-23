@@ -1,15 +1,86 @@
+{{define "copy-icon"}}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg>{{end}}
 {{define "content"}}
 <header class="page-header site-heading">
-  <div><p class="eyebrow">SITE · {{.Site.ID}}</p><h1>{{.Site.Name}}</h1><p class="subhead">{{.Site.Timezone}} · {{len .Site.AllowedOrigins}} {{t "allowed_origins_count"}}</p></div>
-  <div class="header-actions"><a class="button ghost" href="{{appPath (printf "/admin/sites/%s/analytics" .Site.ID)}}">{{t "aggregate_analytics"}}</a>{{if .Site.PublishPublic}}<a class="button ghost" href="{{appPath (printf "/public/%s/analytics" .Site.ID)}}" target="_blank" rel="noopener">{{t "public_analytics"}}</a>{{end}}<a class="button ghost" href="#integration">{{t "integration_code"}}</a></div>
+  <div><div class="site-breadcrumb"><a href="{{appPath "/admin/sites"}}">{{t "sites"}}</a><span>/</span><code>{{.Site.ID}}</code></div><h1>{{.Site.Name}}</h1><p class="subhead">{{.Site.Timezone}} · {{len .Site.AllowedOrigins}} {{t "allowed_origins_count"}}</p></div>
+  <div class="header-actions"><a class="button ghost" href="{{appPath (printf "/admin/sites/%s/analytics" .Site.ID)}}">{{t "aggregate_analytics"}}</a>{{if .Site.PublishPublic}}<a class="button ghost" href="{{appPath (printf "/public/%s/analytics" .Site.ID)}}" target="_blank" rel="noopener">{{t "public_analytics"}}</a>{{end}}</div>
 </header>
 {{if .Saved}}<div class="notice success" role="status">{{.Saved}}</div>{{end}}
 {{if .Error}}<div class="notice danger" role="alert">{{.Error}}</div>{{end}}
+<nav class="settings-jump site-section-nav" aria-label="{{t "site_sections"}}"><a href="#integration">{{t "integration_code"}}</a><a href="#settings">{{t "site_settings"}}</a><a href="#preset">{{t "map_preset"}}</a><a href="#records">{{t "recent_records"}}</a><a href="#danger">{{t "danger_zone"}}</a></nav>
 <section class="metric-strip" aria-label="{{t "cumulative_stats"}}">
   <div><span>Pageviews</span><strong>{{formatCount .Overview.Pageviews}}</strong></div>
   <div><span>Unique Visitors</span><strong>{{formatCount .Overview.UniqueVisitors}}</strong></div>
   <div><span>Pageview Records</span><strong>{{formatCount .Overview.PageviewRecords}}</strong></div>
   <div><span>{{t "retention"}}</span><strong>{{.Site.RetentionDays}} {{t "day"}}</strong></div>
+</section>
+
+<section class="section-block" id="integration">
+  <div class="section-heading"><div><p class="eyebrow">INTEGRATION</p><h2>{{t "integration_code"}}</h2></div></div>
+  <div class="integration-method">
+    <div class="integration-method-heading"><span>01</span><h3>{{t "combined_widget"}}</h3></div>
+    <div class="integration-resource">
+      <h3>{{t "widget_resource"}}</h3>
+      <div class="code-sample">
+        <div class="code-sample-heading"><span>{{t "embed_code"}}</span><button class="copy-control copy-button" type="button" data-copy-target="combined-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div>
+        <pre><code id="combined-snippet">&lt;script async src="{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre>
+      </div>
+      <div class="endpoint-field"><span>{{t "resource_url"}}</span><div class="endpoint-control"><code id="combined-endpoint">{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}</code><button class="copy-control copy-button" type="button" data-copy-target="combined-endpoint" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div></div>
+    </div>
+  </div>
+  <div class="integration-method">
+    <div class="integration-method-heading"><span>02</span><h3>{{t "separate_tracker"}}</h3></div>
+    <div class="integration-resource-grid">
+      <div class="integration-resource">
+        <h3>{{t "tracker_resource"}}</h3>
+        <div class="code-sample">
+          <div class="code-sample-heading"><span>{{t "embed_code"}}</span><button class="copy-control copy-button" type="button" data-copy-target="tracker-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div>
+          <pre><code id="tracker-snippet">&lt;script async src="{{.BaseURL}}/embed/tracker.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre>
+        </div>
+        <div class="endpoint-field"><span>{{t "resource_url"}}</span><div class="endpoint-control"><code id="tracker-endpoint">{{.BaseURL}}/embed/tracker.js?site_id={{.Site.ID}}</code><button class="copy-control copy-button" type="button" data-copy-target="tracker-endpoint" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div></div>
+      </div>
+      <div class="integration-resource">
+        <h3>{{t "map_resource"}}</h3>
+        <div class="code-sample">
+          <div class="code-sample-heading"><span>{{t "embed_code"}}</span><button class="copy-control copy-button" type="button" data-copy-target="map-control-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div>
+          <pre><code id="map-control-snippet">&lt;img loading="lazy" src="{{.BaseURL}}/api/v1/sites/{{.Site.ID}}/map.svg" alt="Visitor map"&gt;</code></pre>
+        </div>
+        <div class="endpoint-field"><span>{{t "resource_url"}}</span><div class="endpoint-control"><code id="map-endpoint">{{.BaseURL}}/api/v1/sites/{{.Site.ID}}/map.svg</code><button class="copy-control copy-button" type="button" data-copy-target="map-endpoint" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section-block" id="settings">
+  <div class="section-heading"><div><p class="eyebrow">SETTINGS</p><h2>{{t "site_settings"}}</h2></div></div>
+  <form method="post" action="{{appPath (printf "/admin/sites/%s/settings" .Site.ID)}}" class="site-settings-form">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <div class="site-settings-group">
+      <div class="site-settings-group-heading"><span>01</span><h3>{{t "site_identity"}}</h3></div>
+      <div class="site-settings-fields">
+        <div class="field-grid two">
+          <label class="field"><span>{{t "display_name"}}</span><input type="text" name="name" maxlength="100" value="{{.Site.Name}}" required></label>
+          <label class="field"><span>{{t "iana_timezone"}}</span><input type="text" name="timezone" value="{{.Site.Timezone}}" {{if .Site.FirstPageviewAt}}readonly{{end}} required></label>
+        </div>
+        <label class="field"><span>{{t "allowed_origins"}}</span><textarea name="origins" rows="3" spellcheck="false" required>{{.OriginsText}}</textarea><small>{{t "origin_hint"}}</small></label>
+      </div>
+    </div>
+    <div class="site-settings-group">
+      <div class="site-settings-group-heading"><span>02</span><h3>{{t "statistics_policy"}}</h3></div>
+      <div class="site-settings-fields field-grid two">
+        <label class="field"><span>{{t "dedup_window"}}</span><div class="input-unit"><input type="number" name="dedup_window_days" min="1" max="30" value="{{.Site.DedupWindowDays}}" required><span>{{t "day"}}</span></div><small>{{t "dedup_change_help"}}</small></label>
+        <label class="field"><span>{{t "record_retention"}}</span><div class="input-unit"><input type="number" name="retention_days" min="1" max="90" value="{{.Site.RetentionDays}}" required><span>{{t "day"}}</span></div></label>
+      </div>
+    </div>
+    <div class="site-settings-group">
+      <div class="site-settings-group-heading"><span>03</span><h3>{{t "access_publishing"}}</h3></div>
+      <div class="site-settings-fields">
+        <label class="setting-toggle"><span><strong>{{t "accept_pageviews"}}</strong><small>{{t "public_ingest_endpoint"}}</small></span><span class="switch-control"><input type="checkbox" name="accept_pageviews" role="switch" {{if .Site.AcceptPageviews}}checked{{end}}><span aria-hidden="true"></span></span></label>
+        <label class="setting-toggle"><span><strong>{{t "publish_data"}}</strong><small>{{t "map_and_analytics"}}</small></span><span class="switch-control"><input type="checkbox" name="publish_public" role="switch" {{if .Site.PublishPublic}}checked{{end}}><span aria-hidden="true"></span></span></label>
+        <label class="field public-language-field"><span>{{t "public_language"}}</span><select name="public_language"><option value="auto" {{if selected .Site.PublicLanguage "auto"}}selected{{end}}>{{t "language_auto"}}</option><option value="zh-CN" {{if selected .Site.PublicLanguage "zh-CN"}}selected{{end}}>简体中文</option><option value="en" {{if selected .Site.PublicLanguage "en"}}selected{{end}}>English</option></select></label>
+      </div>
+    </div>
+    <div class="site-settings-actions"><button class="button primary" type="submit">{{t "save_settings"}}</button></div>
+  </form>
 </section>
 
 <section class="section-block" id="preset">
@@ -44,44 +115,6 @@
       </div>
       <div class="form-actions"><button class="button primary" type="submit">{{t "save_preset"}}</button></div>
     </form>
-  </div>
-</section>
-
-<section class="section-block" id="settings">
-  <div class="section-heading"><div><p class="eyebrow">SETTINGS</p><h2>{{t "site_settings"}}</h2></div></div>
-  <form method="post" action="{{appPath (printf "/admin/sites/%s/settings" .Site.ID)}}" class="settings-form">
-    <input type="hidden" name="csrf" value="{{.CSRF}}">
-    <div class="field-grid two">
-      <label class="field"><span>{{t "display_name"}}</span><input type="text" name="name" maxlength="100" value="{{.Site.Name}}" required></label>
-      <label class="field"><span>{{t "iana_timezone"}}</span><input type="text" name="timezone" value="{{.Site.Timezone}}" {{if .Site.FirstPageviewAt}}readonly{{end}} required></label>
-    </div>
-    <label class="field"><span>Allowed Origins</span><textarea name="origins" rows="3" spellcheck="false" required>{{.OriginsText}}</textarea></label>
-    <label class="field"><span>{{t "public_language"}}</span><select name="public_language"><option value="auto" {{if selected .Site.PublicLanguage "auto"}}selected{{end}}>{{t "language_auto"}}</option><option value="zh-CN" {{if selected .Site.PublicLanguage "zh-CN"}}selected{{end}}>简体中文</option><option value="en" {{if selected .Site.PublicLanguage "en"}}selected{{end}}>English</option></select></label>
-    <div class="field-grid four">
-      <label class="field"><span>{{t "dedup_window"}}</span><div class="input-unit"><input type="number" name="dedup_window_days" min="1" max="30" value="{{.Site.DedupWindowDays}}" required><span>{{t "day"}}</span></div><small>{{t "dedup_change_help"}}</small></label>
-      <label class="field"><span>{{t "record_retention"}}</span><div class="input-unit"><input type="number" name="retention_days" min="1" max="90" value="{{.Site.RetentionDays}}" required><span>{{t "day"}}</span></div></label>
-      <label class="toggle-field"><span><strong>{{t "accept_pageviews"}}</strong><small>{{t "public_ingest_endpoint"}}</small></span><input type="checkbox" name="accept_pageviews" {{if .Site.AcceptPageviews}}checked{{end}}></label>
-      <label class="toggle-field"><span><strong>{{t "publish_data"}}</strong><small>{{t "map_and_analytics"}}</small></span><input type="checkbox" name="publish_public" {{if .Site.PublishPublic}}checked{{end}}></label>
-    </div>
-    <div class="form-actions"><button class="button primary" type="submit">{{t "save_settings"}}</button></div>
-  </form>
-</section>
-
-<section class="section-block" id="integration">
-  <div class="section-heading"><div><p class="eyebrow">INTEGRATION</p><h2>{{t "integration_code"}}</h2></div></div>
-  <div class="snippet-grid">
-    <div class="snippet-card">
-      <div class="snippet-heading"><h3>{{t "combined_widget"}}</h3><button class="icon-button copy-button" type="button" data-copy-target="combined-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
-      <pre><code id="combined-snippet">&lt;script async src="{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre>
-      <div class="endpoint-row"><code class="endpoint" id="combined-endpoint">{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}</code><button class="icon-button copy-button" type="button" data-copy-target="combined-endpoint" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
-    </div>
-    <div class="snippet-card">
-      <div class="snippet-heading"><h3>{{t "separate_tracker"}}</h3><button class="icon-button copy-button" type="button" data-copy-target="tracker-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
-      <pre><code id="tracker-snippet">&lt;script async src="{{.BaseURL}}/embed/tracker.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre>
-      <div class="snippet-heading"><h4>{{t "map_control"}}</h4><button class="icon-button copy-button" type="button" data-copy-target="map-control-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
-      <pre><code id="map-control-snippet">&lt;img loading="lazy" src="{{.BaseURL}}/api/v1/sites/{{.Site.ID}}/map.svg" alt="Visitor map"&gt;</code></pre>
-      <div class="endpoint-row"><code class="endpoint" id="map-endpoint">{{.BaseURL}}/api/v1/sites/{{.Site.ID}}/map.svg</code><button class="icon-button copy-button" type="button" data-copy-target="map-endpoint" title="{{t "copy"}}" aria-label="{{t "copy"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="1.5"></rect><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path></svg><span class="sr-only">{{t "copy"}}</span></button></div>
-    </div>
   </div>
 </section>
 

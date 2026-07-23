@@ -100,6 +100,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/operations/backup", s.adminRunBackup)
 	mux.HandleFunc("POST /admin/operations/cleanup", s.adminRunCleanup)
 	mux.HandleFunc("POST /admin/operations/geoip", s.adminRunGeoIPUpdate)
+	mux.HandleFunc("GET /admin/sites", s.adminSites)
 	mux.HandleFunc("GET /admin/sites/new", s.adminNewSite)
 	mux.HandleFunc("POST /admin/sites/new", s.adminCreateSite)
 	mux.HandleFunc("GET /admin/sites/{siteID}", s.adminSite)
