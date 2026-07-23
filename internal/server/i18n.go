@@ -49,6 +49,7 @@ var messages = map[string]map[string]string{
 		"transparent_background": "透明背景", "background": "背景色", "land": "陆地", "border": "边界", "text": "文字", "marker": "标记", "save_preset": "保存预设",
 		"site_settings": "站点设置", "accept_pageviews": "接收 Pageview", "public_ingest_endpoint": "公开采集端点", "publish_data": "公开数据", "map_and_analytics": "地图与分析页",
 		"save_settings": "保存设置", "combined_widget": "一体式 Widget", "separate_tracker": "分离式 Tracker", "map_control": "地图控件代码", "recent_records": "最近记录", "filter_page_export": "筛选、分页与导出",
+		"refresh_record_geoip": "刷新地理信息", "refresh_record_geoip_confirm": "使用当前 GeoIP 覆写保留期内的 Pageview 地理信息，并重算这些记录覆盖日期的地理聚合？没有明细的早期日期不会改变。", "geoip_unavailable": "GeoIP 数据库不可用",
 		"no_pageview_records": "暂无 Pageview Record", "danger_zone": "危险操作", "irreversible_backup_first": "不可撤销，请先备份", "reset_site_data": "清空 Site 数据",
 		"reset_site_help": "删除逐条记录、聚合和地图点，保留 Site 设置；同时关闭采集和公开展示。", "enter_site_id": "输入 Site ID", "reset_data": "清空数据",
 		"delete_site": "永久删除 Site", "delete_site_help": "删除 Site 及其全部记录、聚合、地图数据和设置，Site ID 不会再次分配。", "delete_permanently": "永久删除",
@@ -62,7 +63,7 @@ var messages = map[string]map[string]string{
 		"public_language": "公开分析默认语言", "language_auto": "自动（跟随访客浏览器）",
 		"flash_site": "Site 已创建。", "flash_settings": "站点设置已保存。", "flash_preset": "Map Preset 已保存。", "flash_reset": "Site 数据已清空；采集和公开展示保持关闭。",
 		"flash_deleted": "Site 已永久删除。", "flash_backup": "备份已创建并通过完整性检查。", "flash_cleanup": "维护清理已完成。", "flash_geoip": "GeoIP 数据库已更新并热加载。",
-		"flash_geoip_current": "GeoIP 数据库当前无需更新。", "flash_update_current": "VisitorTrace 已是最新版本。",
+		"flash_geoip_current": "GeoIP 数据库当前无需更新。", "flash_update_current": "VisitorTrace 已是最新版本。", "flash_record_geoip": "已处理 %d 条 Pageview（%d 条发生变化）：定位 %d 条，未命中 %d 条，跳过 %d 条无效 IP；已重算 %d 个日期的地理聚合。",
 	},
 	"en": {
 		"dashboard": "Dashboard", "sites": "Sites", "records": "Pageview Records", "settings": "Administrator Settings", "logout": "Log out", "admin_navigation": "Admin navigation",
@@ -100,6 +101,7 @@ var messages = map[string]map[string]string{
 		"transparent_background": "Transparent background", "background": "Background", "land": "Land", "border": "Borders", "text": "Text", "marker": "Markers", "save_preset": "Save preset",
 		"site_settings": "Site settings", "accept_pageviews": "Accept Pageviews", "public_ingest_endpoint": "Public ingestion endpoint", "publish_data": "Publish data", "map_and_analytics": "Map and analytics pages",
 		"save_settings": "Save settings", "combined_widget": "Combined Widget", "separate_tracker": "Separate Tracker", "map_control": "Map control code", "recent_records": "Recent records", "filter_page_export": "Filter, paginate, and export",
+		"refresh_record_geoip": "Refresh geography", "refresh_record_geoip_confirm": "Overwrite retained Pageview geography with the current GeoIP database and rebuild geographic aggregates for the dates those records cover? Earlier dates without records will not change.", "geoip_unavailable": "GeoIP database unavailable",
 		"no_pageview_records": "No Pageview Records", "danger_zone": "Danger zone", "irreversible_backup_first": "Irreversible; create a backup first", "reset_site_data": "Reset Site data",
 		"reset_site_help": "Delete individual records, aggregates, and map points while keeping Site settings; ingestion and public views are disabled.", "enter_site_id": "Enter Site ID", "reset_data": "Reset data",
 		"delete_site": "Permanently delete Site", "delete_site_help": "Delete the Site and all records, aggregates, map data, and settings. The Site ID will not be reused.", "delete_permanently": "Delete permanently",
@@ -113,7 +115,7 @@ var messages = map[string]map[string]string{
 		"public_language": "Default Public Analytics language", "language_auto": "Automatic (visitor browser preference)",
 		"flash_site": "Site created.", "flash_settings": "Site settings saved.", "flash_preset": "Map Preset saved.", "flash_reset": "Site data reset; ingestion and public views remain disabled.",
 		"flash_deleted": "Site permanently deleted.", "flash_backup": "Backup created and verified.", "flash_cleanup": "Maintenance cleanup completed.", "flash_geoip": "GeoIP database updated and hot-loaded.",
-		"flash_geoip_current": "The GeoIP database is already current.", "flash_update_current": "VisitorTrace is up to date.",
+		"flash_geoip_current": "The GeoIP database is already current.", "flash_update_current": "VisitorTrace is up to date.", "flash_record_geoip": "Processed %d Pageviews (%d changed): %d located, %d unmatched, %d invalid IPs skipped; geographic aggregates rebuilt for %d dates.",
 	},
 }
 

@@ -3,10 +3,150 @@ package store
 import (
 	"bytes"
 	"context"
+	"net/netip"
 	"path/filepath"
 	"testing"
 	"time"
 )
+
+func TestRefreshPageviewGeoIPRebuildsRetainedGeography(t *testing.T) {
+	ctx := context.Background()
+	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	site, err := st.CreateSite(ctx, CreateSiteParams{Name: "GeoIP refresh", AllowedOrigins: []string{"https://example.com"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	latitude := 30.5928
+	longitude := 114.3055
+	base := time.Now().UTC().Add(-time.Hour)
+	records := []PageviewObservation{
+		{OriginalIP: "192.0.2.1", VisitorDigest: bytes.Repeat([]byte{1}, 32), City: "Wuhan"},
+		{OriginalIP: "192.0.2.1", VisitorDigest: bytes.Repeat([]byte{1}, 32), City: "Wuhan"},
+		{OriginalIP: "192.0.2.2", VisitorDigest: bytes.Repeat([]byte{2}, 32), City: "Wuhan"},
+		{OriginalIP: "not-an-ip", VisitorDigest: bytes.Repeat([]byte{3}, 32), RegionCode: "GD", City: "Shenzhen"},
+	}
+	localDate := ""
+	for index := range records {
+		records[index].SiteID = site.ID
+		records[index].Hostname = "example.com"
+		records[index].OccurredAt = base.Add(time.Duration(index) * time.Second)
+		records[index].Path = "/geoip"
+		records[index].CountryCode = "CN"
+		records[index].Latitude = &latitude
+		records[index].Longitude = &longitude
+		records[index].OperatingSystem = "Linux"
+		records[index].Browser = "Firefox"
+		created, err := st.RecordPageview(ctx, records[index])
+		if err != nil {
+			t.Fatal(err)
+		}
+		localDate = created.LocalDate
+	}
+	if _, err := st.DB.ExecContext(ctx, `
+		INSERT INTO daily_aggregates (site_id, local_date, dimension_kind, dimension_value, pageviews, unique_visitors)
+		VALUES (?, '2000-01-01', 'country', 'LEGACY', 7, 5)
+	`, site.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	sanFranciscoLatitude := 37.7749
+	sanFranciscoLongitude := -122.4194
+	result, err := st.RefreshPageviewGeoIP(ctx, site.ID, func(address netip.Addr) PageviewGeography {
+		switch address.String() {
+		case "192.0.2.1":
+			return PageviewGeography{
+				CountryCode: "US", RegionCode: "CA", City: "San Francisco",
+				Latitude: &sanFranciscoLatitude, Longitude: &sanFranciscoLongitude,
+			}
+		case "192.0.2.2":
+			return PageviewGeography{}
+		default:
+			t.Fatalf("unexpected GeoIP lookup for %s", address)
+			return PageviewGeography{}
+		}
+	})
+	if err != nil {
+		t.Fatalf("RefreshPageviewGeoIP() error = %v", err)
+	}
+	if result.Processed != 3 || result.Changed != 3 || result.Located != 2 || result.Unmatched != 1 || result.InvalidIP != 1 || result.AggregateDates != 1 {
+		t.Fatalf("RefreshPageviewGeoIP() = %#v", result)
+	}
+
+	page, err := st.PageviewRecords(ctx, PageviewFilters{SiteID: site.ID}, nil, "older", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byIP := make(map[string][]PageviewRecord)
+	for _, record := range page.Records {
+		byIP[record.OriginalIP] = append(byIP[record.OriginalIP], record)
+	}
+	for _, record := range byIP["192.0.2.1"] {
+		if record.CountryCode != "US" || record.RegionCode != "CA" || record.City != "San Francisco" || !record.Latitude.Valid || record.Latitude.Float64 != sanFranciscoLatitude {
+			t.Fatalf("located record = %#v", record)
+		}
+	}
+	unmatched := byIP["192.0.2.2"][0]
+	if unmatched.CountryCode != "" || unmatched.RegionCode != "" || unmatched.City != "" || unmatched.Latitude.Valid || unmatched.Longitude.Valid {
+		t.Fatalf("unmatched record retained stale geography: %#v", unmatched)
+	}
+	invalid := byIP["not-an-ip"][0]
+	if invalid.CountryCode != "CN" || invalid.RegionCode != "GD" || invalid.City != "Shenzhen" || !invalid.Latitude.Valid {
+		t.Fatalf("invalid-IP record changed: %#v", invalid)
+	}
+
+	assertAggregate := func(date, kind, value string, wantPageviews, wantVisitors int64) {
+		t.Helper()
+		var pageviews, visitors int64
+		err := st.DB.QueryRowContext(ctx, `
+			SELECT pageviews, unique_visitors FROM daily_aggregates
+			WHERE site_id = ? AND local_date = ? AND dimension_kind = ? AND dimension_value = ?
+		`, site.ID, date, kind, value).Scan(&pageviews, &visitors)
+		if err != nil || pageviews != wantPageviews || visitors != wantVisitors {
+			t.Fatalf("aggregate %s/%s/%s = PV %d UV %d, %v; want PV %d UV %d", date, kind, value, pageviews, visitors, err, wantPageviews, wantVisitors)
+		}
+	}
+	assertAggregate(localDate, "overall", "*", 4, 3)
+	assertAggregate(localDate, "country", "US", 2, 1)
+	assertAggregate(localDate, "country", "unknown", 1, 1)
+	assertAggregate(localDate, "country", "CN", 1, 1)
+	assertAggregate(localDate, "city", "US|CA|San Francisco", 2, 1)
+	assertAggregate(localDate, "city", "CN|GD|Shenzhen", 1, 1)
+	assertAggregate("2000-01-01", "country", "LEGACY", 7, 5)
+	var staleWuhan int
+	if err := st.DB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM daily_aggregates
+		WHERE site_id = ? AND local_date = ? AND dimension_kind = 'city' AND dimension_value = 'CN||Wuhan'
+	`, site.ID, localDate).Scan(&staleWuhan); err != nil || staleWuhan != 0 {
+		t.Fatalf("stale Wuhan aggregates = %d, %v", staleWuhan, err)
+	}
+	mapData, err := st.PublicMapData(ctx, site.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundSanFrancisco := false
+	for _, point := range mapData.Points {
+		if point.City == "Wuhan" {
+			t.Fatalf("stale Wuhan map point = %#v", point)
+		}
+		if point.City == "San Francisco" && point.Pageviews == 2 && point.UniqueVisitors == 1 {
+			foundSanFrancisco = true
+		}
+	}
+	if !foundSanFrancisco {
+		t.Fatalf("rebuilt map points = %#v", mapData.Points)
+	}
+	var registration int
+	if err := st.DB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM visitor_registrations
+		WHERE site_id = ? AND dimension_kind = 'country' AND dimension_value = ? AND visitor_digest = ?
+	`, site.ID, scopedVisitorDimension("example.com", "US"), bytes.Repeat([]byte{1}, 32)).Scan(&registration); err != nil || registration != 1 {
+		t.Fatalf("rebuilt visitor registration = %d, %v", registration, err)
+	}
+}
 
 func TestPageviewRecordFiltersAndCursorPagination(t *testing.T) {
 	ctx := context.Background()

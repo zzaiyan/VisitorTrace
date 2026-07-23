@@ -6,6 +6,7 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+- Added a Site-page action that refreshes retained Pageview geography from the active GeoIP database and atomically rebuilds the corresponding country, region, and city PV/UV aggregates. Historical dates without detailed records remain untouched.
 - Added graphical GeoIP management to Administrator Settings: provider selection, automatic/manual-only policy, official or custom sources, credential replacement/removal without secret echo, update status, immediate checks, and forced downloads.
 - Added `visitortrace geoip query` and `scripts/query-mmdb.sh` to print formatted raw MMDB metadata and records for one IP, including the matched network and explicit no-record status.
 - Added `scripts/update-systemd-binary.sh` for verified manual updates from an already-downloaded local binary, including a pre-update backup, atomic release switch, service restart, and automatic executable rollback.

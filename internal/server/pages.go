@@ -64,15 +64,16 @@ type adminDashboardData struct {
 
 type adminSiteData struct {
 	pageLayout
-	Site          store.Site
-	Overview      store.SiteOverview
-	Preset        maprender.Options
-	Recent        []store.PageviewRecord
-	OriginsText   string
-	MapPreviewURL string
-	MapAspect     float64
-	BaseURL       string
-	Saved         string
+	Site           store.Site
+	Overview       store.SiteOverview
+	Preset         maprender.Options
+	Recent         []store.PageviewRecord
+	OriginsText    string
+	MapPreviewURL  string
+	MapAspect      float64
+	BaseURL        string
+	Saved          string
+	GeoIPAvailable bool
 }
 
 type newSiteData struct {
@@ -394,6 +395,10 @@ func (s *Server) adminSite(w http.ResponseWriter, r *http.Request) {
 		pageLayout: s.adminLayout(r, session, site.Name, "sites"), Site: site, Overview: overview,
 		Preset: preset, Recent: recent, OriginsText: strings.Join(site.AllowedOrigins, "\n"),
 		MapPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview.svg"), MapAspect: maprender.MapAspect, BaseURL: s.externalBaseURL(r), Saved: adminFlash(r),
+		GeoIPAvailable: s.geoIPAvailable(),
+	}
+	if flash := recordGeoIPFlash(r, data.Lang); flash != "" {
+		data.Saved = flash
 	}
 	data.Error = r.URL.Query().Get("error")
 	s.renderPage(w, r, "site", data)

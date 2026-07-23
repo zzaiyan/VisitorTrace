@@ -117,6 +117,8 @@ Aggregate export requires one Site and separately exports overall, hostname, pat
 
 When one configured Site is used on multiple domains, each hostname appears as an independent aggregate row. Pageview Records also retain the hostname that the tracker reported and the server confirmed from the allowed Origin; the same visitor is therefore counted independently on different hostnames.
 
+The **Refresh geography** action on a Site page queries the active GeoIP database again for every retained Pageview Record. It updates each record and rebuilds country, region, and city PV/UV for every Site-local date represented by those records. Dates with no remaining records are left untouched, as are overall, hostname, path, browser, and operating-system aggregates. A valid IP with no database match has stale geography cleared and is counted under the unknown country; a malformed stored IP is skipped and keeps its existing geography. The action is available only while a GeoIP database is loaded and invalidates cached maps after a successful transaction.
+
 ## Website Integration
 
 The integrated Widget records a Pageview and inserts the map:

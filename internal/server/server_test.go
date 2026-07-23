@@ -601,6 +601,42 @@ func TestAdminGeoIPSettingsDoNotRenderSavedSecrets(t *testing.T) {
 	}
 }
 
+func TestAdminSiteGeoIPRefreshRequiresAvailableDatabase(t *testing.T) {
+	app, _, site := testAdminServer(t)
+	cookie, csrf := loginAdmin(t, app)
+
+	pageRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID, nil)
+	pageRequest.Host = "127.0.0.1:8790"
+	pageRequest.AddCookie(cookie)
+	pageResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(pageResponse, pageRequest)
+	pageBody := pageResponse.Body.String()
+	if pageResponse.Code != http.StatusOK || !strings.Contains(pageBody, "/records/geoip") || !strings.Contains(pageBody, "刷新地理信息") || !strings.Contains(pageBody, "disabled") {
+		t.Fatalf("Site GeoIP refresh control = status %d body %q", pageResponse.Code, pageBody)
+	}
+
+	form := url.Values{"csrf": {csrf}}
+	request := httptest.NewRequest(http.MethodPost, "/admin/sites/"+site.ID+"/records/geoip", strings.NewReader(form.Encode()))
+	request.Host = "127.0.0.1:8790"
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") || !strings.HasSuffix(response.Header().Get("Location"), "#records") {
+		t.Fatalf("unavailable GeoIP refresh = status %d location %q", response.Code, response.Header().Get("Location"))
+	}
+}
+
+func TestRecordGeoIPFlash(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/admin/sites/example?saved=record-geoip&processed=9&changed=7&located=6&unmatched=3&invalid=2&dates=4", nil)
+	message := recordGeoIPFlash(request, "en")
+	for _, value := range []string{"Processed 9", "7 changed", "6 located", "3 unmatched", "2 invalid", "4 dates"} {
+		if !strings.Contains(message, value) {
+			t.Fatalf("record GeoIP flash %q does not contain %q", message, value)
+		}
+	}
+}
+
 func TestAdminGeoIPSettingsCanClearPartialMaxMindCredentials(t *testing.T) {
 	app, _, _ := testAdminServer(t)
 	app.Config.MaxMindAccountID = "partial-account"

@@ -144,6 +144,8 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .snippet-grid pre { overflow: auto; min-height: 53px; margin: 0 0 12px; padding: 12px; background: #19272b; color: #dcebe2; line-height: 1.5; white-space: pre-wrap; }
 .endpoint { color: var(--muted); }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); background: white; }
+.records-heading-actions { display: flex; align-items: center; gap: 14px; }
+.records-heading-actions form { margin: 0; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
 th { padding: 12px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: 0; white-space: nowrap; }
 td { padding: 13px 14px; border-bottom: 1px solid #edf1ef; white-space: nowrap; }
@@ -300,6 +302,9 @@ tbody tr:hover { background: #f6f9f7; }
 	.geoip-manual { align-items: stretch; flex-direction: column; }
 	.geoip-manual .inline-actions { width: 100%; }
 	.geoip-manual .button { flex: 1; }
+	.records-section-heading { align-items: flex-start; flex-direction: column; }
+	.records-heading-actions { width: 100%; align-items: stretch; flex-direction: column; }
+	.records-heading-actions form, .records-heading-actions .button { width: 100%; }
   .page-header .button, .header-actions { width: 100%; }
   .header-actions .button { flex: 1; }
 	.site-grid, .field-grid.two, .field-grid.four, .snippet-grid, .dimension-grid, .danger-grid, .records-filter, .aggregate-export, .admin-chart-grid, .credential-grid { grid-template-columns: 1fr; }
