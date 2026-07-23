@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -554,7 +555,7 @@ func TestAdminSelfUpdateRequiresEmbeddedKey(t *testing.T) {
 	settings.AddCookie(cookie)
 	settingsResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(settingsResponse, settings)
-	if settingsResponse.Code != http.StatusOK || !strings.Contains(settingsResponse.Body.String(), "版本更新") || !strings.Contains(settingsResponse.Body.String(), "未配置") || !strings.Contains(settingsResponse.Body.String(), "disabled") {
+	if settingsResponse.Code != http.StatusOK || !strings.Contains(settingsResponse.Body.String(), "版本更新") || !strings.Contains(settingsResponse.Body.String(), "本地文件更新") || !strings.Contains(settingsResponse.Body.String(), `action="/admin/settings/update/local"`) || !strings.Contains(settingsResponse.Body.String(), `enctype="multipart/form-data"`) || !strings.Contains(settingsResponse.Body.String(), "未配置") || !strings.Contains(settingsResponse.Body.String(), "disabled") {
 		t.Fatalf("settings update section = status %d body %q", settingsResponse.Code, settingsResponse.Body.String())
 	}
 	form := url.Values{"csrf": {csrf}, "password": {"correct horse"}}
@@ -566,6 +567,37 @@ func TestAdminSelfUpdateRequiresEmbeddedKey(t *testing.T) {
 	app.Handler().ServeHTTP(response, request)
 	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") {
 		t.Fatalf("self-update without key = status %d location %q", response.Code, response.Header().Get("Location"))
+	}
+
+	var upload bytes.Buffer
+	writer := multipart.NewWriter(&upload)
+	if err := writer.WriteField("csrf", csrf); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.WriteField("password", "correct horse"); err != nil {
+		t.Fatal(err)
+	}
+	manifestPart, err := writer.CreateFormFile("manifest", "manifest.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = manifestPart.Write([]byte(`{}`))
+	binaryPart, err := writer.CreateFormFile("binary", "visitortrace-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = binaryPart.Write([]byte("candidate"))
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	localRequest := httptest.NewRequest(http.MethodPost, "/admin/settings/update/local", &upload)
+	localRequest.Host = "127.0.0.1:8790"
+	localRequest.Header.Set("Content-Type", writer.FormDataContentType())
+	localRequest.AddCookie(cookie)
+	localResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(localResponse, localRequest)
+	if localResponse.Code != http.StatusSeeOther || !strings.Contains(localResponse.Header().Get("Location"), "error=") || !strings.Contains(localResponse.Header().Get("Location"), "#self-update") {
+		t.Fatalf("local self-update without key = status %d location %q", localResponse.Code, localResponse.Header().Get("Location"))
 	}
 }
 

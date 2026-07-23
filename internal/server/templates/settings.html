@@ -64,18 +64,37 @@
     <div class="form-actions"><button class="button primary" type="submit">{{t "save_base_url"}}</button></div>
   </form>
 </section>
-<section class="section-block">
+<section class="section-block" id="self-update">
   <div class="section-heading"><div><p class="eyebrow">SELF UPDATE</p><h2>{{t "version_update"}}</h2></div><span class="muted">{{t "current"}} {{.CurrentVersion}}</span></div>
   <div class="update-status">
     <div><span>{{t "stable_path"}}</span><code>{{.StableExecutable}}</code></div>
     <div><span>{{t "signature_verification"}}</span><strong>{{if .UpdateKeyReady}}{{t "configured"}}{{else}}{{t "not_configured"}}{{end}}</strong></div>
     <div><span>{{t "launch_mode"}}</span><strong>{{if .RunningFromStablePath}}{{t "stable_launch"}}{{else}}{{t "needs_adjustment"}}{{end}}</strong></div>
   </div>
-  <form method="post" action="{{appPath "/admin/settings/update"}}" class="update-form">
-    <input type="hidden" name="csrf" value="{{.CSRF}}">
-    <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
-    <button class="button primary" type="submit" {{if or (not .UpdateKeyReady) (not .RunningFromStablePath)}}disabled{{end}}>{{t "check_and_update"}}</button>
-  </form>
+  <div class="update-methods">
+    <div class="update-method">
+      <div class="update-method-heading"><h3>{{t "online_update"}}</h3><p>{{t "online_update_help"}}</p></div>
+      <form method="post" action="{{appPath "/admin/settings/update"}}" class="update-form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
+        <button class="button primary" type="submit" {{if or (not .UpdateKeyReady) (not .RunningFromStablePath)}}disabled{{end}}>{{t "check_and_update"}}</button>
+      </form>
+    </div>
+    <div class="update-method">
+      <div class="update-method-heading"><h3>{{t "local_update"}}</h3><p>{{t "local_update_help"}}</p></div>
+      <form method="post" action="{{appPath "/admin/settings/update/local"}}" enctype="multipart/form-data" class="local-update-form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <div class="update-file-grid">
+          <label class="field"><span>{{t "signed_manifest"}}</span><input type="file" name="manifest" accept="application/json,.json" required></label>
+          <label class="field"><span>{{t "release_binary"}} <code>{{.UpdatePlatform}}</code></span><input type="file" name="binary" required></label>
+        </div>
+        <div class="update-submit-row">
+          <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
+          <button class="button primary" type="submit" {{if or (not .UpdateKeyReady) (not .RunningFromStablePath)}}disabled{{end}}>{{t "install_local_update"}}</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </section>
 <script>
 (() => {

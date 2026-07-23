@@ -91,6 +91,7 @@ type adminSettingsData struct {
 	StableExecutable       string
 	UpdateKeyReady         bool
 	RunningFromStablePath  bool
+	UpdatePlatform         string
 	BaseURL                string
 	EffectiveBaseURL       string
 	GeoIPProvider          string
@@ -219,7 +220,8 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		pageLayout:     s.adminLayout(r, session, "管理员设置", "settings"),
 		CurrentVersion: manager.CurrentVersion, StableExecutable: manager.StableBinaryPath(),
 		UpdateKeyReady: len(manager.PublicKey) > 0, RunningFromStablePath: manager.RunningFromStablePath(),
-		BaseURL: s.Config.BaseURL, EffectiveBaseURL: s.externalBaseURL(r),
+		UpdatePlatform: manager.Platform,
+		BaseURL:        s.Config.BaseURL, EffectiveBaseURL: s.externalBaseURL(r),
 		GeoIPProvider: s.Config.GeoIPProvider, GeoIPUpdate: s.Config.GeoIPUpdate,
 		GeoIPUpdateURL: s.Config.GeoIPUpdateURL, GeoIPChecksumURL: s.Config.GeoIPChecksumURL,
 		GeoIPOfficialSource: s.Config.GeoIPUpdateURL == profile.URL, GeoIPOfficialURL: profile.URL,

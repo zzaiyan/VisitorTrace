@@ -1,17 +1,21 @@
 package selfupdate
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -60,6 +64,58 @@ func TestPrepareAndCompleteUpdate(t *testing.T) {
 	}
 	if len(statuses) != 1 || statuses[0].Operation != "self_update" || statuses[0].Succeeded == nil || !*statuses[0].Succeeded {
 		t.Fatalf("update status = %#v", statuses)
+	}
+}
+
+func TestPrepareAndActivateLocalUpdateWithoutReleaseNetwork(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("release layout uses symbolic links")
+	}
+	manager, st, _, configPath, closeServer := updateFixture(t)
+	defer closeServer()
+	defer st.Close()
+	if _, err := manager.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+	manifestData, candidate := fixtureReleaseFiles(t, manager)
+	manager.ConfigPath = configPath
+	manager.Config.UpdateManifestURL = "://release-network-is-unavailable"
+	result, err := manager.PrepareAndActivateLocal(context.Background(), manifestData, bytes.NewReader(candidate))
+	if err != nil {
+		t.Fatalf("PrepareAndActivateLocal() error = %v", err)
+	}
+	if result.Current || result.Version != "1.1.0" || !HasPending(manager.Config.DataDir) {
+		t.Fatalf("PrepareAndActivateLocal() = %#v", result)
+	}
+	target, err := os.Readlink(filepath.Join(manager.ReleasesRoot(), "current"))
+	if err != nil || target != "v1.1.0" {
+		t.Fatalf("current target = %q, %v", target, err)
+	}
+}
+
+func TestPrepareAndActivateLocalRejectsTamperedBinary(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("release layout uses symbolic links")
+	}
+	manager, st, _, configPath, closeServer := updateFixture(t)
+	defer closeServer()
+	defer st.Close()
+	if _, err := manager.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+	manifestData, candidate := fixtureReleaseFiles(t, manager)
+	candidate[0] ^= 0xff
+	manager.ConfigPath = configPath
+	_, err := manager.PrepareAndActivateLocal(context.Background(), manifestData, bytes.NewReader(candidate))
+	if err == nil || !strings.Contains(err.Error(), "SHA-256 mismatch") {
+		t.Fatalf("PrepareAndActivateLocal() error = %v", err)
+	}
+	target, readErr := os.Readlink(filepath.Join(manager.ReleasesRoot(), "current"))
+	if readErr != nil || target != "v1.0.0" {
+		t.Fatalf("current target after rejection = %q, %v", target, readErr)
+	}
+	if HasPending(manager.Config.DataDir) {
+		t.Fatal("tampered update created pending state")
 	}
 }
 
@@ -200,4 +256,39 @@ func updateFixture(t *testing.T) (*Manager, *store.Store, config.Config, string,
 	manager.ExecutablePath = currentExecutable
 	manager.Now = func() time.Time { return time.Date(2026, time.July, 22, 12, 0, 0, 0, time.UTC) }
 	return manager, st, cfg, configPath, server.Close
+}
+
+func fixtureReleaseFiles(t *testing.T, manager *Manager) ([]byte, []byte) {
+	t.Helper()
+	response, err := manager.HTTPClient.Get(manager.Config.UpdateManifestURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestData, readErr := io.ReadAll(response.Body)
+	response.Body.Close()
+	if readErr != nil || response.StatusCode != http.StatusOK {
+		t.Fatalf("read fixture manifest = status %d, error %v", response.StatusCode, readErr)
+	}
+	manifest, err := DecodeManifest(manifestData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestURL, err := url.Parse(manager.Config.UpdateManifestURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assetURL, err := manifestURL.Parse(manifest.Assets[manager.Platform].URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err = manager.HTTPClient.Get(assetURL.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, readErr := io.ReadAll(response.Body)
+	response.Body.Close()
+	if readErr != nil || response.StatusCode != http.StatusOK {
+		t.Fatalf("read fixture candidate = status %d, error %v", response.StatusCode, readErr)
+	}
+	return manifestData, candidate
 }

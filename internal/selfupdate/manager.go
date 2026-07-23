@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	manifestLimit = int64(1 << 20)
 	updateLockAge = 2 * time.Hour
 )
 
@@ -91,9 +90,16 @@ func (m *Manager) Check(ctx context.Context) (CheckResult, error) {
 	if err := validateDownloadURL(manifestURL); err != nil {
 		return CheckResult{}, err
 	}
-	data, err := m.downloadBytes(ctx, manifestURL.String(), manifestLimit)
+	data, err := m.downloadBytes(ctx, manifestURL.String(), MaxManifestBytes)
 	if err != nil {
 		return CheckResult{}, fmt.Errorf("download release manifest: %w", err)
+	}
+	return m.checkManifest(data)
+}
+
+func (m *Manager) checkManifest(data []byte) (CheckResult, error) {
+	if int64(len(data)) > MaxManifestBytes {
+		return CheckResult{}, fmt.Errorf("release manifest exceeds %d bytes", MaxManifestBytes)
 	}
 	manifest, err := DecodeManifest(data)
 	if err != nil {
@@ -121,6 +127,25 @@ func (m *Manager) PrepareAndActivate(ctx context.Context) (result PrepareResult,
 	if err != nil {
 		return PrepareResult{}, err
 	}
+	return m.prepareAndActivate(ctx, check, m.installRemoteCandidate)
+}
+
+func (m *Manager) PrepareAndActivateLocal(ctx context.Context, manifestData []byte, binary io.Reader) (PrepareResult, error) {
+	if binary == nil {
+		return PrepareResult{}, fmt.Errorf("local release executable is required")
+	}
+	check, err := m.checkManifest(manifestData)
+	if err != nil {
+		return PrepareResult{}, err
+	}
+	return m.prepareAndActivate(ctx, check, func(ctx context.Context, asset Asset, targetDirectory, targetBinary string) error {
+		return m.installLocalCandidate(binary, asset, targetDirectory, targetBinary)
+	})
+}
+
+type candidateInstaller func(context.Context, Asset, string, string) error
+
+func (m *Manager) prepareAndActivate(ctx context.Context, check CheckResult, install candidateInstaller) (result PrepareResult, returnErr error) {
 	if check.Current {
 		return PrepareResult{Version: check.Manifest.Version, Current: true, StablePath: m.StableBinaryPath()}, nil
 	}
@@ -159,7 +184,7 @@ func (m *Manager) PrepareAndActivate(ctx context.Context) (result PrepareResult,
 	}
 	targetDirectory := filepath.Join(releasesRoot, versionName)
 	targetBinary := filepath.Join(targetDirectory, "visitortrace")
-	if err := m.installCandidate(ctx, check.Asset, targetDirectory, targetBinary); err != nil {
+	if err := install(ctx, check.Asset, targetDirectory, targetBinary); err != nil {
 		return PrepareResult{}, err
 	}
 	candidateCtx, candidateCancel := context.WithTimeout(ctx, 2*time.Minute)
@@ -277,7 +302,27 @@ func (m *Manager) currentReleaseTarget() (string, error) {
 	return target, nil
 }
 
-func (m *Manager) installCandidate(ctx context.Context, asset Asset, targetDirectory, targetBinary string) error {
+func (m *Manager) installRemoteCandidate(ctx context.Context, asset Asset, targetDirectory, targetBinary string) error {
+	manifestURL, _ := url.Parse(m.Config.UpdateManifestURL)
+	assetURL, err := manifestURL.Parse(asset.URL)
+	if err != nil {
+		return fmt.Errorf("resolve release asset URL: %w", err)
+	}
+	if err := validateDownloadURL(assetURL); err != nil {
+		return err
+	}
+	return m.installCandidate(asset, targetDirectory, targetBinary, func(destination string) error {
+		return m.downloadFile(ctx, assetURL.String(), destination, asset)
+	})
+}
+
+func (m *Manager) installLocalCandidate(binary io.Reader, asset Asset, targetDirectory, targetBinary string) error {
+	return m.installCandidate(asset, targetDirectory, targetBinary, func(destination string) error {
+		return writeCandidateFile(binary, destination, asset)
+	})
+}
+
+func (m *Manager) installCandidate(asset Asset, targetDirectory, targetBinary string, write func(string) error) error {
 	if info, err := os.Stat(targetBinary); err == nil && !info.IsDir() {
 		checksum, size, err := fileChecksum(targetBinary)
 		if err == nil && strings.EqualFold(checksum, asset.SHA256) && size == asset.Size {
@@ -297,21 +342,13 @@ func (m *Manager) installCandidate(ctx context.Context, asset Asset, targetDirec
 	} else if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("inspect release directory: %w", err)
 	}
-	manifestURL, _ := url.Parse(m.Config.UpdateManifestURL)
-	assetURL, err := manifestURL.Parse(asset.URL)
-	if err != nil {
-		return fmt.Errorf("resolve release asset URL: %w", err)
-	}
-	if err := validateDownloadURL(assetURL); err != nil {
-		return err
-	}
 	workspace, err := os.MkdirTemp(m.ReleasesRoot(), ".download-*")
 	if err != nil {
 		return fmt.Errorf("create release download workspace: %w", err)
 	}
 	defer os.RemoveAll(workspace)
 	candidate := filepath.Join(workspace, "visitortrace")
-	if err := m.downloadFile(ctx, assetURL.String(), candidate, asset); err != nil {
+	if err := write(candidate); err != nil {
 		return err
 	}
 	if err := os.Chmod(candidate, 0o700); err != nil {
@@ -387,12 +424,16 @@ func (m *Manager) downloadFile(ctx context.Context, source, destination string, 
 	if response.ContentLength >= 0 && response.ContentLength != asset.Size {
 		return fmt.Errorf("release executable size does not match manifest")
 	}
+	return writeCandidateFile(response.Body, destination, asset)
+}
+
+func writeCandidateFile(source io.Reader, destination string, asset Asset) error {
 	file, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fmt.Errorf("create release executable: %w", err)
 	}
 	hash := sha256.New()
-	written, copyErr := io.Copy(io.MultiWriter(file, hash), io.LimitReader(response.Body, asset.Size+1))
+	written, copyErr := io.Copy(io.MultiWriter(file, hash), io.LimitReader(source, asset.Size+1))
 	if copyErr == nil {
 		copyErr = file.Sync()
 	}

@@ -12,7 +12,11 @@ import (
 	"time"
 )
 
-const ManifestFormatVersion = 1
+const (
+	ManifestFormatVersion = 1
+	MaxManifestBytes      = int64(1 << 20)
+	MaxReleaseAssetBytes  = int64(200 << 20)
+)
 
 type Asset struct {
 	URL    string `json:"url"`
@@ -83,7 +87,7 @@ func ValidateUnsignedManifest(manifest Manifest) error {
 		if strings.TrimSpace(platform) == "" || strings.TrimSpace(asset.URL) == "" {
 			return fmt.Errorf("release asset platform and URL are required")
 		}
-		if asset.Size < 1 || asset.Size > 200<<20 {
+		if asset.Size < 1 || asset.Size > MaxReleaseAssetBytes {
 			return fmt.Errorf("release asset %s has an invalid size", platform)
 		}
 		if len(asset.SHA256) != 64 {
