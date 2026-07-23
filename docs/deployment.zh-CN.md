@@ -86,6 +86,8 @@ sudo -u visitortrace /usr/local/bin/visitortrace update bootstrap \
 
 进程管理器必须运行 `/var/lib/visitortrace/releases/current/visitortrace`，并在进程正常退出后也重新启动；验签通过的自更新切换稳定链接后会正常退出。
 
+管理后台既可以在线获取配置的签名 Release，也可以接收本地文件。本地签名更新时，在其他设备下载同一 Release 的 `manifest.json` 和“管理员设置”所示平台的二进制，再在“版本更新 > 本地文件更新”中同时上传。该流程保留签名、大小、SHA-256、候选身份、Schema、备份和回滚检查，因此服务器无需连接发布站点，也可以安装改变 Schema 的版本。
+
 ### 使用本地二进制手动更新
 
 如果新版二进制和 `checksums.txt` 已经位于服务器，可以在不下载文件的情况下执行更新：
@@ -210,6 +212,7 @@ sudo systemctl enable --now visitortrace-backup.timer
 
 ```nginx
 location / {
+    client_max_body_size 210m;
     proxy_pass http://127.0.0.1:8790;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -219,7 +222,7 @@ location / {
 }
 ```
 
-`X-Forwarded-For` 用于传递真实访客 IP，`X-Forwarded-Proto` 用于让后台在 HTTPS 反向代理后正确设置安全 Cookie。VisitorTrace 只接受 `trusted_proxies` 中回环地址提供的这些请求头。不要为采集、后台、健康检查或分析路由开启代理缓存；静态资源和 SVG 响应已经自行发送缓存头。
+`client_max_body_size 210m` 用于放行后台本地更新上传；不使用该方式时可以移除或调低。`X-Forwarded-For` 用于传递真实访客 IP，`X-Forwarded-Proto` 用于让后台在 HTTPS 反向代理后正确设置安全 Cookie。VisitorTrace 只接受 `trusted_proxies` 中回环地址提供的这些请求头。不要为采集、后台、健康检查或分析路由开启代理缓存；静态资源和 SVG 响应已经自行发送缓存头。
 
 如果使用 `/visitortrace` 这样的子路径，需要在后台设置相同的 Base URL，并让 Nginx 保留此前缀。`proxy_pass` 末尾不要加斜杠：
 
@@ -229,6 +232,7 @@ location = /visitortrace {
 }
 
 location /visitortrace/ {
+    client_max_body_size 210m;
     proxy_pass http://127.0.0.1:8790;
     proxy_http_version 1.1;
     proxy_set_header Host $host;

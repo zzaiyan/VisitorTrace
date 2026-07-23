@@ -356,11 +356,13 @@ sudo ./scripts/update-systemd-binary.sh \
 
 The script verifies the local checksum when supplied, runs the candidate's `doctor --upgrade-check`, creates a verified pre-update backup, switches the stable release link atomically, and restarts the systemd service. If the new process does not stay active, it restores the previous release. It preserves an intentionally inactive service as inactive. To keep automatic rollback from mixing executable and database versions, local updates must keep the same database schema; use the signed updater for a schema-changing release. The defaults match the deployment guide; use `--user`, `--data-dir`, `--config`, or `--service-name` for a custom installation.
 
-Alternatively, enter the current password under Administrator Settings and select Check and update. The Admin workflow re-verifies the password in that request. Once the candidate is prepared, the current process exits gracefully and the supervisor starts the new version through the stable path.
+Administrator Settings offers two signed update methods. **Online update** fetches the configured manifest and platform asset. **Local files** accepts the `manifest.json` and the binary for the displayed platform from the same Release, which is useful when the server cannot reach the release host. Both methods re-verify the current Administrator password. Unlike `update-systemd-binary.sh`, the local-file Admin method uses the complete signed updater and can apply a release that changes the database schema.
+
+After either method prepares the candidate, the current process exits gracefully and the supervisor starts the new version through the stable path. A reverse proxy must allow the local upload size; the deployment guide uses `client_max_body_size 210m` to cover the signed 200 MiB asset limit plus multipart overhead.
 
 The updater verifies the Ed25519 manifest signature, platform asset size and SHA-256, candidate version/schema identity, and the candidate's `doctor --upgrade-check`. Only then does it create a pre-update database snapshot, persist pending state, and atomically switch `current`. Readiness confirms the new release and retains the two latest prior versions. Three failed readiness startups restore the pre-update database and switch back to the prior release.
 
-Production release builds must embed the project's release public key. Development builds without a key disable the update button. The manifest defaults to GitHub Releases and can point to a domestic mirror through protected configuration:
+Production release builds must embed the project's release public key. Development builds without a key disable both update methods. The manifest defaults to GitHub Releases and can point to a domestic mirror through protected configuration:
 
 ```json
 {

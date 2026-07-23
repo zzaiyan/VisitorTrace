@@ -4,6 +4,11 @@
 
 This file records user-facing changes for each published VisitorTrace release.
 
+## Unreleased
+
+- Added a local-file option to Administrator Settings self-update. Administrators can upload the signed `manifest.json` and matching platform binary from one Release while retaining Ed25519, size, SHA-256, candidate identity, schema, backup, and rollback checks.
+- Documented the local signed workflow, its distinction from the same-schema manual systemd script, and the reverse-proxy upload-size setting.
+
 ## 0.1.2 - 2026-07-23
 
 - Added a Site-page action that refreshes retained Pageview geography from the active GeoIP database and atomically rebuilds the corresponding country, region, and city PV/UV aggregates. Historical dates without detailed records remain untouched.

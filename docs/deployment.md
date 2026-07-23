@@ -86,6 +86,8 @@ sudo -u visitortrace /usr/local/bin/visitortrace update bootstrap \
 
 The process supervisor must run `/var/lib/visitortrace/releases/current/visitortrace` and restart it even after a clean exit, because a verified self-update exits normally after switching the stable link.
 
+The Admin Console can either fetch the configured signed release or accept local files. For a local signed update, download `manifest.json` and the binary matching the platform shown in Administrator Settings from the same Release, then upload both under **Version update > Local files**. This path retains signature, size, SHA-256, candidate identity, schema, backup, and rollback checks; it can therefore apply schema-changing releases without giving the server access to the release host.
+
 ### Manual update from a local binary
 
 If the new release binary and `checksums.txt` are already on the server, update without downloading anything:
@@ -210,6 +212,7 @@ BT Panel versions use different field labels. Check the generated Nginx configur
 
 ```nginx
 location / {
+    client_max_body_size 210m;
     proxy_pass http://127.0.0.1:8790;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -219,7 +222,7 @@ location / {
 }
 ```
 
-`X-Forwarded-For` supplies the original visitor IP, while `X-Forwarded-Proto` lets secure Admin cookies work behind HTTPS. VisitorTrace accepts them only from the loopback CIDRs configured in `trusted_proxies`. Do not enable proxy caching for ingestion, Admin, health, or analytics routes; static assets and SVG responses already send their own cache headers.
+`client_max_body_size 210m` allows the Admin local-update upload; omit or reduce it if that method will not be used. `X-Forwarded-For` supplies the original visitor IP, while `X-Forwarded-Proto` lets secure Admin cookies work behind HTTPS. VisitorTrace accepts them only from the loopback CIDRs configured in `trusted_proxies`. Do not enable proxy caching for ingestion, Admin, health, or analytics routes; static assets and SVG responses already send their own cache headers.
 
 For a subpath deployment such as `/visitortrace`, configure the application with the matching Base URL and preserve that prefix in Nginx. The `proxy_pass` value must not have a trailing slash:
 
@@ -229,6 +232,7 @@ location = /visitortrace {
 }
 
 location /visitortrace/ {
+    client_max_body_size 210m;
     proxy_pass http://127.0.0.1:8790;
     proxy_http_version 1.1;
     proxy_set_header Host $host;

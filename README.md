@@ -21,7 +21,7 @@ A tiny self-hosted visitor map and Pageview tracker for personal homepages, blog
 - A password-protected Admin Console
 - Filterable, cursor-paginated, CSV-exportable Pageview Records
 - Backup, cleanup, GeoIP, and resource health overview
-- One-click self-update with Ed25519 verification, automatic backup, and rollback
+- Online and local-file self-update with Ed25519 verification, automatic backup, and rollback
 - Live Map Preset previews
 - Integrated Widget and separated Tracker modes
 

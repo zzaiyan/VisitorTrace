@@ -77,6 +77,10 @@ The effective Public Map Options `CacheKey` is namespaced by Site ID. The in-mem
 
 ## Release Signing and Self-Update
 
+`selfupdate.Manager` verifies online and uploaded manifests through the same strict decoder, Ed25519 signature check, platform selection, and semantic-version comparison. Both sources then enter one activation path for the schema guard, candidate identity check, `doctor --upgrade-check`, pre-update backup, pending state, stable-link switch, readiness confirmation, and rollback. Only candidate acquisition differs: the online source streams an HTTPS response, while the local source streams the uploaded file. Both writers enforce the signed byte count and SHA-256 while creating the candidate.
+
+The local Admin route accepts multipart input only for an authenticated Administrator with a valid CSRF token and a freshly re-verified password. The request is capped at 203 MiB, keeps at most 2 MiB of multipart data in memory, removes spill files when the request ends, limits the manifest to 1 MiB, and limits the platform asset to 200 MiB. The upload filename, MIME type, and client-reported identity are not security inputs.
+
 `.github/workflows/ci.yml` checks Go tests, the Race Detector, Vet, module integrity, locked frontend dependencies, dependency vulnerabilities, and reproducibility of committed browser assets. Normal CI has read-only repository access.
 
 Before the first production release, generate the project release key once in an offline or otherwise protected environment:
