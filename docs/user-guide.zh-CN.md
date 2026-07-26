@@ -114,9 +114,9 @@ Site 管理页的“聚合分析”使用相同日期范围和交互组件，并
 
 后台“访问明细”页面显示全部 Site 的 Pageview Record，默认每页 100 条，可选择 50 或 200 条。页面使用与当前筛选绑定的游标向较早或较新记录翻页，避免数据持续写入时页码偏移。
 
-可组合使用以下精确筛选：Site、访问 hostname、UTC 起止时间、规范化路径、原始 IP、Visitor Digest、国家代码、地区代码、城市、浏览器和操作系统。页面时间按对应 Site 时区显示，悬浮可查看 UTC 时间。
+可组合使用以下精确筛选：Site、采集方式（`js` 或 `image`）、访问 hostname、UTC 起止时间、规范化路径、原始 IP、Visitor Digest、国家代码、地区代码、城市、浏览器和操作系统。页面时间按对应 Site 时区显示，悬浮可查看 UTC 时间。
 
-“导出当前筛选 CSV”会流式输出所有符合条件的记录，不受当前页大小影响。文件同时包含 UTC 时间和 Site 本地时间，以及经纬度、原始 IP 和 Visitor Digest 等全部明细字段。以 `=`、`+`、`-` 或 `@` 开头的文本会增加前导单引号，避免电子表格将外部数据解释为公式。
+“导出当前筛选 CSV”会流式输出所有符合条件的记录，不受当前页大小影响。文件同时包含 UTC 时间和 Site 本地时间，以及采集方式、经纬度、原始 IP 和 Visitor Digest 等全部明细字段。以 `=`、`+`、`-` 或 `@` 开头的文本会增加前导单引号，避免电子表格将外部数据解释为公式。
 
 聚合导出要求选择一个 Site，可按整体、hostname、路径、国家、地区、城市、浏览器或操作系统分别导出，并可限制 Site 本地日期范围。
 
@@ -126,7 +126,7 @@ Site 页面中的“刷新地理信息”会使用当前 GeoIP 数据库重新�
 
 ## 网站接入
 
-一体式 Widget 会同时记录 Pageview 并插入地图：
+推荐的一体式 JavaScript Widget 会同时记录 Pageview 并插入地图：
 
 ```html
 <script async src="https://stats.example.com/embed/widget.js?site_id=SITE_ID"></script>
@@ -137,6 +137,22 @@ Site 页面中的“刷新地理信息”会使用当前 GeoIP 数据库重新�
 ```html
 <script async src="https://stats.example.com/visitortrace/embed/widget.js?site_id=SITE_ID"></script>
 ```
+
+一体式 Image Widget 是不依赖 JavaScript 的兼容变体，适用于静态 HTML、允许远程图片的 Markdown 渲染器或接入限制较多的发布系统：
+
+```html
+<a href="https://stats.example.com/public/SITE_ID/analytics"
+   target="_blank" rel="noopener">
+  <img src="https://stats.example.com/embed/widget.svg?site_id=SITE_ID"
+       width="300" height="168"
+       alt="Visitor map"
+       title="VisitorTrace Public Map | IP geolocation data">
+</a>
+```
+
+每个有效图片请求会先记录一条 Pageview，再返回 SVG。请求 Referer 必须能还原为该 Site 的某个 Allowed Origin；Referer 缺失、格式错误或来源不允许时仍会返回地图，但不会计数。由于浏览器不会运行 VisitorTrace 代码，该变体无法创建 localStorage Visitor ID，UV 会退化为使用客户端 IP 与 User-Agent 的组合指纹。路径默认取自 Referer；现代浏览器的跨域 Referrer Policy 通常只发送 Origin，因此默认路径经常是 `/`。固定页面可显式加入规范化路径，例如 `&path=%2Fresearch`（写在 HTML 属性中时使用 `&amp;path=%2Fresearch`）。
+
+VisitorTrace 为 Image Widget 返回 `Cache-Control: private, no-store`，但上游 Markdown/图片代理、预取器和缓存仍可能隐藏访客 IP、替换 Referer，或把多次浏览合并为一次请求。因此 GitHub Camo 等服务可以正常显示地图，却不适合精确统计 PV/UV。普通网页应优先使用 JavaScript Widget；如果需要每次页面加载都计数，不要为 Image Widget 增加 `loading="lazy"`。
 
 分离式 Tracker 只记录 Pageview：
 
@@ -154,7 +170,7 @@ Tracker 会上报当前页面 hostname。服务端以已经通过 Origin 校验�
      alt="Visitor map">
 ```
 
-Site 页面为每段接入代码和每个资源地址提供一键复制。一体式接入成对展示 Widget 嵌入代码与脚本地址；分离式接入分别为 Tracker 和懒加载 Map SVG 展示嵌入代码与资源地址。
+Site 页面为每段接入代码和每个资源地址提供一键复制。一体式接入包含推荐的 JavaScript Widget 和兼容型 Image Widget；分离式接入分别为 Tracker 和懒加载 Map SVG 展示嵌入代码与资源地址。
 
 ## Map Preset 与 URL 覆写
 

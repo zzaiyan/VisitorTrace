@@ -12,6 +12,8 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"net/netip"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +34,8 @@ import (
 var embeddedAssets embed.FS
 
 const maxIngestionBody = 2 * 1024
+
+var errMapPreset = errors.New("could not load Map Preset")
 
 type pageviewPayload struct {
 	Path      string `json:"path"`
@@ -116,6 +120,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/sites/{siteID}/pageviews", s.collectPageview)
 	mux.HandleFunc("GET /embed/tracker.js", s.trackerScript)
 	mux.HandleFunc("GET /embed/widget.js", s.widgetScript)
+	mux.HandleFunc("GET /embed/widget.svg", s.widgetImage)
 	mux.HandleFunc("GET /api/v1/sites/{siteID}/map.svg", s.mapSVG)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" || r.Method != http.MethodGet {
@@ -306,26 +311,7 @@ func (s *Server) collectPageview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid visitor identity", http.StatusBadRequest)
 		return
 	}
-	s.geoMu.RLock()
-	location := geoip.Location{}
-	if s.geoIP != nil {
-		location = s.geoIP.Lookup(address)
-	}
-	s.geoMu.RUnlock()
-	_, err = s.Store.RecordPageview(r.Context(), store.PageviewObservation{
-		SiteID:          siteID,
-		Hostname:        hostname,
-		Path:            path,
-		CountryCode:     location.CountryCode,
-		RegionCode:      location.RegionCode,
-		City:            location.City,
-		Latitude:        location.Latitude,
-		Longitude:       location.Longitude,
-		VisitorDigest:   digest,
-		OriginalIP:      address.String(),
-		OperatingSystem: classification.OperatingSystem,
-		Browser:         classification.Browser,
-	})
+	err = s.recordResolvedPageview(r.Context(), configuredSite, address, digest, hostname, path, classification, store.CollectionMethodJS)
 	if errors.Is(err, store.ErrCollectionDisabled) {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -352,6 +338,140 @@ func (s *Server) trackerScript(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) widgetScript(w http.ResponseWriter, r *http.Request) {
 	s.serveEmbedScript(w, r)
+}
+
+func (s *Server) widgetImage(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	siteValues, ok := query["site_id"]
+	if !ok || len(siteValues) != 1 || strings.TrimSpace(siteValues[0]) == "" {
+		http.Error(w, "site_id is required and must occur once", http.StatusBadRequest)
+		return
+	}
+	siteID := strings.TrimSpace(siteValues[0])
+	configuredSite, err := s.Store.GetSite(r.Context(), siteID)
+	if err != nil || !configuredSite.PublishPublic {
+		http.Error(w, "unknown Site", http.StatusNotFound)
+		return
+	}
+
+	mapQuery := cloneQuery(query)
+	delete(mapQuery, "site_id")
+	pathValues := mapQuery["path"]
+	delete(mapQuery, "path")
+	if len(pathValues) > 1 {
+		http.Error(w, "path must occur at most once", http.StatusBadRequest)
+		return
+	}
+	explicitPath := ""
+	if len(pathValues) == 1 {
+		explicitPath, err = pageview.NormalizePath(pathValues[0])
+		if err != nil {
+			http.Error(w, "invalid page path", http.StatusBadRequest)
+			return
+		}
+	}
+
+	options, err := parseSiteMapOptions(configuredSite, mapQuery)
+	if err != nil {
+		if errors.Is(err, errMapPreset) {
+			s.logger.Error("load Image Widget Map Preset failed", "site_id", siteID, "error", err)
+			http.Error(w, errMapPreset.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.recordImagePageview(r, configuredSite, explicitPath)
+	cached, err := s.renderSiteMap(r.Context(), configuredSite, options)
+	if errors.Is(err, store.ErrPublicationDisabled) {
+		http.Error(w, "public views are disabled", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		s.logger.Error("render Image Widget failed", "site_id", siteID, "error", err)
+		http.Error(w, "could not render Image Widget", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
+	_, _ = w.Write(cached.body)
+}
+
+func (s *Server) recordImagePageview(r *http.Request, configuredSite store.Site, explicitPath string) {
+	if s.clientIP == nil {
+		return
+	}
+	referer, err := url.Parse(strings.TrimSpace(r.Referer()))
+	if err != nil || referer.Scheme == "" || referer.Host == "" || referer.User != nil {
+		return
+	}
+	origin := (&url.URL{Scheme: referer.Scheme, Host: referer.Host}).String()
+	if !configuredSite.AllowsOrigin(origin) {
+		return
+	}
+	hostname, err := visitorsite.HostnameFromOrigin(origin)
+	if err != nil {
+		return
+	}
+	path := explicitPath
+	if path == "" {
+		path, err = pageview.NormalizePath(referer.EscapedPath())
+		if err != nil {
+			return
+		}
+	}
+	address, err := s.clientIP.Resolve(r)
+	if err != nil || !s.ipLimit.Allow(configuredSite.ID+"|"+address.String()) || !s.siteLimit.Allow(configuredSite.ID) {
+		return
+	}
+	userAgentValue := r.UserAgent()
+	if userAgentValue == "" {
+		return
+	}
+	classification := useragent.Classify(userAgentValue)
+	if classification.Bot {
+		return
+	}
+	digest, err := visitor.Digest(configuredSite.HMACKey, "", address.String(), userAgentValue)
+	if err != nil {
+		return
+	}
+	if err := s.recordResolvedPageview(r.Context(), configuredSite, address, digest, hostname, path, classification, store.CollectionMethodImage); err != nil && !errors.Is(err, store.ErrCollectionDisabled) {
+		s.logger.Error("record Image Widget Pageview failed", "site_id", configuredSite.ID, "error", err)
+	}
+}
+
+func (s *Server) recordResolvedPageview(ctx context.Context, configuredSite store.Site, address netip.Addr, digest []byte, hostname, path string, classification useragent.Classification, method string) error {
+	s.geoMu.RLock()
+	location := geoip.Location{}
+	if s.geoIP != nil {
+		location = s.geoIP.Lookup(address)
+	}
+	s.geoMu.RUnlock()
+	_, err := s.Store.RecordPageview(ctx, store.PageviewObservation{
+		SiteID:           configuredSite.ID,
+		Hostname:         hostname,
+		Path:             path,
+		CountryCode:      location.CountryCode,
+		RegionCode:       location.RegionCode,
+		City:             location.City,
+		Latitude:         location.Latitude,
+		Longitude:        location.Longitude,
+		VisitorDigest:    digest,
+		OriginalIP:       address.String(),
+		OperatingSystem:  classification.OperatingSystem,
+		Browser:          classification.Browser,
+		CollectionMethod: method,
+	})
+	return err
+}
+
+func cloneQuery(values url.Values) url.Values {
+	result := make(url.Values, len(values))
+	for key, entries := range values {
+		result[key] = append([]string(nil), entries...)
+	}
+	return result
 }
 
 func (s *Server) serveEmbedScript(w http.ResponseWriter, r *http.Request) {
@@ -388,20 +508,41 @@ func (s *Server) mapSVG(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown Site", http.StatusNotFound)
 		return
 	}
-	preset, err := maprender.ParsePresetJSON(configuredSite.MapPresetJSON)
+	options, err := parseSiteMapOptions(configuredSite, r.URL.Query())
 	if err != nil {
-		s.logger.Error("load Map Preset failed", "site_id", siteID, "error", err)
-		http.Error(w, "could not load Map Preset", http.StatusInternalServerError)
-		return
-	}
-	options, err := maprender.ParseOptionsWithDefaults(r.URL.Query(), preset)
-	if err != nil {
+		if errors.Is(err, errMapPreset) {
+			s.logger.Error("load Public Map Preset failed", "site_id", siteID, "error", err)
+			http.Error(w, errMapPreset.Error(), http.StatusInternalServerError)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	key := siteID + "|" + options.CacheKey()
-	cached, err := s.mapCache.getOrRender(r.Context(), key, siteID, time.Now(), func() (mapCacheItem, error) {
-		data, err := s.Store.PublicMapData(r.Context(), siteID)
+	cached, err := s.renderSiteMap(r.Context(), configuredSite, options)
+	if errors.Is(err, store.ErrPublicationDisabled) {
+		http.Error(w, "public views are disabled", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		s.logger.Error("render Public Map failed", "site_id", siteID, "error", err)
+		http.Error(w, "could not render Public Map", http.StatusInternalServerError)
+		return
+	}
+	s.writeMapResponse(w, r, cached)
+}
+
+func parseSiteMapOptions(configuredSite store.Site, values url.Values) (maprender.Options, error) {
+	preset, err := maprender.ParsePresetJSON(configuredSite.MapPresetJSON)
+	if err != nil {
+		return maprender.Options{}, fmt.Errorf("%w: %v", errMapPreset, err)
+	}
+	return maprender.ParseOptionsWithDefaults(values, preset)
+}
+
+func (s *Server) renderSiteMap(ctx context.Context, configuredSite store.Site, options maprender.Options) (mapCacheItem, error) {
+	key := configuredSite.ID + "|" + options.CacheKey()
+	return s.mapCache.getOrRender(ctx, key, configuredSite.ID, time.Now(), func() (mapCacheItem, error) {
+		data, err := s.Store.PublicMapData(ctx, configuredSite.ID)
 		if err != nil {
 			return mapCacheItem{}, err
 		}
@@ -414,16 +555,6 @@ func (s *Server) mapSVG(w http.ResponseWriter, r *http.Request) {
 			body: body, etag: fmt.Sprintf("\"%x\"", sum[:16]), expiresAt: time.Now().Add(mapCacheTTL),
 		}, nil
 	})
-	if errors.Is(err, store.ErrPublicationDisabled) {
-		http.Error(w, "public views are disabled", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		s.logger.Error("render Public Map failed", "site_id", siteID, "error", err)
-		http.Error(w, "could not render Public Map", http.StatusInternalServerError)
-		return
-	}
-	s.writeMapResponse(w, r, cached)
 }
 
 func (s *Server) writeMapResponse(w http.ResponseWriter, r *http.Request, cached mapCacheItem) {

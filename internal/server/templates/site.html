@@ -18,13 +18,24 @@
   <div class="section-heading"><div><p class="eyebrow">INTEGRATION</p><h2>{{t "integration_code"}}</h2></div></div>
   <div class="integration-method">
     <div class="integration-method-heading"><span>01</span><h3>{{t "combined_widget"}}</h3></div>
-    <div class="integration-resource">
-      <h3>{{t "widget_resource"}}</h3>
-      <div class="code-sample">
-        <div class="code-sample-heading"><span>{{t "embed_code"}}</span><button class="copy-control copy-button" type="button" data-copy-target="combined-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div>
-        <pre><code id="combined-snippet">&lt;script async src="{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre>
+    <div class="integration-resource-grid">
+      <div class="integration-resource">
+        <div class="integration-resource-heading"><h3>{{t "javascript_widget"}}</h3><span class="integration-badge recommended">{{t "recommended"}}</span></div>
+        <div class="code-sample">
+          <div class="code-sample-heading"><span>{{t "embed_code"}}</span><button class="copy-control copy-button" type="button" data-copy-target="combined-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div>
+          <pre><code id="combined-snippet">&lt;script async src="{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}"&gt;&lt;/script&gt;</code></pre>
+        </div>
+        <div class="endpoint-field"><span>{{t "resource_url"}}</span><div class="endpoint-control"><code id="combined-endpoint">{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}</code><button class="copy-control copy-button" type="button" data-copy-target="combined-endpoint" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div></div>
       </div>
-      <div class="endpoint-field"><span>{{t "resource_url"}}</span><div class="endpoint-control"><code id="combined-endpoint">{{.BaseURL}}/embed/widget.js?site_id={{.Site.ID}}</code><button class="copy-control copy-button" type="button" data-copy-target="combined-endpoint" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div></div>
+      <div class="integration-resource">
+        <div class="integration-resource-heading"><h3>{{t "image_widget"}}</h3><span class="integration-badge compatibility">{{t "compatibility_mode"}}</span></div>
+        <div class="code-sample">
+          <div class="code-sample-heading"><span>{{t "embed_code"}}</span><button class="copy-control copy-button" type="button" data-copy-target="image-widget-snippet" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div>
+          <pre><code id="image-widget-snippet">&lt;a href="{{.BaseURL}}/public/{{.Site.ID}}/analytics" target="_blank" rel="noopener"&gt;&lt;img src="{{.BaseURL}}/embed/widget.svg?site_id={{.Site.ID}}" width="{{.Preset.Width}}" height="{{.Preset.Height}}" alt="Visitor map" title="VisitorTrace Public Map | IP geolocation data"&gt;&lt;/a&gt;</code></pre>
+        </div>
+        <div class="endpoint-field"><span>{{t "resource_url"}}</span><div class="endpoint-control"><code id="image-widget-endpoint">{{.BaseURL}}/embed/widget.svg?site_id={{.Site.ID}}</code><button class="copy-control copy-button" type="button" data-copy-target="image-widget-endpoint" title="{{t "copy"}}" aria-label="{{t "copy"}}">{{template "copy-icon" .}}<span class="sr-only">{{t "copy"}}</span></button></div></div>
+        <p class="integration-note">{{t "image_widget_limitations"}}</p>
+      </div>
     </div>
   </div>
   <div class="integration-method">
@@ -131,8 +142,8 @@
     </div>
   </div>
   <div class="table-wrap">
-    <table><thead><tr><th>{{t "time"}}</th><th>{{t "hostname"}}</th><th>{{t "path"}}</th><th>{{t "location"}}</th><th>{{t "original_ip"}}</th><th>{{t "system"}}</th><th>{{t "browsers"}}</th><th>Visitor Digest</th></tr></thead>
-      <tbody>{{range .Recent}}<tr><td><time datetime="{{formatUTC .OccurredAt}}">{{formatTime .OccurredAt}}</time></td><td><code>{{.Hostname}}</code></td><td><code>{{.Path}}</code></td><td>{{if .City}}{{.City}}{{else if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}}</td><td><code>{{.OriginalIP}}</code></td><td>{{.OperatingSystem}}</td><td>{{.Browser}}</td><td><code class="digest">{{.VisitorDigest}}</code></td></tr>{{else}}<tr><td colspan="8" class="empty-cell">{{t "no_pageview_records"}}</td></tr>{{end}}</tbody>
+    <table><thead><tr><th>{{t "time"}}</th><th>{{t "collection_method"}}</th><th>{{t "hostname"}}</th><th>{{t "path"}}</th><th>{{t "location"}}</th><th>{{t "original_ip"}}</th><th>{{t "system"}}</th><th>{{t "browsers"}}</th><th>Visitor Digest</th></tr></thead>
+      <tbody>{{range .Recent}}<tr><td><time datetime="{{formatUTC .OccurredAt}}">{{formatTime .OccurredAt}}</time></td><td><span class="method-badge {{if eq .CollectionMethod "image"}}image{{else}}js{{end}}">{{if eq .CollectionMethod "image"}}Image{{else}}JS{{end}}</span></td><td><code>{{.Hostname}}</code></td><td><code>{{.Path}}</code></td><td>{{if .City}}{{.City}}{{else if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}}</td><td><code>{{.OriginalIP}}</code></td><td>{{.OperatingSystem}}</td><td>{{.Browser}}</td><td><code class="digest">{{.VisitorDigest}}</code></td></tr>{{else}}<tr><td colspan="9" class="empty-cell">{{t "no_pageview_records"}}</td></tr>{{end}}</tbody>
     </table>
   </div>
 </section>

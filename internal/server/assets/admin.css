@@ -172,6 +172,12 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .integration-resource, .integration-resource-grid { min-width: 0; }
 .integration-resource { display: grid; gap: 12px; }
 .integration-resource > h3 { font-size: 13px; }
+.integration-resource-heading { display: flex; min-height: 22px; align-items: center; justify-content: space-between; gap: 10px; }
+.integration-resource-heading h3 { margin: 0; font-size: 13px; }
+.integration-badge { padding: 3px 6px; border: 1px solid #c7d4d1; background: #f4f7f6; color: var(--muted); font-size: 8px; font-weight: 800; text-transform: uppercase; white-space: nowrap; }
+.integration-badge.recommended { border-color: #a9cabe; background: #e8f3ee; color: var(--green-dark); }
+.integration-badge.compatibility { border-color: #dfc4b8; background: #fff4ef; color: #a65035; }
+.integration-note { margin: 0; padding-left: 10px; border-left: 2px solid #db9a80; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .integration-resource-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; }
 .integration-resource-grid > .integration-resource { padding-right: 22px; }
 .integration-resource-grid > .integration-resource + .integration-resource { padding-right: 0; padding-left: 22px; border-left: 1px solid var(--line); }
@@ -218,6 +224,8 @@ tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: #f6f9f7; }
 .empty-cell { padding: 34px; color: var(--muted); text-align: center; }
 .digest { color: var(--muted); }
+.method-badge { display: inline-block; min-width: 42px; padding: 4px 7px; border: 1px solid #b9ccc6; background: #edf5f1; color: var(--green-dark); font-size: 9px; font-weight: 800; text-align: center; text-transform: uppercase; }
+.method-badge.image { border-color: #dfc4b8; background: #fff4ef; color: #a65035; }
 .records-filter { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; align-items: end; }
 .records-filter .form-actions { align-self: end; }
 .pagination { display: flex; min-height: 42px; justify-content: space-between; margin-top: 16px; }

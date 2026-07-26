@@ -23,7 +23,7 @@ A tiny self-hosted visitor map and Pageview tracker for personal homepages, blog
 - Backup, cleanup, GeoIP, and resource health overview
 - Online and local-file self-update with Ed25519 verification, automatic backup, and rollback
 - Live Map Preset previews
-- Integrated Widget and separated Tracker modes
+- Integrated JavaScript/Image Widgets and a separated Tracker mode
 
 ## Quick Preview
 

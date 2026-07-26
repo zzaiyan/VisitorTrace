@@ -9,18 +9,19 @@ import (
 )
 
 type PageviewFilters struct {
-	SiteID          string
-	OccurredFrom    *time.Time
-	OccurredTo      *time.Time
-	Hostname        string
-	Path            string
-	OriginalIP      string
-	VisitorDigest   []byte
-	CountryCode     string
-	RegionCode      string
-	City            string
-	Browser         string
-	OperatingSystem string
+	SiteID           string
+	OccurredFrom     *time.Time
+	OccurredTo       *time.Time
+	Hostname         string
+	Path             string
+	OriginalIP       string
+	VisitorDigest    []byte
+	CountryCode      string
+	RegionCode       string
+	City             string
+	Browser          string
+	OperatingSystem  string
+	CollectionMethod string
 }
 
 type PageviewCursor struct {
@@ -105,7 +106,7 @@ func pageviewRecordQuery(filters PageviewFilters) (string, []any) {
 	query := `
 		SELECT p.id, p.site_id, s.name, s.timezone, p.occurred_at, p.local_date, p.hostname, p.path,
 		       p.country_code, p.region_code, p.city, p.latitude, p.longitude,
-		       p.visitor_digest, p.original_ip, p.operating_system, p.browser
+		       p.visitor_digest, p.original_ip, p.operating_system, p.browser, p.collection_method
 		FROM pageviews AS p
 		JOIN sites AS s ON s.id = p.site_id
 		WHERE 1 = 1`
@@ -135,6 +136,7 @@ func pageviewRecordQuery(filters PageviewFilters) (string, []any) {
 		{filters.City, "p.city = ?"},
 		{filters.Browser, "p.browser = ?"},
 		{filters.OperatingSystem, "p.operating_system = ?"},
+		{filters.CollectionMethod, "p.collection_method = ?"},
 	} {
 		if filter.value != "" {
 			add(filter.condition, filter.value)
@@ -157,7 +159,7 @@ func scanPageviewRecord(scanner rowScanner) (PageviewRecord, error) {
 	if err := scanner.Scan(
 		&item.ID, &item.SiteID, &item.SiteName, &item.SiteTimezone, &occurred, &item.LocalDate, &item.Hostname, &item.Path,
 		&item.CountryCode, &item.RegionCode, &item.City, &item.Latitude, &item.Longitude,
-		&digest, &item.OriginalIP, &item.OperatingSystem, &item.Browser,
+		&digest, &item.OriginalIP, &item.OperatingSystem, &item.Browser, &item.CollectionMethod,
 	); err != nil {
 		return PageviewRecord{}, fmt.Errorf("scan Pageview Record: %w", err)
 	}

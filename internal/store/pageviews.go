@@ -11,20 +11,26 @@ import (
 
 var ErrCollectionDisabled = errors.New("Pageview collection is disabled for this Site")
 
+const (
+	CollectionMethodJS    = "js"
+	CollectionMethodImage = "image"
+)
+
 type PageviewObservation struct {
-	SiteID          string
-	OccurredAt      time.Time
-	Hostname        string
-	Path            string
-	CountryCode     string
-	RegionCode      string
-	City            string
-	Latitude        *float64
-	Longitude       *float64
-	VisitorDigest   []byte
-	OriginalIP      string
-	OperatingSystem string
-	Browser         string
+	SiteID           string
+	OccurredAt       time.Time
+	Hostname         string
+	Path             string
+	CountryCode      string
+	RegionCode       string
+	City             string
+	Latitude         *float64
+	Longitude        *float64
+	VisitorDigest    []byte
+	OriginalIP       string
+	OperatingSystem  string
+	Browser          string
+	CollectionMethod string
 }
 
 type RecordPageviewResult struct {
@@ -54,6 +60,12 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 	}
 	if len(observation.Hostname) > 253 {
 		return RecordPageviewResult{}, fmt.Errorf("Pageview hostname is too long")
+	}
+	if observation.CollectionMethod == "" {
+		observation.CollectionMethod = CollectionMethodJS
+	}
+	if !ValidCollectionMethod(observation.CollectionMethod) {
+		return RecordPageviewResult{}, fmt.Errorf("unsupported collection method %q", observation.CollectionMethod)
 	}
 
 	s.writeMu.Lock()
@@ -104,11 +116,11 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO pageviews (
 			site_id, occurred_at, local_date, hostname, path, country_code, region_code, city,
-			latitude, longitude, visitor_digest, original_ip, operating_system, browser
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			latitude, longitude, visitor_digest, original_ip, operating_system, browser, collection_method
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, observation.SiteID, observation.OccurredAt.Format(time.RFC3339Nano), localDate, observation.Hostname, observation.Path,
 		observation.CountryCode, observation.RegionCode, observation.City, observation.Latitude, observation.Longitude,
-		observation.VisitorDigest, observation.OriginalIP, observation.OperatingSystem, observation.Browser)
+		observation.VisitorDigest, observation.OriginalIP, observation.OperatingSystem, observation.Browser, observation.CollectionMethod)
 	if err != nil {
 		return RecordPageviewResult{}, fmt.Errorf("insert Pageview Record: %w", err)
 	}
@@ -183,6 +195,10 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 		return RecordPageviewResult{}, fmt.Errorf("commit Pageview transaction: %w", err)
 	}
 	return RecordPageviewResult{ID: pageviewID, LocalDate: localDate, DeduplicationWindow: windowStart, NewOverallVisitor: newOverall}, nil
+}
+
+func ValidCollectionMethod(value string) bool {
+	return value == CollectionMethodJS || value == CollectionMethodImage
 }
 
 func aggregateDimensions(observation PageviewObservation) []aggregateDimension {

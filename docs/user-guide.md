@@ -114,9 +114,9 @@ The top of the Admin dashboard reports application version and uptime, SQLite ve
 
 The Admin Console's Pageview Records view covers every Site. It shows 100 rows by default, with 50 and 200 row options. Filter-bound cursors move toward older or newer records without the drift of offset page numbers while ingestion continues.
 
-Exact filters can be combined for Site, hostname, UTC start/end time, normalized path, original IP, Visitor Digest, country code, region code, city, browser, and operating system. On-screen timestamps use each record's Site timezone; hovering reveals UTC.
+Exact filters can be combined for Site, collection method (`js` or `image`), hostname, UTC start/end time, normalized path, original IP, Visitor Digest, country code, region code, city, browser, and operating system. On-screen timestamps use each record's Site timezone; hovering reveals UTC.
 
-Export current filters streams every matching record to CSV and is not limited by the current page size. The file contains UTC and Site-local timestamps plus every detailed field, including coordinates, original IP, and Visitor Digest. Text beginning with `=`, `+`, `-`, or `@` receives a leading apostrophe so spreadsheet software does not interpret external data as a formula.
+Export current filters streams every matching record to CSV and is not limited by the current page size. The file contains UTC and Site-local timestamps plus every detailed field, including collection method, coordinates, original IP, and Visitor Digest. Text beginning with `=`, `+`, `-`, or `@` receives a leading apostrophe so spreadsheet software does not interpret external data as a formula.
 
 Aggregate export requires one Site and separately exports overall, hostname, path, country, region, city, browser, or operating-system families, optionally bounded by Site-local dates.
 
@@ -126,7 +126,7 @@ The **Refresh geography** action on a Site page queries the active GeoIP databas
 
 ## Website Integration
 
-The integrated Widget records a Pageview and inserts the map:
+The recommended integrated JavaScript Widget records a Pageview and inserts the map:
 
 ```html
 <script async src="https://stats.example.com/embed/widget.js?site_id=SITE_ID"></script>
@@ -137,6 +137,22 @@ For a subpath deployment, use the Base URL shown in the Admin Console:
 ```html
 <script async src="https://stats.example.com/visitortrace/embed/widget.js?site_id=SITE_ID"></script>
 ```
+
+The integrated Image Widget is a JavaScript-free compatibility variant for static HTML, Markdown renderers that permit remote images, and restrictive publishing systems:
+
+```html
+<a href="https://stats.example.com/public/SITE_ID/analytics"
+   target="_blank" rel="noopener">
+  <img src="https://stats.example.com/embed/widget.svg?site_id=SITE_ID"
+       width="300" height="168"
+       alt="Visitor map"
+       title="VisitorTrace Public Map | IP geolocation data">
+</a>
+```
+
+Each valid image request records one Pageview before returning the SVG. The request Referer must resolve to one of the Site's Allowed Origins; a missing, malformed, or disallowed Referer still receives the map but is not counted. Because the browser does not run VisitorTrace code, this variant cannot create a local-storage Visitor ID: UV deduplication falls back to the client IP plus User-Agent. The default path comes from the Referer and is often `/` under modern cross-origin referrer policies. A fixed page can set an explicit normalized path, for example `&path=%2Fresearch` (write it as `&amp;path=%2Fresearch` in an HTML attribute).
+
+VisitorTrace returns the Image Widget with `Cache-Control: private, no-store`, but upstream Markdown/image proxies, prefetchers, and caches can still hide the visitor IP, replace the Referer, or combine many views into one request. GitHub Camo and similar services therefore make the image useful for display but unsuitable for accurate Pageview or UV measurement. Use the JavaScript Widget on ordinary web pages whenever possible, and do not add `loading="lazy"` to the Image Widget when every page load should count.
 
 The separated Tracker records a Pageview without rendering a map:
 
@@ -154,7 +170,7 @@ The separated integration area also provides a copyable map control snippet for 
      alt="Visitor map">
 ```
 
-The Site page provides one-click copy controls for every integration snippet and resource URL. The integrated mode pairs the Widget embed code with its script URL. The separated mode does the same independently for the Tracker and lazy-loaded Map SVG.
+The Site page provides one-click copy controls for every integration snippet and resource URL. Integrated access contains the recommended JavaScript Widget and the compatible Image Widget. Separated access provides snippets and resource URLs for both the Tracker and lazy-loaded Map SVG.
 
 ## Map Presets and URL Overrides
 

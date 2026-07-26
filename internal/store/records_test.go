@@ -165,6 +165,7 @@ func TestPageviewRecordFiltersAndCursorPagination(t *testing.T) {
 			SiteID: site.ID, Hostname: []string{"one.example", "two.example"}[i%2], OccurredAt: base.Add(time.Duration(i) * time.Minute), Path: []string{"/", "/notes"}[i%2],
 			CountryCode: "CN", RegionCode: "HB", City: "Wuhan", VisitorDigest: bytes.Repeat([]byte{byte(i + 1)}, 32),
 			OriginalIP: []string{"192.0.2.1", "192.0.2.2"}[i%2], OperatingSystem: "Linux", Browser: []string{"Firefox", "Chrome"}[i%2],
+			CollectionMethod: []string{CollectionMethodJS, CollectionMethodImage}[i%2],
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -193,7 +194,7 @@ func TestPageviewRecordFiltersAndCursorPagination(t *testing.T) {
 	if len(back.Records) != 2 || back.Records[0].ID != first.Records[0].ID || back.Records[1].ID != first.Records[1].ID {
 		t.Fatalf("newer page = %#v, want %#v", back, first)
 	}
-	filtered, err := st.PageviewRecords(ctx, PageviewFilters{SiteID: site.ID, Path: "/notes", OriginalIP: "192.0.2.2", Browser: "Chrome"}, nil, "older", 100)
+	filtered, err := st.PageviewRecords(ctx, PageviewFilters{SiteID: site.ID, Path: "/notes", OriginalIP: "192.0.2.2", Browser: "Chrome", CollectionMethod: CollectionMethodImage}, nil, "older", 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,6 +207,10 @@ func TestPageviewRecordFiltersAndCursorPagination(t *testing.T) {
 	}
 	if hostFiltered.Records[0].Hostname != "two.example" {
 		t.Fatalf("hostname-filtered record = %#v", hostFiltered.Records[0])
+	}
+	jsFiltered, err := st.PageviewRecords(ctx, PageviewFilters{SiteID: site.ID, CollectionMethod: CollectionMethodJS}, nil, "older", 100)
+	if err != nil || len(jsFiltered.Records) != 3 {
+		t.Fatalf("JS-filtered records = %#v, %v", jsFiltered, err)
 	}
 }
 
@@ -233,7 +238,7 @@ func TestPageviewAndAggregateExports(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != 1 || records[0].SiteTimezone != site.Timezone {
+	if len(records) != 1 || records[0].SiteTimezone != site.Timezone || records[0].CollectionMethod != CollectionMethodJS {
 		t.Fatalf("exported records = %#v", records)
 	}
 	var aggregates []AggregateExportRow

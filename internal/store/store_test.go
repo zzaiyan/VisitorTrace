@@ -108,7 +108,7 @@ func TestMigrateFromSchemaV1(t *testing.T) {
 	}
 }
 
-func TestMigrateFromSchemaV8AddsHostname(t *testing.T) {
+func TestMigrateFromSchemaV9AddsCollectionMethod(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "visitortrace.sqlite3")
 	ctx := context.Background()
 	st, err := open(ctx, path)
@@ -124,18 +124,37 @@ func TestMigrateFromSchemaV8AddsHostname(t *testing.T) {
 			t.Fatalf("apply migration %d: %v", item.version, err)
 		}
 	}
-	if version, err := st.SchemaVersion(ctx); err != nil || version != 8 {
+	if version, err := st.SchemaVersion(ctx); err != nil || version != 9 {
 		t.Fatalf("pre-migration schema = %d, %v", version, err)
 	}
 	if err := st.Migrate(ctx); err != nil {
 		t.Fatalf("Migrate() error = %v", err)
 	}
 	var columns int
-	if err := st.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('pageviews') WHERE name = 'hostname'`).Scan(&columns); err != nil {
+	if err := st.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('pageviews') WHERE name = 'collection_method'`).Scan(&columns); err != nil {
 		t.Fatal(err)
 	}
 	if columns != 1 {
-		t.Fatalf("hostname columns = %d, want 1", columns)
+		t.Fatalf("collection_method columns = %d, want 1", columns)
+	}
+	site, err := st.CreateSite(ctx, CreateSiteParams{Name: "Migration", AllowedOrigins: []string{"https://example.com"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.DB.ExecContext(ctx, `
+		INSERT INTO pageviews (
+			site_id, occurred_at, local_date, hostname, path, visitor_digest,
+			original_ip, operating_system, browser
+		) VALUES (?, '2026-07-26T00:00:00Z', '2026-07-26', 'example.com', '/', ?, '192.0.2.1', 'Linux', 'Firefox')
+	`, site.ID, bytes.Repeat([]byte{1}, 32)); err != nil {
+		t.Fatal(err)
+	}
+	var method string
+	if err := st.DB.QueryRowContext(ctx, `SELECT collection_method FROM pageviews WHERE site_id = ?`, site.ID).Scan(&method); err != nil {
+		t.Fatal(err)
+	}
+	if method != CollectionMethodJS {
+		t.Fatalf("default collection method = %q, want %q", method, CollectionMethodJS)
 	}
 	if err := st.SchemaReady(ctx); err != nil {
 		t.Fatal(err)

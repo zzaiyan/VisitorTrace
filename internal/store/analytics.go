@@ -314,23 +314,24 @@ func (s *Store) readCityMetrics(ctx context.Context, siteID, startDate, endDate 
 }
 
 type PageviewRecord struct {
-	ID              int64
-	SiteID          string
-	SiteName        string
-	SiteTimezone    string
-	OccurredAt      time.Time
-	LocalDate       string
-	Hostname        string
-	Path            string
-	CountryCode     string
-	RegionCode      string
-	City            string
-	Latitude        sql.NullFloat64
-	Longitude       sql.NullFloat64
-	VisitorDigest   string
-	OriginalIP      string
-	OperatingSystem string
-	Browser         string
+	ID               int64
+	SiteID           string
+	SiteName         string
+	SiteTimezone     string
+	OccurredAt       time.Time
+	LocalDate        string
+	Hostname         string
+	Path             string
+	CountryCode      string
+	RegionCode       string
+	City             string
+	Latitude         sql.NullFloat64
+	Longitude        sql.NullFloat64
+	VisitorDigest    string
+	OriginalIP       string
+	OperatingSystem  string
+	Browser          string
+	CollectionMethod string
 }
 
 func (s *Store) RecentPageviewRecords(ctx context.Context, siteID string, limit int) ([]PageviewRecord, error) {

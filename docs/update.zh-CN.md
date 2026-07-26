@@ -6,7 +6,8 @@
 
 ## 尚未发布
 
-- 暂无未发布变更。
+- 新增不依赖 JavaScript 的一体式 Image Widget：有效图片加载会在同一端点记录访问并返回 SVG 地图。该接口会按 Site Allowed Origins 校验 Referer，支持固定 `path` 与全部地图 URL 覆写参数，使用 no-store 客户端缓存，并在来源无法验证或识别为机器人时退化为只绘图。
+- 管理后台的逐条记录、精确筛选和 CSV 导出新增采集方式（`js` 或 `image`）。SQLite Schema 从 9 升级到 10，已有明细会自动标记为 `js`。
 
 ## 0.1.3 - 2026-07-24
 

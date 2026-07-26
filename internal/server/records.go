@@ -20,7 +20,7 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
-var recordFilterKeys = []string{"site_id", "from", "to", "hostname", "path", "ip", "digest", "country", "region", "city", "browser", "os"}
+var recordFilterKeys = []string{"site_id", "from", "to", "method", "hostname", "path", "ip", "digest", "country", "region", "city", "browser", "os"}
 
 type recordFilterValues struct {
 	SiteID   string
@@ -35,6 +35,7 @@ type recordFilterValues struct {
 	City     string
 	Browser  string
 	OS       string
+	Method   string
 	Limit    int
 }
 
@@ -143,7 +144,7 @@ func (s *Server) adminRecordsCSV(w http.ResponseWriter, r *http.Request) {
 	writer := csv.NewWriter(w)
 	_ = writer.Write([]string{
 		"id", "site_id", "site_name", "occurred_at_utc", "occurred_at_site_time", "local_date", "hostname", "path",
-		"country_code", "region_code", "city", "latitude", "longitude", "visitor_digest", "original_ip", "operating_system", "browser",
+		"country_code", "region_code", "city", "latitude", "longitude", "visitor_digest", "original_ip", "operating_system", "browser", "collection_method",
 	})
 	err = s.Store.ExportPageviewRecords(r.Context(), filters, func(record store.PageviewRecord) error {
 		return writer.Write(pageviewCSVRow(record))
@@ -210,11 +211,15 @@ func parseRecordFilters(query url.Values) (store.PageviewFilters, recordFilterVa
 		SiteID: strings.TrimSpace(query.Get("site_id")), From: strings.TrimSpace(query.Get("from")), To: strings.TrimSpace(query.Get("to")),
 		Hostname: strings.ToLower(strings.TrimSpace(query.Get("hostname"))), Path: strings.TrimSpace(query.Get("path")), IP: strings.TrimSpace(query.Get("ip")), Digest: strings.TrimSpace(query.Get("digest")),
 		Country: strings.ToUpper(strings.TrimSpace(query.Get("country"))), Region: strings.TrimSpace(query.Get("region")),
-		City: strings.TrimSpace(query.Get("city")), Browser: strings.TrimSpace(query.Get("browser")), OS: strings.TrimSpace(query.Get("os")), Limit: limit,
+		City: strings.TrimSpace(query.Get("city")), Browser: strings.TrimSpace(query.Get("browser")), OS: strings.TrimSpace(query.Get("os")),
+		Method: strings.ToLower(strings.TrimSpace(query.Get("method"))), Limit: limit,
 	}
 	filters := store.PageviewFilters{
 		SiteID: values.SiteID, Hostname: values.Hostname, CountryCode: values.Country, RegionCode: values.Region, City: values.City,
-		Browser: values.Browser, OperatingSystem: values.OS,
+		Browser: values.Browser, OperatingSystem: values.OS, CollectionMethod: values.Method,
+	}
+	if values.Method != "" && !store.ValidCollectionMethod(values.Method) {
+		return filters, values, fmt.Errorf("采集方式筛选无效")
 	}
 	if values.From != "" {
 		parsed, err := parseUTCFilterTime(values.From)
@@ -319,7 +324,7 @@ func recordFilterQuery(values recordFilterValues, includeLimit bool) url.Values 
 	input := map[string]string{
 		"site_id": values.SiteID, "from": values.From, "to": values.To, "path": values.Path, "ip": values.IP,
 		"digest": values.Digest, "country": values.Country, "region": values.Region, "city": values.City,
-		"hostname": values.Hostname, "browser": values.Browser, "os": values.OS,
+		"method": values.Method, "hostname": values.Hostname, "browser": values.Browser, "os": values.OS,
 	}
 	for _, key := range recordFilterKeys {
 		if input[key] != "" {
@@ -364,6 +369,7 @@ func pageviewCSVRow(record store.PageviewRecord) []string {
 		strconv.FormatInt(record.ID, 10), csvSafe(record.SiteID), csvSafe(record.SiteName), record.OccurredAt.UTC().Format(time.RFC3339Nano),
 		localTime.Format(time.RFC3339Nano), record.LocalDate, csvSafe(record.Hostname), csvSafe(record.Path), csvSafe(record.CountryCode), csvSafe(record.RegionCode),
 		csvSafe(record.City), latitude, longitude, record.VisitorDigest, csvSafe(record.OriginalIP), csvSafe(record.OperatingSystem), csvSafe(record.Browser),
+		record.CollectionMethod,
 	}
 }
 

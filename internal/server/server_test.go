@@ -70,12 +70,12 @@ func TestPageviewCollection(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("Pageview Record count = %d, want 1", count)
 	}
-	var hostname string
-	if err := st.DB.QueryRow(`SELECT hostname FROM pageviews WHERE site_id = ?`, site.ID).Scan(&hostname); err != nil {
+	var hostname, method string
+	if err := st.DB.QueryRow(`SELECT hostname, collection_method FROM pageviews WHERE site_id = ?`, site.ID).Scan(&hostname, &method); err != nil {
 		t.Fatalf("read Pageview hostname: %v", err)
 	}
-	if hostname != "example.com" {
-		t.Fatalf("Pageview hostname = %q, want example.com", hostname)
+	if hostname != "example.com" || method != store.CollectionMethodJS {
+		t.Fatalf("Pageview hostname/method = %q/%q, want example.com/%s", hostname, method, store.CollectionMethodJS)
 	}
 }
 
@@ -157,6 +157,109 @@ func TestIntegratedWidgetScript(t *testing.T) {
 	}
 }
 
+func TestIntegratedImageWidgetRecordsAndRenders(t *testing.T) {
+	app, st, site := testServer(t)
+	handler := app.Handler()
+	request := httptest.NewRequest(http.MethodGet, "/embed/widget.svg?site_id="+site.ID+"&path=%2Fexplicit&w=320&h=180", nil)
+	request.Header.Set("Referer", "https://example.com/from-referer?ignored=1")
+	request.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) Firefox/128.0")
+	request.RemoteAddr = "192.0.2.20:1234"
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `<svg`) || !strings.Contains(response.Body.String(), `width="320" height="180"`) {
+		t.Fatalf("image widget = status %d body %q", response.Code, response.Body.String())
+	}
+	if response.Header().Get("Cache-Control") != "private, no-store" || !strings.HasPrefix(response.Header().Get("Content-Type"), "image/svg+xml") || response.Header().Get("ETag") != "" {
+		t.Fatalf("image widget headers = cache %q content-type %q etag %q", response.Header().Get("Cache-Control"), response.Header().Get("Content-Type"), response.Header().Get("ETag"))
+	}
+
+	request = httptest.NewRequest(http.MethodGet, "/embed/widget.svg?site_id="+site.ID, nil)
+	request.Header.Set("Referer", "https://example.com/from-referer?ignored=1")
+	request.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) Firefox/128.0")
+	request.RemoteAddr = "192.0.2.20:1234"
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("image widget Referer-path status = %d", response.Code)
+	}
+	rows, err := st.DB.Query(`SELECT hostname, path, collection_method, original_ip, operating_system, browser FROM pageviews ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	wantPaths := []string{"/explicit", "/from-referer"}
+	index := 0
+	for rows.Next() {
+		var hostname, path, method, originalIP, operatingSystem, browser string
+		if err := rows.Scan(&hostname, &path, &method, &originalIP, &operatingSystem, &browser); err != nil {
+			t.Fatal(err)
+		}
+		if index >= len(wantPaths) || hostname != "example.com" || path != wantPaths[index] || method != store.CollectionMethodImage || originalIP != "192.0.2.20" || operatingSystem != "Linux" || browser != "Firefox" {
+			t.Fatalf("image Pageview %d = host %q path %q method %q ip %q os %q browser %q", index, hostname, path, method, originalIP, operatingSystem, browser)
+		}
+		index++
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if index != len(wantPaths) {
+		t.Fatalf("image Pageview count = %d, want %d", index, len(wantPaths))
+	}
+}
+
+func TestIntegratedImageWidgetDegradesToReadOnly(t *testing.T) {
+	tests := []struct {
+		name      string
+		referer   string
+		userAgent string
+	}{
+		{name: "missing Referer", userAgent: "Mozilla/5.0 Firefox/128.0"},
+		{name: "disallowed Referer", referer: "https://evil.example/page", userAgent: "Mozilla/5.0 Firefox/128.0"},
+		{name: "bot", referer: "https://example.com/page", userAgent: "ExampleBot/1.0"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			app, st, site := testServer(t)
+			request := httptest.NewRequest(http.MethodGet, "/embed/widget.svg?site_id="+site.ID, nil)
+			request.Header.Set("Referer", test.referer)
+			request.Header.Set("User-Agent", test.userAgent)
+			request.RemoteAddr = "192.0.2.21:1234"
+			response := httptest.NewRecorder()
+			app.Handler().ServeHTTP(response, request)
+			if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `<svg`) {
+				t.Fatalf("image widget = status %d body %q", response.Code, response.Body.String())
+			}
+			var count int
+			if err := st.DB.QueryRow(`SELECT COUNT(*) FROM pageviews`).Scan(&count); err != nil {
+				t.Fatal(err)
+			}
+			if count != 0 {
+				t.Fatalf("read-only image request created %d Pageviews", count)
+			}
+		})
+	}
+}
+
+func TestIntegratedImageWidgetValidatesBeforeRecording(t *testing.T) {
+	app, st, site := testServer(t)
+	request := httptest.NewRequest(http.MethodGet, "/embed/widget.svg?site_id="+site.ID+"&unknown=value", nil)
+	request.Header.Set("Referer", "https://example.com/page")
+	request.Header.Set("User-Agent", "Mozilla/5.0 Firefox/128.0")
+	request.RemoteAddr = "192.0.2.22:1234"
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("invalid image widget status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+	var count int
+	if err := st.DB.QueryRow(`SELECT COUNT(*) FROM pageviews`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("invalid image request created %d Pageviews", count)
+	}
+}
+
 func TestSubpathRoutesAndConfiguredBaseURL(t *testing.T) {
 	dir := t.TempDir()
 	cfg := config.Default(dir)
@@ -229,7 +332,7 @@ func TestSubpathRoutesAndConfiguredBaseURL(t *testing.T) {
 	siteResponse := httptest.NewRecorder()
 	handler.ServeHTTP(siteResponse, sitePage)
 	siteBody := siteResponse.Body.String()
-	if siteResponse.Code != http.StatusOK || !strings.Contains(siteBody, "https://stats.example.com/visitortrace/embed/widget.js") || !strings.Contains(siteBody, `data-copy-target="combined-snippet"`) {
+	if siteResponse.Code != http.StatusOK || !strings.Contains(siteBody, "https://stats.example.com/visitortrace/embed/widget.js") || !strings.Contains(siteBody, "https://stats.example.com/visitortrace/embed/widget.svg") || !strings.Contains(siteBody, `data-copy-target="combined-snippet"`) {
 		t.Fatalf("subpath Site page = status %d, body = %q", siteResponse.Code, siteBody)
 	}
 
@@ -238,6 +341,15 @@ func TestSubpathRoutesAndConfiguredBaseURL(t *testing.T) {
 	trackerBody := tracker.Body.String()
 	if tracker.Code != http.StatusOK || !strings.Contains(trackerBody, `new URL("../", scriptURL)`) || strings.Contains(trackerBody, `new URL("/api/v1`) {
 		t.Fatalf("subpath tracker = status %d, body = %q", tracker.Code, trackerBody)
+	}
+	imageRequest := httptest.NewRequest(http.MethodGet, "/visitortrace/embed/widget.svg?site_id="+site.ID, nil)
+	imageRequest.Header.Set("Referer", "https://example.com/")
+	imageRequest.Header.Set("User-Agent", "Mozilla/5.0 Firefox/128.0")
+	imageRequest.RemoteAddr = "192.0.2.23:1234"
+	imageResponse := httptest.NewRecorder()
+	handler.ServeHTTP(imageResponse, imageRequest)
+	if imageResponse.Code != http.StatusOK || !strings.Contains(imageResponse.Body.String(), `<svg`) {
+		t.Fatalf("subpath image widget = status %d body %q", imageResponse.Code, imageResponse.Body.String())
 	}
 
 	baseForm := url.Values{
@@ -407,11 +519,11 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	sitePage.AddCookie(cookies[0])
 	sitePageResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(sitePageResponse, sitePage)
-	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-endpoint"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) || !strings.Contains(sitePageResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) {
+	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.svg") || !strings.Contains(sitePageResponse.Body.String(), `id="image-widget-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-endpoint"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) || !strings.Contains(sitePageResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) {
 		t.Fatalf("admin Site page = status %d, body = %q", sitePageResponse.Code, sitePageResponse.Body.String())
 	}
-	if count := strings.Count(sitePageResponse.Body.String(), `class="copy-control copy-button"`); count != 6 {
-		t.Fatalf("admin Site page copy controls = %d, want 6", count)
+	if count := strings.Count(sitePageResponse.Body.String(), `class="copy-control copy-button"`); count != 8 {
+		t.Fatalf("admin Site page copy controls = %d, want 8", count)
 	}
 	if _, err := st.DB.Exec(`UPDATE sites SET first_pageview_at = ? WHERE id = ?`, time.Now().UTC().Format(time.RFC3339Nano), site.ID); err != nil {
 		t.Fatalf("lock Site timezone fixture: %v", err)
@@ -498,7 +610,7 @@ func TestAdminRecordFilteringAndCSVExports(t *testing.T) {
 	_, err := st.RecordPageview(context.Background(), store.PageviewObservation{
 		SiteID: site.ID, OccurredAt: time.Date(2026, time.July, 22, 8, 0, 0, 0, time.UTC), Path: "/records",
 		CountryCode: "CN", RegionCode: "HB", City: "Wuhan", VisitorDigest: bytes.Repeat([]byte{6}, 32),
-		OriginalIP: "203.0.113.6", OperatingSystem: "Linux", Browser: "Firefox",
+		OriginalIP: "203.0.113.6", OperatingSystem: "Linux", Browser: "Firefox", CollectionMethod: store.CollectionMethodImage,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -512,12 +624,12 @@ func TestAdminRecordFilteringAndCSVExports(t *testing.T) {
 		app.Handler().ServeHTTP(response, request)
 		return response
 	}
-	page := get("/admin/records?site_id=" + site.ID + "&ip=203.0.113.6")
-	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "203.0.113.6") || !strings.Contains(page.Body.String(), "/records") || !strings.Contains(page.Body.String(), "导出当前筛选 CSV") {
+	page := get("/admin/records?site_id=" + site.ID + "&method=image&ip=203.0.113.6")
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "203.0.113.6") || !strings.Contains(page.Body.String(), "/records") || !strings.Contains(page.Body.String(), "导出当前筛选 CSV") || !strings.Contains(page.Body.String(), `class="method-badge image"`) {
 		t.Fatalf("record page = status %d body %q", page.Code, page.Body.String())
 	}
-	recordCSV := get("/admin/records.csv?site_id=" + site.ID + "&ip=203.0.113.6")
-	if recordCSV.Code != http.StatusOK || recordCSV.Header().Get("Content-Type") != "text/csv; charset=utf-8" || !strings.Contains(recordCSV.Body.String(), "occurred_at_site_time") || !strings.Contains(recordCSV.Body.String(), "203.0.113.6") {
+	recordCSV := get("/admin/records.csv?site_id=" + site.ID + "&method=image&ip=203.0.113.6")
+	if recordCSV.Code != http.StatusOK || recordCSV.Header().Get("Content-Type") != "text/csv; charset=utf-8" || !strings.Contains(recordCSV.Body.String(), "occurred_at_site_time") || !strings.Contains(recordCSV.Body.String(), "collection_method") || !strings.Contains(recordCSV.Body.String(), "203.0.113.6") || !strings.Contains(recordCSV.Body.String(), ",image\n") {
 		t.Fatalf("record CSV = status %d body %q", recordCSV.Code, recordCSV.Body.String())
 	}
 	aggregateCSV := get("/admin/aggregates.csv?site_id=" + site.ID + "&dimension=overall&start=2026-07-22&end=2026-07-22")
@@ -527,6 +639,10 @@ func TestAdminRecordFilteringAndCSVExports(t *testing.T) {
 	invalid := get("/admin/records?digest=not-a-digest")
 	if invalid.Code != http.StatusBadRequest {
 		t.Fatalf("invalid filter status = %d", invalid.Code)
+	}
+	invalidMethod := get("/admin/records?method=pixel")
+	if invalidMethod.Code != http.StatusBadRequest {
+		t.Fatalf("invalid collection method status = %d", invalidMethod.Code)
 	}
 }
 

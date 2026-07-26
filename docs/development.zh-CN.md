@@ -47,7 +47,9 @@ make frontend
 
 Pageview 写入事务同时保存逐条记录、访客窗口登记和持久化聚合。过期逐条记录不得反向修改已经形成的聚合。
 
-采集请求先从已经通过 `Allowed Origin` 校验的 `Origin` 请求头提取规范化 `hostname`；内嵌 tracker 也会上报 `window.location.hostname`，两者不一致时服务端拒绝非空上报。每条 Pageview Record 都保存 hostname，并新增 hostname 聚合维度。访客登记的内部作用域为 `(Site、hostname、窗口、维度、访客)`，因此共享一个配置 Site 的不同域名会分别计 UV，即使它们产生了相同的 Visitor Digest。Migration 9 增加明细列和索引；迁移前的明细 hostname 为空，迁移前的聚合无法反推出域名维度。
+JavaScript 采集请求先从已经通过 `Allowed Origin` 校验的 `Origin` 请求头提取规范化 `hostname`；内嵌 tracker 也会上报 `window.location.hostname`，两者不一致时服务端拒绝非空上报。Image Widget 改为从 `Referer` 提取并校验 Origin；Referer 不可用或来源不允许时退化为只绘图。记录路径取显式 `path` 参数或 Referer 路径；由于没有浏览器 Visitor ID，访客摘要回退为 IP 与 User-Agent 的 HMAC。机器人、限流、来源无效或已关闭采集的图片请求仍会返回地图，但不会写入。两条采集路径最终使用相同的 Pageview/聚合原子事务。
+
+每条 Pageview Record 都保存 hostname，并新增 hostname 聚合维度。访客登记的内部作用域为 `(Site、hostname、窗口、维度、访客)`，因此共享一个配置 Site 的不同域名会分别计 UV，即使它们产生了相同的 Visitor Digest。Migration 9 增加 Pageview hostname 列和索引；迁移前的明细 hostname 为空，迁移前的聚合无法反推出域名维度。Migration 10 为逐条记录增加 `collection_method`（`js` 或 `image`），历史记录默认标记为 `js`；该字段可筛选、可导出，但不会形成新的持久化聚合维度。
 
 `site_deduplication_rules` 以 Site 本地日期保存计数规则历史。修改周期时，事务会在下一本地日期 upsert 新规则；Pageview 按其本地日期选择最近已生效规则，并从该规则的生效日计算新窗口锚点。已有 `visitor_registrations.window_end` 保持原值，仅可能延后临时登记的清理，不会改变新规则下的计数。
 
@@ -76,6 +78,8 @@ Pageview Record 列表使用 `(occurred_at, id)` 复合游标，查询顺序由�
 后台 CSS 和分析页 JavaScript 的 URL 带有由内容计算的 revision，因此可以继续使用一小时公开缓存，同时避免升级后的后台加载旧样式或旧脚本。
 
 Public Map 的有效 Options `CacheKey` 与 Site ID 组成缓存键。内存 LRU 的 TTL 为 5 分钟，每个 Site 最多 256 个变体，全局 SVG body 最多 32 MiB；同键 miss 通过进程内 flight 合并。Map Preset 更新、Site 清空和删除会递增 Site 缓存代次，避免正在渲染的旧结果在失效后重新写回。
+
+`GET /embed/widget.svg?site_id=...` 会先移除 `site_id` 和可选 `path`，再把其他查询参数交给同一套严格 Map Options 解析器和渲染器。响应使用 `private, no-store` 且不返回 Public Map ETag，使遵守缓存指令的客户端每次加载都会到达采集端点；进程内仍复用有界地图缓存以控制 CPU。`GET /api/v1/sites/{siteID}/map.svg` 保持只读和公开缓存语义。
 
 ## 发布签名与自更新
 

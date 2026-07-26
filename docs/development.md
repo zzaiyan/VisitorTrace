@@ -47,7 +47,9 @@ Migrations are embedded in `internal/store/migrations.go` and applied in version
 
 The Pageview ingestion transaction stores the individual record, visitor-window registrations, and durable aggregates together. Expiring an individual record must not reverse its durable aggregate contributions.
 
-Accepted ingestion derives a normalized `hostname` from the validated `Origin` header; the embedded tracker also reports `window.location.hostname`, and the server rejects a non-empty report that disagrees. The hostname is stored on each Pageview Record and added to the durable aggregate dimensions. Visitor registrations are internally scoped by `(Site, hostname, window, dimension, visitor)`, so the same visitor digest is counted independently on different hostnames even when they share one configured Site. Migration 9 adds the Pageview column and index; pre-migration detailed rows have an empty hostname and pre-migration aggregates cannot be reconstructed by hostname.
+Accepted JavaScript ingestion derives a normalized `hostname` from the validated `Origin` header; the embedded tracker also reports `window.location.hostname`, and the server rejects a non-empty report that disagrees. The Image Widget instead derives and validates the Origin from `Referer`; an unavailable or disallowed Referer degrades to read-only rendering. It uses the explicit `path` query value or the Referer path and falls back to the HMAC of IP plus User-Agent because no browser Visitor ID exists. Bot, rate-limited, malformed-source, and collection-disabled image requests still render but do not write. Both paths use the same atomic Pageview/aggregate transaction.
+
+The hostname is stored on each Pageview Record and added to the durable aggregate dimensions. Visitor registrations are internally scoped by `(Site, hostname, window, dimension, visitor)`, so the same visitor digest is counted independently on different hostnames even when they share one configured Site. Migration 9 adds the Pageview hostname column and index; pre-migration detailed rows have an empty hostname and pre-migration aggregates cannot be reconstructed by hostname. Migration 10 adds `collection_method` (`js` or `image`) to detailed records and defaults historical records to `js`; the field is filterable and exported but intentionally does not create a durable aggregate dimension.
 
 `site_deduplication_rules` stores counting-rule history as Site-local dates. A window change upserts a rule for the next local date. Ingestion selects the latest rule effective on the Pageview's local date and calculates windows from that rule's effective-date anchor. Existing `visitor_registrations.window_end` values remain unchanged; they can only delay cleanup of temporary registrations and cannot affect counting under the new rule.
 
@@ -76,6 +78,8 @@ Pageview Record lists use a compound `(occurred_at, id)` cursor with server-cont
 Embedded Admin CSS and analytics JavaScript URLs carry a revision derived from their content. Releases can retain one-hour public asset caching without leaving an upgraded Admin page on stale styles or scripts.
 
 The effective Public Map Options `CacheKey` is namespaced by Site ID. The in-memory LRU has a five-minute TTL, at most 256 variants per Site, and a 32 MiB global SVG-body budget; an in-process flight coalesces misses for one key. Map Preset updates, Site resets, and deletions advance the Site cache generation so a stale in-flight render cannot repopulate invalidated data.
+
+`GET /embed/widget.svg?site_id=...` strips `site_id` and the optional `path` before passing the remaining query to the same strict Map Options parser and renderer. Its response is `private, no-store` and omits the Public Map ETag so conforming clients reach ingestion on every load; the shared bounded in-process render cache still limits CPU use. `GET /api/v1/sites/{siteID}/map.svg` remains read-only and publicly cacheable.
 
 ## Release Signing and Self-Update
 

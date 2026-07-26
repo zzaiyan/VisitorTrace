@@ -153,6 +153,13 @@ var migrations = []migration{
 			`CREATE INDEX pageviews_site_hostname_time ON pageviews (site_id, hostname, occurred_at DESC, id DESC)`,
 		},
 	},
+	{
+		version: 10,
+		statements: []string{
+			`ALTER TABLE pageviews ADD COLUMN collection_method TEXT NOT NULL DEFAULT 'js' CHECK (collection_method IN ('js', 'image'))`,
+			`CREATE INDEX pageviews_site_collection_time ON pageviews (site_id, collection_method, occurred_at DESC, id DESC)`,
+		},
+	},
 }
 
 func (s *Store) initializeBaseSchema(ctx context.Context, passwordHash string) error {

@@ -6,7 +6,8 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
-No unreleased changes.
+- Added a JavaScript-free Integrated Image Widget that records valid image loads and returns the SVG map from one endpoint. It validates Referer against Site Allowed Origins, supports fixed `path` and all map URL overrides, uses no-store client caching, and degrades to read-only rendering for unverifiable or bot traffic.
+- Added Pageview collection-method metadata (`js` or `image`) to Administrator record tables, exact filtering, and CSV export. This advances the SQLite schema from 9 to 10; existing detailed records are marked as `js` automatically.
 
 ## 0.1.3 - 2026-07-24
 
