@@ -164,13 +164,13 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .toggle-field small { margin-top: 3px; font-size: 10px; font-weight: 400; }
 .toggle-field input { width: 17px; height: 17px; }
 .site-section-nav { margin: -12px 0 28px; }
-.integration-method { display: grid; grid-template-columns: minmax(150px, .32fr) minmax(0, 1.68fr); gap: 32px; padding: 24px 0; border-top: 1px solid var(--line); }
+.integration-method { display: grid; grid-template-columns: minmax(150px, .32fr) minmax(0, 1.68fr); align-items: start; gap: 32px; padding: 24px 0; border-top: 1px solid var(--line); }
 .integration-method:last-child { border-bottom: 1px solid var(--line); }
 .integration-method-heading { display: flex; align-items: baseline; gap: 10px; }
 .integration-method-heading span, .site-settings-group-heading span { color: var(--coral); font-size: 10px; font-weight: 800; }
 .integration-method-heading h3, .site-settings-group-heading h3, .integration-resource > h3 { margin: 0; }
 .integration-resource, .integration-resource-grid { min-width: 0; }
-.integration-resource { display: grid; gap: 12px; }
+.integration-resource { display: grid; align-content: start; gap: 12px; }
 .integration-resource > h3 { font-size: 13px; }
 .integration-resource-heading { display: flex; min-height: 22px; align-items: center; justify-content: space-between; gap: 10px; }
 .integration-resource-heading h3 { margin: 0; font-size: 13px; }
@@ -178,7 +178,7 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .integration-badge.recommended { border-color: #a9cabe; background: #e8f3ee; color: var(--green-dark); }
 .integration-badge.compatibility { border-color: #dfc4b8; background: #fff4ef; color: #a65035; }
 .integration-note { margin: 0; padding-left: 10px; border-left: 2px solid #db9a80; color: var(--muted); font-size: 10px; line-height: 1.55; }
-.integration-resource-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; }
+.integration-resource-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 0; }
 .integration-resource-grid > .integration-resource { padding-right: 22px; }
 .integration-resource-grid > .integration-resource + .integration-resource { padding-right: 0; padding-left: 22px; border-left: 1px solid var(--line); }
 .code-sample { min-width: 0; border: 1px solid #26373b; background: #19272b; color: #dcebe2; }
