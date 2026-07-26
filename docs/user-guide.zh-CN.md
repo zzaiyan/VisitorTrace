@@ -98,7 +98,7 @@ install -Dm700 visitortrace-0.1.3-linux-amd64 "$HOME/.local/bin/visitortrace"
 
 Admin Console 可管理 Site 设置、Pageview 接收和公开状态、Map Preset，并查看原始 IP、路径、浏览器、操作系统和 Visitor Digest。Public Analytics 只展示聚合统计。
 
-站点管理使用独立的 `/admin/sites` 列表，新建 Site 是列表中的单独操作。每个 Site 页面按接入代码、站点设置、Map Preset、最近记录和危险操作组织；站点设置进一步分为基本信息与 Allowed Origins、统计与保留规则、采集与公开控制。
+站点管理使用独立的 `/admin/sites` 列表，新建 Site 是列表中的单独操作。每个 Site 页面按全部历史的可交互访客地图、接入代码、站点设置、Map Preset、最近记录和危险操作组织；地图读取管理员权限下的聚合数据，即使 Site 已关闭公开展示仍可使用。站点设置进一步分为基本信息与 Allowed Origins、统计与保留规则、采集与公开控制。
 
 Public Analytics 的日期范围会同时作用于 PV/UV 摘要、趋势、地理地图和各维度表格。支持今天、7/30/90 天、全部及自定义日期；启用 JavaScript 时，趋势图可缩放，地图可平移和缩放。脚本不可用时会自动保留同一日期范围的服务端 SVG 地图和基础趋势图。
 

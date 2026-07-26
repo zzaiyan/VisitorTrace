@@ -30,17 +30,26 @@ const dataElement = document.getElementById("analytics-data");
 const trendElement = document.getElementById("trend-chart-interactive");
 const mapElement = document.getElementById("geo-chart");
 
-if (dataElement && trendElement && mapElement) {
+if (dataElement && (trendElement || mapElement)) {
   document.body.classList.add("analytics-enhancing");
   try {
     const payload = JSON.parse(dataElement.textContent || "{}");
     const labels = payload.labels || {};
-    const trend = echarts.init(trendElement, null, { renderer: "svg" });
-    const map = echarts.init(mapElement, null, { renderer: "svg" });
-    const charts = [trend, map];
+    const charts = [];
+    const observedElements = [];
 
-    trend.setOption(trendOptions(payload.daily || [], labels, payload.rules || []));
-    map.setOption(mapOptions(payload.points || [], labels));
+    if (trendElement) {
+      const trend = echarts.init(trendElement, null, { renderer: "svg" });
+      trend.setOption(trendOptions(payload.daily || [], labels, payload.rules || []));
+      charts.push(trend);
+      observedElements.push(trendElement);
+    }
+    if (mapElement) {
+      const map = echarts.init(mapElement, null, { renderer: "svg" });
+      map.setOption(mapOptions(payload.points || [], labels));
+      charts.push(map);
+      observedElements.push(mapElement);
+    }
     addDimensionChart(charts, "path-chart", barOptions(payload.paths || [], labels));
     addDimensionChart(charts, "browser-chart", pieOptions(payload.browsers || [], labels));
     addDimensionChart(charts, "os-chart", pieOptions(payload.operating_systems || [], labels));
@@ -52,8 +61,7 @@ if (dataElement && trendElement && mapElement) {
     };
     if ("ResizeObserver" in window) {
       const observer = new ResizeObserver(resize);
-      observer.observe(trendElement);
-      observer.observe(mapElement);
+      observedElements.forEach((element) => observer.observe(element));
     } else {
       window.addEventListener("resize", resize, { passive: true });
     }

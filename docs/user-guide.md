@@ -98,7 +98,7 @@ When a Base URL has a path, prepend that path to each route above.
 
 The Admin Console manages Site settings, collection and publication state, Map Presets, and sensitive Pageview Record fields such as original IP, path, browser, operating system, and Visitor Digest. Public Analytics exposes aggregate data only.
 
-Site management has a dedicated list at `/admin/sites`; creating a Site is a separate action from that list. Each Site page is organized into integration, settings, Map Preset, recent records, and destructive operations. Site settings group identity and Allowed Origins, counting and retention rules, and collection/publication controls separately.
+Site management has a dedicated list at `/admin/sites`; creating a Site is a separate action from that list. Each Site page is organized into an all-history interactive visitor map, integration, settings, Map Preset, recent records, and destructive operations. The map reads Administrator-authorized aggregates and remains available when public publishing is disabled. Site settings group identity and Allowed Origins, counting and retention rules, and collection/publication controls separately.
 
 The selected Public Analytics date range applies consistently to PV/UV summaries, trends, the geographic map, and dimension tables. Presets cover today, 7/30/90 days, all history, and a custom range. With JavaScript, the trend can be zoomed and the map can be panned and zoomed. Without JavaScript, the page retains a server-rendered SVG map and basic trend for the same range.
 

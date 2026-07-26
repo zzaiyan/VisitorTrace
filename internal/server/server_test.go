@@ -1008,6 +1008,15 @@ func TestAdminAnalyticsIncludesPathsForPrivateSite(t *testing.T) {
 	if response.Code != http.StatusOK || !strings.Contains(body, "/admin-only-path") || !strings.Contains(body, "Path performance") || !strings.Contains(body, `id="path-chart"`) || !strings.Contains(body, "Counting rule changes") || !strings.Contains(body, `"window_days":5`) {
 		t.Fatalf("Admin Analytics = status %d body %q", response.Code, body)
 	}
+	siteRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID+"?lang=en", nil)
+	siteRequest.Host = "127.0.0.1:8790"
+	siteRequest.AddCookie(cookie)
+	siteResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(siteResponse, siteRequest)
+	siteBody := siteResponse.Body.String()
+	if siteResponse.Code != http.StatusOK || !strings.Contains(siteBody, `id="visitor-map"`) || !strings.Contains(siteBody, `id="geo-chart"`) || !strings.Contains(siteBody, `id="analytics-data"`) || !strings.Contains(siteBody, `"name":"Shanghai"`) || !strings.Contains(siteBody, `/assets/analytics.js`) {
+		t.Fatalf("private Site interactive map = status %d body %q", siteResponse.Code, siteBody)
+	}
 	public := httptest.NewRecorder()
 	app.Handler().ServeHTTP(public, httptest.NewRequest(http.MethodGet, "/public/"+site.ID+"/analytics", nil))
 	if public.Code != http.StatusNotFound {

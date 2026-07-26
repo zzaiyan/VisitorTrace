@@ -308,6 +308,8 @@ tbody tr:hover { background: #f6f9f7; }
 .analytics-map, .trend-panel, .data-panel { min-width: 0; padding: 20px; border: 1px solid var(--line); background: white; }
 .analytics-map img { display: block; width: 100%; height: auto; background: #e7edeb; }
 .analytics-map .attribution { display: block; margin-top: 9px; }
+.site-analytics-map { padding: clamp(14px, 2vw, 24px); }
+.site-analytics-map > .chart-fallback { display: block; }
 .interactive-chart { display: none; width: 100%; }
 .analytics-enhancing .interactive-chart, .analytics-enhanced .interactive-chart { display: block; }
 .analytics-enhanced .chart-fallback { display: none; }

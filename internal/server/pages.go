@@ -83,6 +83,7 @@ type adminSiteData struct {
 	Site           store.Site
 	Overview       store.SiteOverview
 	Preset         maprender.Options
+	ChartJSON      template.JS
 	Recent         []store.PageviewRecord
 	OriginsText    string
 	MapPreviewURL  string
@@ -373,6 +374,16 @@ func (s *Server) adminSite(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusInternalServerError, "无法读取站点统计。")
 		return
 	}
+	mapData, err := s.Store.AdminMapData(r.Context(), siteID)
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "无法读取访客地图。")
+		return
+	}
+	chartJSON, err := analyticsMapChartJSON(mapData, adminLanguage(r))
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "无法编码访客地图。")
+		return
+	}
 	preset, err := maprender.ParsePresetJSON(site.MapPresetJSON)
 	if err != nil {
 		s.renderError(w, r, http.StatusInternalServerError, "无法读取 Map Preset。")
@@ -385,7 +396,7 @@ func (s *Server) adminSite(w http.ResponseWriter, r *http.Request) {
 	}
 	data := adminSiteData{
 		pageLayout: s.adminLayout(r, session, site.Name, "sites"), Site: site, Overview: overview,
-		Preset: preset, Recent: recent, OriginsText: strings.Join(site.AllowedOrigins, "\n"),
+		Preset: preset, ChartJSON: chartJSON, Recent: recent, OriginsText: strings.Join(site.AllowedOrigins, "\n"),
 		MapPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview.svg"), MapAspect: maprender.MapAspect, BaseURL: s.externalBaseURL(r), Saved: adminFlash(r),
 		GeoIPAvailable: s.geoIPAvailable(),
 	}
@@ -656,39 +667,62 @@ func (s *Server) publicAnalyticsMap(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
-func analyticsChartJSON(analytics store.PublicAnalyticsData, lang string) (template.JS, error) {
-	type chartPoint struct {
-		Name string  `json:"name"`
-		Lon  float64 `json:"lon"`
-		Lat  float64 `json:"lat"`
-		PV   int64   `json:"pv"`
-		UV   int64   `json:"uv"`
+type analyticsChartPoint struct {
+	Name string  `json:"name"`
+	Lon  float64 `json:"lon"`
+	Lat  float64 `json:"lat"`
+	PV   int64   `json:"pv"`
+	UV   int64   `json:"uv"`
+}
+
+func analyticsMapChartJSON(data store.PublicMapData, lang string) (template.JS, error) {
+	payload := struct {
+		Points []analyticsChartPoint `json:"points"`
+		Labels map[string]string     `json:"labels"`
+	}{Points: analyticsChartPoints(data.Points), Labels: analyticsChartLabels(lang)}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
 	}
+	return template.JS(encoded), nil
+}
+
+func analyticsChartJSON(analytics store.PublicAnalyticsData, lang string) (template.JS, error) {
 	payload := struct {
 		Daily    []store.DailyMetric             `json:"daily"`
-		Points   []chartPoint                    `json:"points"`
+		Points   []analyticsChartPoint           `json:"points"`
 		Paths    []store.AnalyticsMetric         `json:"paths,omitempty"`
 		Browsers []store.AnalyticsMetric         `json:"browsers,omitempty"`
 		OS       []store.AnalyticsMetric         `json:"operating_systems,omitempty"`
 		Rules    []store.DeduplicationRuleChange `json:"rules,omitempty"`
 		Labels   map[string]string               `json:"labels"`
-	}{Daily: analytics.Daily, Labels: map[string]string{
-		"pageviews": translate(lang, "pageviews"), "uniqueVisitors": translate(lang, "unique_visitors"),
-		"visitors": translate(lang, "visitors"), "unknown": translate(lang, "unknown"),
-		"path": translate(lang, "path"), "share": translate(lang, "share"), "days": translate(lang, "days"),
-	}, Paths: analytics.Paths, Browsers: analytics.Browsers, OS: analytics.OperatingSystems, Rules: analytics.DeduplicationRules}
-	for _, point := range analytics.MapPoints {
-		name := point.City
-		if name == "" {
-			name = point.CountryCode
-		}
-		payload.Points = append(payload.Points, chartPoint{Name: name, Lon: point.Longitude, Lat: point.Latitude, PV: point.Pageviews, UV: point.UniqueVisitors})
-	}
+	}{Daily: analytics.Daily, Points: analyticsChartPoints(analytics.MapPoints), Labels: analyticsChartLabels(lang),
+		Paths: analytics.Paths, Browsers: analytics.Browsers, OS: analytics.OperatingSystems, Rules: analytics.DeduplicationRules}
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
 	}
 	return template.JS(data), nil
+}
+
+func analyticsChartPoints(points []store.MapPoint) []analyticsChartPoint {
+	result := make([]analyticsChartPoint, 0, len(points))
+	for _, point := range points {
+		name := point.City
+		if name == "" {
+			name = point.CountryCode
+		}
+		result = append(result, analyticsChartPoint{Name: name, Lon: point.Longitude, Lat: point.Latitude, PV: point.Pageviews, UV: point.UniqueVisitors})
+	}
+	return result
+}
+
+func analyticsChartLabels(lang string) map[string]string {
+	return map[string]string{
+		"pageviews": translate(lang, "pageviews"), "uniqueVisitors": translate(lang, "unique_visitors"),
+		"visitors": translate(lang, "visitors"), "unknown": translate(lang, "unknown"),
+		"path": translate(lang, "path"), "share": translate(lang, "share"), "days": translate(lang, "days"),
+	}
 }
 
 func (s *Server) analyticsRange(r *http.Request, site store.Site) (string, string, string, error) {

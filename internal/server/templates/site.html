@@ -6,12 +6,21 @@
 </header>
 {{if .Saved}}<div class="notice success" role="status">{{.Saved}}</div>{{end}}
 {{if .Error}}<div class="notice danger" role="alert">{{.Error}}</div>{{end}}
-<nav class="settings-jump site-section-nav" aria-label="{{t "site_sections"}}"><a href="#integration">{{t "integration_code"}}</a><a href="#settings">{{t "site_settings"}}</a><a href="#preset">{{t "map_preset"}}</a><a href="#records">{{t "recent_records"}}</a><a href="#danger">{{t "danger_zone"}}</a></nav>
+<nav class="settings-jump site-section-nav" aria-label="{{t "site_sections"}}"><a href="#visitor-map">{{t "visitor_map"}}</a><a href="#integration">{{t "integration_code"}}</a><a href="#settings">{{t "site_settings"}}</a><a href="#preset">{{t "map_preset"}}</a><a href="#records">{{t "recent_records"}}</a><a href="#danger">{{t "danger_zone"}}</a></nav>
 <section class="metric-strip" aria-label="{{t "cumulative_stats"}}">
   <div><span>Pageviews</span><strong>{{formatCount .Overview.Pageviews}}</strong></div>
   <div><span>Unique Visitors</span><strong>{{formatCount .Overview.UniqueVisitors}}</strong></div>
   <div><span>Pageview Records</span><strong>{{formatCount .Overview.PageviewRecords}}</strong></div>
   <div><span>{{t "retention"}}</span><strong>{{.Site.RetentionDays}} {{t "day"}}</strong></div>
+</section>
+
+<section class="section-block" id="visitor-map">
+  <div class="section-heading"><div><p class="eyebrow">GEOGRAPHY</p><h2>{{t "visitor_map"}}</h2></div><span class="muted">{{t "all_history"}}</span></div>
+  <div class="analytics-map site-analytics-map">
+    <div id="geo-chart" class="interactive-chart geo-chart" role="img" aria-label="{{.Site.Name}} {{t "visitor_map"}}"></div>
+    <a class="chart-fallback" href="{{.MapPreviewURL}}" target="_blank" rel="noopener"><img src="{{.MapPreviewURL}}" alt="{{.Site.Name}} {{t "visitor_map"}}"></a>
+    {{with geoAttribution}}<a class="attribution" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}
+  </div>
 </section>
 
 <section class="section-block" id="integration">
@@ -167,6 +176,8 @@
     </form>
   </div>
 </section>
+<script type="application/json" id="analytics-data">{{.ChartJSON}}</script>
+<script defer src="{{assetPath "/assets/analytics.js"}}"></script>
 <script>
 (function () {
   var form = document.getElementById("preset-form");
