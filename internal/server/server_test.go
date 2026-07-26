@@ -197,7 +197,7 @@ func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 	for _, want := range []string{
 		`<!doctype html>`, `<html lang="en">`, `width="320" height="180"`, `data-width="320" data-height="180"`, `data-city="Wuhan"`, `id="widget-tooltip"`,
 		`href="/public/` + site.ID + `/analytics"`, `IP geolocation by DB-IP`, `pointerover`, `(hover: none)`, `window.parent.postMessage`, `visitortrace:resize`, `.visitortrace-marker > title`,
-		`id="widget-map-controls"`, `Reset map position and zoom`, `visitortrace-map-content`, `VisitorTraceMapControls`, `visitortrace:map-controls-ready`, `viewport.addEventListener("wheel"`, `type: "pinch"`,
+		`id="widget-map-controls"`, `Reset map position and zoom`, `visitortrace-map-content`, `VisitorTraceMapControls`, `visitortrace:map-controls-ready`, `viewport.addEventListener("wheel"`, `type: "pinch"`, `M2 12h3m14 0h3M12 2v3m0 14v3`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("interactive widget body is missing %q", want)
@@ -640,6 +640,9 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	if count := strings.Count(sitePageResponse.Body.String(), `class="copy-control copy-button"`); count != 8 {
 		t.Fatalf("admin Site page copy controls = %d, want 8", count)
 	}
+	if body := sitePageResponse.Body.String(); strings.Contains(body, `name="site_id"`) || !strings.Contains(body, `id="preset-image-preview" data-preview-base="/admin/sites/`+site.ID+`/preset-preview.svg" width="640" height="320"`) || !strings.Contains(body, `imagePreview.style.width = width + "px"`) {
+		t.Fatalf("admin Site page retained Site ID confirmation or lacks fixed-size Image fallback: %q", body)
+	}
 	if _, err := st.DB.Exec(`UPDATE sites SET first_pageview_at = ? WHERE id = ?`, time.Now().UTC().Format(time.RFC3339Nano), site.ID); err != nil {
 		t.Fatalf("lock Site timezone fixture: %v", err)
 	}
@@ -693,7 +696,7 @@ func TestAdminSiteResetAndDelete(t *testing.T) {
 	}
 	post := func(path string) *httptest.ResponseRecorder {
 		t.Helper()
-		form := url.Values{"csrf": {csrf}, "site_id": {site.ID}, "password": {"correct horse"}}
+		form := url.Values{"csrf": {csrf}, "password": {"correct horse"}}
 		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
 		request.Host = "127.0.0.1:8790"
 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")

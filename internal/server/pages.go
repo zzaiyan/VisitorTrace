@@ -500,8 +500,8 @@ func (s *Server) adminResetSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	siteID := r.PathValue("siteID")
-	if r.FormValue("site_id") != siteID || !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", "Site ID 或管理员密码不正确。")
+	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", "管理员密码不正确。")
 		return
 	}
 	if err := s.Store.ResetSiteData(r.Context(), siteID); err != nil {
@@ -527,8 +527,8 @@ func (s *Server) adminDeleteSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	siteID := r.PathValue("siteID")
-	if r.FormValue("site_id") != siteID || !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", "Site ID 或管理员密码不正确。")
+	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", "管理员密码不正确。")
 		return
 	}
 	if err := s.Store.DeleteSite(r.Context(), siteID); err != nil {

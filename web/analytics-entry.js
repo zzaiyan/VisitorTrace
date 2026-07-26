@@ -48,7 +48,7 @@ window.VisitorTraceMapControls = mapControlsAPI;
 mapControlsAPI.add({
   id: "reset",
   label: (context) => context.resetLabel,
-  icon: createResetIcon,
+  icon: createLocateIcon,
   activate: (context) => context.reset(),
 });
 
@@ -145,14 +145,19 @@ function renderMapControl(host, definition) {
   host.buttons.set(definition.id, button);
 }
 
-function createResetIcon() {
+function createLocateIcon() {
   const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   icon.setAttribute("viewBox", "0 0 24 24");
   icon.setAttribute("aria-hidden", "true");
-  ["M3 12a9 9 0 1 0 3-6.7L3 8", "M3 3v5h5"].forEach((value) => {
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", value);
-    icon.appendChild(path);
+  const ticks = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  ticks.setAttribute("d", "M2 12h3m14 0h3M12 2v3m0 14v3");
+  icon.appendChild(ticks);
+  [7, 3].forEach((radius) => {
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", "12");
+    circle.setAttribute("cy", "12");
+    circle.setAttribute("r", radius);
+    icon.appendChild(circle);
   });
   return icon;
 }

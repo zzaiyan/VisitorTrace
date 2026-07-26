@@ -22,10 +22,10 @@
     .widget-tooltip p { display: flex; gap: 10px; margin: 3px 0 0; color: #e6eceb; font-size: 11px; line-height: 1.35; white-space: nowrap; }
     .widget-tooltip small { display: block; margin-top: 4px; color: #aebcba; font-size: 9px; line-height: 1.3; }
     .map-controls { position: fixed; z-index: 3; display: flex; gap: 4px; }
-    .map-control { display: grid; width: 27px; height: 27px; place-items: center; padding: 0; border: 1px solid rgba(91, 110, 108, .48); border-radius: 3px; background: rgba(255, 255, 255, .94); color: #34484a; box-shadow: 0 2px 7px rgba(18, 28, 30, .14); cursor: pointer; }
+    .map-control { display: grid; width: 25px; height: 25px; place-items: center; padding: 0; border: 1px solid rgba(91, 110, 108, .45); border-radius: 3px; background: rgba(255, 255, 255, .94); color: #34484a; box-shadow: 0 1px 5px rgba(18, 28, 30, .14); cursor: pointer; }
     .map-control:hover, .map-control:focus-visible { border-color: #2f655a; background: #f3f8f6; color: #214e45; outline: none; }
     .map-control:focus-visible { box-shadow: 0 0 0 2px rgba(47, 101, 90, .25); }
-    .map-control svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
+    .map-control svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
     @media (prefers-reduced-motion: reduce) { .visitortrace-marker circle { transition: none; } }
   </style>
 </head>
@@ -147,14 +147,19 @@
         controlsHost.style.top = Math.round(Math.max(topLeft.y, bottomRight.y) - controlsHost.offsetHeight - 7) + "px";
       }
 
-      function createResetIcon() {
+      function createLocateIcon() {
         var icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         icon.setAttribute("viewBox", "0 0 24 24");
         icon.setAttribute("aria-hidden", "true");
-        ["M3 12a9 9 0 1 0 3-6.7L3 8", "M3 3v5h5"].forEach(function (value) {
-          var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          path.setAttribute("d", value);
-          icon.appendChild(path);
+        var ticks = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        ticks.setAttribute("d", "M2 12h3m14 0h3M12 2v3m0 14v3");
+        icon.appendChild(ticks);
+        [7, 3].forEach(function (radius) {
+          var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          circle.setAttribute("cx", "12");
+          circle.setAttribute("cy", "12");
+          circle.setAttribute("r", radius);
+          icon.appendChild(circle);
         });
         return icon;
       }
@@ -187,7 +192,7 @@
         }
       };
       window.VisitorTraceMapControls = mapControls;
-      mapControls.add({ id: "reset", label: {{printf "%q" .ResetLabel}}, icon: createResetIcon, activate: resetView });
+      mapControls.add({ id: "reset", label: {{printf "%q" .ResetLabel}}, icon: createLocateIcon, activate: resetView });
       root.dispatchEvent(new CustomEvent("visitortrace:map-controls-ready", { bubbles: true, detail: { controls: mapControls, reset: resetView } }));
       window.addEventListener("resize", placeControls, { passive: true });
 

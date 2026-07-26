@@ -349,7 +349,7 @@ The command reads and confirms the new password interactively. Automation may pr
 
 ## Site Reset and Deletion
 
-The bottom of each Site page contains two dangerous operations. Both require the complete Site ID and current Administrator password:
+The bottom of each Site page contains two dangerous operations. Because the page is already scoped to one Site, both require only the current Administrator password:
 
 - Reset Site data removes Pageview Records, all aggregates, and map locations while preserving Site settings. It rotates the HMAC key, unlocks the statistics timezone, and leaves collection and public views disabled until they are reviewed and enabled manually.
 - Permanently delete Site removes the Site, all associated data, and its settings. Its Site ID is never reassigned.

@@ -115,7 +115,7 @@
       </div>
       <div class="preview-surface">
         <iframe id="preset-widget-preview" src="{{.WidgetPreviewURL}}" data-preview-base="{{.WidgetPreviewURL}}" width="{{.Preset.Width}}" height="{{.Preset.Height}}" title="{{t "interactive_widget_preview"}}" scrolling="no" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe>
-        <img id="preset-image-preview" data-preview-base="{{.MapPreviewURL}}" alt="{{t "image_fallback"}}" hidden>
+        <img id="preset-image-preview" data-preview-base="{{.MapPreviewURL}}" width="{{.Preset.Width}}" height="{{.Preset.Height}}" alt="{{t "image_fallback"}}" hidden>
       </div>
       {{with geoAttribution}}<a class="attribution" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}
     </div>
@@ -171,14 +171,12 @@
     <form method="post" action="{{appPath (printf "/admin/sites/%s/reset" .Site.ID)}}" class="danger-form">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div><h3>{{t "reset_site_data"}}</h3><p>{{t "reset_site_help"}}</p></div>
-      <label class="field"><span>{{t "enter_site_id"}}</span><input type="text" name="site_id" autocomplete="off" required></label>
       <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>
       <button class="button danger" type="submit">{{t "reset_data"}}</button>
     </form>
     <form method="post" action="{{appPath (printf "/admin/sites/%s/delete" .Site.ID)}}" class="danger-form">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div><h3>{{t "delete_site"}}</h3><p>{{t "delete_site_help"}}</p></div>
-      <label class="field"><span>{{t "enter_site_id"}}</span><input type="text" name="site_id" autocomplete="off" required></label>
       <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>
       <button class="button danger" type="submit">{{t "delete_permanently"}}</button>
     </form>
@@ -220,6 +218,13 @@
     widgetPreview.style.maxWidth = width + "px";
     widgetPreview.style.aspectRatio = width + " / " + height;
   }
+  function sizeImage(width, height) {
+    if (!isFinite(width) || !isFinite(height) || width < 160 || width > 1200 || height < 90 || height > 800) return;
+    imagePreview.width = width;
+    imagePreview.height = height;
+    imagePreview.style.width = width + "px";
+    imagePreview.style.height = height + "px";
+  }
   function update() {
     var query = previewQuery();
     var preview = activeMode === "widget" ? widgetPreview : imagePreview;
@@ -228,7 +233,10 @@
       loadedURLs[activeMode] = nextURL;
       preview.src = nextURL;
     }
-    if (activeMode === "widget") sizeWidget(Number(form.elements.w.value), Number(form.elements.h.value));
+    var width = Number(form.elements.w.value);
+    var height = Number(form.elements.h.value);
+    if (activeMode === "widget") sizeWidget(width, height);
+    else sizeImage(width, height);
   }
   function selectMode(mode) {
     activeMode = mode;
@@ -260,6 +268,7 @@
     sizeWidget(Number(data.width), Number(data.height));
   });
   sizeWidget(Number(form.elements.w.value), Number(form.elements.h.value));
+  sizeImage(Number(form.elements.w.value), Number(form.elements.h.value));
   function chromeHeight() {
     var fontSize = Number(form.elements.fs.value) || 12;
     var titleHeight = form.elements.show_title.checked ? fontSize + 10 : 0;

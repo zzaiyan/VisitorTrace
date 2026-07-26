@@ -6,6 +6,7 @@
 
 ## 尚未发布
 
+- 地图 Reset 控件改用更小的定位样式图标；Image fallback 预览按配置的像素尺寸原样显示，不再缩放；Site 专属危险操作移除重复的 Site ID 确认，同时保留管理员密码验证。
 - Map Preset 新增完整交互式 Widget 与 Image fallback 双模式预览，并支持私有 Site 的管理员专用渲染。所有交互式地图均在左下角提供位置与缩放 Reset 控件；iframe 与 ECharts 视图同时开放统一的可扩展控件注册表，便于后续增加操作。
 - 将分离式接入从静态 Map SVG 升级为独立的 `map.js` Loader。该 Loader 不执行采集，而是挂载与一体式模式相同的懒加载、响应式交互 Widget，可与 `tracker.js` 组合、独立延迟加载，或单独用于只读展示。
 - 将一体式 JavaScript Widget 的静态图片替换为独立渲染、受 sandbox 隔离的 iframe。城市点位支持鼠标、键盘和触屏查看详情及 GeoIP 署名；点击地图会打开公开分析，同时 Pageview 采集仍由父页面 Loader 完成。
