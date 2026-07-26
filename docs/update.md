@@ -6,6 +6,10 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.1.4 - 2026-07-27
+
 - Top-aligned independent columns in Site integration layouts, preventing shorter code resources from being vertically distributed beside taller alternatives.
 - Added the all-history interactive visitor map directly to each Site management page. It reuses the Public Analytics map interactions, remains available for private Sites, and retains the Administrator-authenticated SVG as a no-JavaScript fallback.
 - Added a JavaScript-free Integrated Image Widget that records valid image loads and returns the SVG map from one endpoint. It validates Referer against Site Allowed Origins, supports fixed `path` and all map URL overrides, uses no-store client caching, and degrades to read-only rendering for unverifiable or bot traffic.
