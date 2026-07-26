@@ -175,15 +175,15 @@ The separated Tracker records a Pageview without rendering a map:
 
 The tracker reports the current page hostname. The server derives the authoritative hostname from the validated request Origin, so different domains sharing one Site remain separate in hostname statistics and Unique Visitor counting.
 
-The separated integration area also provides a copyable map control snippet for lazy loading. The map can be loaded independently as an image:
+The separated integration area also provides a display-only Interactive Map loader. Use it with the Tracker when collection and rendering need independent lifecycle control, or defer it until the map enters the viewport:
 
 ```html
-<img loading="lazy"
-     src="https://stats.example.com/api/v1/sites/SITE_ID/map.svg"
-     alt="Visitor map">
+<script async src="https://stats.example.com/embed/map.js?site_id=SITE_ID"></script>
 ```
 
-The Site page provides one-click copy controls for every integration snippet and resource URL. Integrated access contains the recommended Interactive Widget loader and the compatible Image Widget. Separated access provides snippets and resource URLs for both the Tracker and lazy-loaded Map SVG.
+`map.js` never records a Pageview. It mounts the same sandboxed iframe as the Integrated Widget, including lazy loading, Map Preset and URL overrides, responsive aspect-ratio updates, marker details, touch behavior, and Public Analytics navigation. Loading only `tracker.js` remains the lowest-cost choice when no map should be rendered; loading only `map.js` renders public statistics without collecting the host page.
+
+The Site page provides one-click copy controls for every integration snippet and resource URL. Integrated access contains the recommended Interactive Widget loader and the compatible Image Widget. Separated access provides independent Tracker and Interactive Map loaders with the same final Widget experience.
 
 ## Map Presets and URL Overrides
 

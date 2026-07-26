@@ -160,6 +160,22 @@ func TestIntegratedWidgetScript(t *testing.T) {
 	}
 }
 
+func TestSeparatedMapScript(t *testing.T) {
+	app, _, site := testServer(t)
+	request := httptest.NewRequest(http.MethodGet, "/embed/map.js?site_id="+site.ID+"&w=640", nil)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("separated map status = %d, body = %q", response.Code, response.Body.String())
+	}
+	body := response.Body.String()
+	for _, want := range []string{`displayOnly = /\/map\.js$/`, "rendersWidget", `new URL("embed/widget", appURL)`, `document.createElement("iframe")`, `frame.loading = "lazy"`, `visitortrace:resize`, `if (!displayOnly) send(window.location.pathname)`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("separated map response is missing %q", want)
+		}
+	}
+}
+
 func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 	app, st, site := testServer(t)
 	latitude := 30.5928
@@ -608,7 +624,7 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	sitePage.AddCookie(cookies[0])
 	sitePageResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(sitePageResponse, sitePage)
-	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.svg") || !strings.Contains(sitePageResponse.Body.String(), `id="image-widget-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-endpoint"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) || !strings.Contains(sitePageResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) {
+	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.svg") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/map.js") || !strings.Contains(sitePageResponse.Body.String(), `id="image-widget-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-endpoint"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) || !strings.Contains(sitePageResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) {
 		t.Fatalf("admin Site page = status %d, body = %q", sitePageResponse.Code, sitePageResponse.Body.String())
 	}
 	if count := strings.Count(sitePageResponse.Body.String(), `class="copy-control copy-button"`); count != 8 {

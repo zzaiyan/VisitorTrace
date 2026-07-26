@@ -175,15 +175,15 @@ VisitorTrace 为 Image Widget 返回 `Cache-Control: private, no-store`，但上
 
 Tracker 会上报当前页面 hostname。服务端以已经通过 Origin 校验的 hostname 为权威值，因此共享一个 Site 的不同域名会在 hostname 统计和独立访客计数中保持隔离。
 
-分离式接入区域同时提供可复制的地图控件代码，适合懒加载。地图可单独作为图片加载：
+分离式接入区域同时提供只负责显示的交互式地图 Loader。需要分别控制采集和渲染生命周期时，可将其与 Tracker 组合，也可以等地图进入视口后再加载：
 
 ```html
-<img loading="lazy"
-     src="https://stats.example.com/api/v1/sites/SITE_ID/map.svg"
-     alt="Visitor map">
+<script async src="https://stats.example.com/embed/map.js?site_id=SITE_ID"></script>
 ```
 
-Site 页面为每段接入代码和每个资源地址提供一键复制。一体式接入包含推荐的交互式 Widget Loader 和兼容型 Image Widget；分离式接入分别为 Tracker 和懒加载 Map SVG 展示嵌入代码与资源地址。
+`map.js` 不记录 Pageview。它与一体式 Widget 挂载相同的 sandbox iframe，因此完整保留懒加载、Map Preset 与 URL 覆写、响应式比例更新、点位详情、触屏行为和公开分析跳转。无需显示地图时只加载 `tracker.js`，是占用最低的方案；只加载 `map.js` 则可展示公开统计而不采集宿主页面。
+
+Site 页面为每段接入代码和每个资源地址提供一键复制。一体式接入包含推荐的交互式 Widget Loader 和兼容型 Image Widget；分离式接入分别提供 Tracker 与交互式地图 Loader，最终 Widget 体验保持一致。
 
 ## Map Preset 与 URL 覆写
 

@@ -6,6 +6,7 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+- Upgraded separated integration from a static Map SVG to an independent `map.js` loader. It performs no collection and mounts the same lazy, responsive Interactive Widget as integrated mode, so it can be paired with `tracker.js`, deferred independently, or used alone for read-only display.
 - Replaced the Integrated JavaScript Widget's static image with a sandboxed, independently rendered iframe. City markers now expose mouse, keyboard, and touch details with GeoIP attribution, and map clicks open Public Analytics without moving Pageview collection out of the parent-page loader.
 - Reduced every SVG map by defining the world basemap once and reusing it across the Bering Strait seam instead of serializing the same path twice. The iframe reports its effective Map Preset dimensions to the loader so responsive embedding preserves the projection ratio.
 

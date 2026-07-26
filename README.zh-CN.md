@@ -23,7 +23,7 @@
 - 备份、清理、GeoIP 与资源状态总览
 - 支持在线与本地文件、带 Ed25519 验签、自动备份和失败回滚的一键自更新
 - 可实时预览的地图预设
-- 一体式交互 iframe/Image Widget 与分离式 Tracker 接入模式
+- 一体式交互 iframe/Image Widget，以及可独立组合的 Tracker 与交互式地图 Loader
 
 ## 快速预览
 

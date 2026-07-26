@@ -15,7 +15,8 @@
   ).href;
   var state = window.__visitorTraceState || (window.__visitorTraceState = {});
   var siteState = state[siteID] || (state[siteID] = { sent: {}, visitorID: null });
-  var integrated = /\/widget\.js$/.test(scriptURL.pathname);
+  var displayOnly = /\/map\.js$/.test(scriptURL.pathname);
+  var rendersWidget = displayOnly || /\/widget\.js$/.test(scriptURL.pathname);
 
   function getVisitorID() {
     if (siteState.visitorID) return siteState.visitorID;
@@ -66,9 +67,11 @@
     }
   }
 
-  window.VisitorTrace = window.VisitorTrace || {};
-  window.VisitorTrace.track = send;
-  if (integrated) {
+  if (!displayOnly) {
+    window.VisitorTrace = window.VisitorTrace || {};
+    window.VisitorTrace.track = send;
+  }
+  if (rendersWidget) {
     var frameURL = new URL("embed/widget", appURL);
     scriptURL.searchParams.forEach(function (value, key) {
       frameURL.searchParams.append(key, value);
@@ -111,5 +114,5 @@
     wrapper.appendChild(frame);
     if (script.parentNode) script.parentNode.insertBefore(wrapper, script.nextSibling);
   }
-  send(window.location.pathname);
+  if (!displayOnly) send(window.location.pathname);
 }());
