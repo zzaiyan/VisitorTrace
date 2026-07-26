@@ -78,6 +78,13 @@ func TestRenderEscapesLabelsAndIncludesMap(t *testing.T) {
 	if !strings.Contains(value, `data-city="Wuhan"`) || !strings.Contains(value, `data-country="CN"`) || !strings.Contains(value, `data-pv="12" data-uv="8"`) || !strings.Contains(value, `tabindex="0" role="link"`) {
 		t.Fatal("rendered marker is missing interactive metadata")
 	}
+	contentIndex := strings.Index(value, `class="visitortrace-map-content"`)
+	mapIndex := strings.Index(value, `class="visitortrace-map"`)
+	markerLayerIndex := strings.Index(value, `class="visitortrace-marker-layer"`)
+	markerIndex := strings.Index(value, `class="visitortrace-marker"`)
+	if contentIndex < 0 || mapIndex < contentIndex || markerLayerIndex < mapIndex || markerIndex < markerLayerIndex || !strings.Contains(value, `</g><g class="visitortrace-marker-layer">`) {
+		t.Fatal("basemap and markers do not share the interactive map-content transform")
+	}
 	if strings.Contains(value, "DB-IP") {
 		t.Fatal("provider attribution was drawn inside SVG")
 	}

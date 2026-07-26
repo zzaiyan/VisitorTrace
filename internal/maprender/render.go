@@ -69,7 +69,7 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 	for _, shift := range []float64{-mapBaseOffset, mapBaseWidth - mapBaseOffset} {
 		fmt.Fprintf(&output, "<use href=\"#visitortrace-land\" transform=\"translate(%s 0)\" fill=\"#%s\" stroke=\"#%s\" stroke-width=\"0.7\" vector-effect=\"non-scaling-stroke\"/>", format(shift), options.Land, options.Border)
 	}
-	output.WriteString("</g></g>")
+	output.WriteString("</g><g class=\"visitortrace-marker-layer\">")
 	maxMetric := int64(0)
 	for _, point := range data.Points {
 		if point.Latitude < mapMinLatitude || point.Latitude > mapMaxLatitude {
@@ -104,7 +104,7 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 		tooltip := fmt.Sprintf("%s: %s Pageviews, %s Unique Visitors", name, formatCount(point.Pageviews), formatCount(point.UniqueVisitors))
 		fmt.Fprintf(&output, "<g class=\"visitortrace-marker\" tabindex=\"0\" role=\"link\" aria-label=\"%s\" data-city=\"%s\" data-country=\"%s\" data-pv=\"%d\" data-uv=\"%d\"><title>%s</title><circle cx=\"%s\" cy=\"%s\" r=\"%s\" fill=\"#%s\" fill-opacity=\"0.78\" stroke=\"#ffffff\" stroke-width=\"0.6\"/></g>", html.EscapeString(tooltip), html.EscapeString(name), html.EscapeString(point.CountryCode), point.Pageviews, point.UniqueVisitors, html.EscapeString(tooltip), format(x), format(y), format(radius), options.Marker)
 	}
-	output.WriteString("</g>")
+	output.WriteString("</g></g></g>")
 	footerTop := options.Height - footerHeight
 	if len(stats) > 0 {
 		line := strings.Join(stats, "  ·  ")

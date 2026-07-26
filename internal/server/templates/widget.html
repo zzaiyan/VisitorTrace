@@ -59,6 +59,7 @@
       var gesture = null;
       var gestureMoved = false;
       var view = { scale: 1, x: 0, y: 0 };
+      var viewFrame = 0;
 
       Array.prototype.forEach.call(root.querySelectorAll(".visitortrace-marker > title"), function (node) {
         node.remove();
@@ -83,14 +84,24 @@
         view.y = clamp(view.y, height * (1 - view.scale), 0);
       }
 
-      function applyView() {
-        constrainView();
+      function renderView() {
+        viewFrame = 0;
         mapContent.setAttribute("transform", "translate(" + view.x + " " + view.y + ") scale(" + view.scale + ")");
+      }
+
+      function applyView(immediate) {
+        constrainView();
+        if (immediate) {
+          if (viewFrame) window.cancelAnimationFrame(viewFrame);
+          renderView();
+        } else if (!viewFrame) {
+          viewFrame = window.requestAnimationFrame(renderView);
+        }
       }
 
       function resetView() {
         view = { scale: 1, x: 0, y: 0 };
-        applyView();
+        applyView(true);
         hide();
       }
 
@@ -104,6 +115,16 @@
 
       function pointerValues() {
         return Object.keys(pointers).map(function (key) { return pointers[key]; });
+      }
+
+      function capturePointer(event) {
+        if (!viewport.setPointerCapture) return false;
+        try {
+          viewport.setPointerCapture(event.pointerId);
+          return true;
+        } catch (_) {
+          return false;
+        }
       }
 
       function beginGesture() {
@@ -209,17 +230,28 @@
       }, { passive: false });
 
       viewport.addEventListener("pointerdown", function (event) {
-        if (markerFrom(event.target) || (event.pointerType === "mouse" && event.button !== 0)) return;
-        pointers[event.pointerId] = { x: event.clientX, y: event.clientY };
-        if (viewport.setPointerCapture) viewport.setPointerCapture(event.pointerId);
-        if (pointerValues().length === 1) gestureMoved = false;
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        var deferCapture = Boolean(markerFrom(event.target)) && event.pointerType !== "mouse";
+        pointers[event.pointerId] = { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, captured: false, deferCapture: deferCapture };
+        if (!deferCapture) pointers[event.pointerId].captured = capturePointer(event);
+        if (pointerValues().length === 1) {
+          gestureMoved = false;
+          suppressClick = false;
+        }
         beginGesture();
         document.body.classList.add("is-panning");
       });
 
       viewport.addEventListener("pointermove", function (event) {
-        if (!pointers[event.pointerId]) return;
-        pointers[event.pointerId] = { x: event.clientX, y: event.clientY };
+        var pointer = pointers[event.pointerId];
+        if (!pointer) return;
+        if (pointer.deferCapture) {
+          if (Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) <= 3) return;
+          pointer.deferCapture = false;
+          pointer.captured = capturePointer(event);
+        }
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
         var values = pointerValues();
         if (values.length > 1) {
           if (!gesture || gesture.type !== "pinch") beginGesture();
@@ -240,10 +272,11 @@
         event.preventDefault();
       });
 
-      function endPointer(event) {
-        if (!pointers[event.pointerId]) return;
+      function endPointer(event, captureLost) {
+        var pointer = pointers[event.pointerId];
+        if (!pointer) return;
         delete pointers[event.pointerId];
-        if (viewport.releasePointerCapture && viewport.hasPointerCapture && viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+        if (!captureLost && pointer.captured && viewport.releasePointerCapture && viewport.hasPointerCapture && viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
         if (pointerValues().length) {
           beginGesture();
         } else {
@@ -254,6 +287,13 @@
       }
       viewport.addEventListener("pointerup", endPointer);
       viewport.addEventListener("pointercancel", endPointer);
+      viewport.addEventListener("lostpointercapture", function (event) { endPointer(event, true); });
+      window.addEventListener("blur", function () {
+        pointers = {};
+        gesture = null;
+        gestureMoved = false;
+        document.body.classList.remove("is-panning");
+      });
 
       function markerFrom(target) {
         return target && target.closest ? target.closest(".visitortrace-marker") : null;

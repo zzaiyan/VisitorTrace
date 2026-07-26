@@ -197,7 +197,7 @@ func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 	for _, want := range []string{
 		`<!doctype html>`, `<html lang="en">`, `width="320" height="180"`, `data-width="320" data-height="180"`, `data-city="Wuhan"`, `id="widget-tooltip"`,
 		`href="/public/` + site.ID + `/analytics"`, `IP geolocation by DB-IP`, `pointerover`, `(hover: none)`, `window.parent.postMessage`, `visitortrace:resize`, `.visitortrace-marker > title`,
-		`id="widget-map-controls"`, `Reset map position and zoom`, `visitortrace-map-content`, `VisitorTraceMapControls`, `visitortrace:map-controls-ready`, `viewport.addEventListener("wheel"`, `type: "pinch"`, `M2 12h3m14 0h3M12 2v3m0 14v3`,
+		`id="widget-map-controls"`, `Reset map position and zoom`, `visitortrace-map-content`, `visitortrace-marker-layer`, `VisitorTraceMapControls`, `visitortrace:map-controls-ready`, `viewport.addEventListener("wheel"`, `viewport.addEventListener("lostpointercapture"`, `window.requestAnimationFrame(renderView)`, `type: "pinch"`, `M2 12h3m14 0h3M12 2v3m0 14v3`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("interactive widget body is missing %q", want)

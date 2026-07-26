@@ -79,7 +79,7 @@ Pageview Record 列表使用 `(occurred_at, id)` 复合游标，查询顺序由�
 
 Public Map 的有效 Options `CacheKey` 与 Site ID 组成缓存键。内存 LRU 的 TTL 为 5 分钟，每个 Site 最多 256 个变体，全局 SVG body 最多 32 MiB；同键 miss 通过进程内 flight 合并。Map Preset 更新、Site 清空和删除会递增 Site 缓存代次，避免正在渲染的旧结果在失效后重新写回。
 
-SVG Renderer 在 `<defs>` 中只保存一次底图路径，再通过 `<use>` 放置白令海峡接缝两侧的副本；裁剪后的 `visitortrace-map-content` 分组把地图变换与标题、统计栏隔离。城市点位保留供 SVG 单独打开时使用的原生 `<title>`，同时增加经过转义的城市、国家、PV、UV 属性供交互层读取。`GET /embed/widget?site_id=...` 把该 SVG 内联到可缓存、兼容 sandbox 且不依赖外部运行库的 HTML 文档中，提供指针、焦点、触屏详情、指针/触屏平移缩放、左下角控件注册表和公开分析跳转，并通过 `postMessage` 向父页面报告已校验的预设尺寸。该文档不采集 Pageview；`widget.js` 负责从父页面采集 hostname/path 并挂载懒加载 iframe，而分离式 `tracker.js` 与 `map.js` 分别承担这两个职责。两种显示 Loader 都只接受来自自身 iframe `contentWindow` 的尺寸消息。
+SVG Renderer 在 `<defs>` 中只保存一次底图路径，再通过 `<use>` 放置白令海峡接缝两侧的副本；裁剪后的 `visitortrace-map-content` 同时包含底图和 `visitortrace-marker-layer`，使二者共享同一变换，并与标题、统计栏隔离。城市点位保留供 SVG 单独打开时使用的原生 `<title>`，同时增加经过转义的城市、国家、PV、UV 属性供交互层读取。`GET /embed/widget?site_id=...` 把该 SVG 内联到可缓存、兼容 sandbox 且不依赖外部运行库的 HTML 文档中，提供指针、焦点、触屏详情、指针/触屏平移缩放、左下角控件注册表和公开分析跳转，并通过 `postMessage` 向父页面报告已校验的预设尺寸。平移与缩放写入通过 `requestAnimationFrame` 合并；指针捕获丢失或窗口失焦会清理手势状态，触屏从圆点起手时则在移动超过轻触阈值后才捕获指针。该文档不采集 Pageview；`widget.js` 负责从父页面采集 hostname/path 并挂载懒加载 iframe，而分离式 `tracker.js` 与 `map.js` 分别承担这两个职责。两种显示 Loader 都只接受来自自身 iframe `contentWindow` 的尺寸消息。
 
 iframe 和 ECharts 交互地图使用相同的控件扩展契约：`window.VisitorTraceMapControls.add({id, label, icon, activate})` 注册控件，`remove(id)` 删除控件；ECharts 地图元素还暴露 `element.visitorTraceMapControls`，并触发可冒泡的 `visitortrace:map-controls-ready` 事件。内置 Reset 是该接口的第一个使用者。管理员专用 `/admin/sites/{siteID}/preset-preview` 端点基于 `AdminMapData` 渲染同一 iframe 文档，使私有 Site 也能实时预览，同时不放宽公开发布校验。
 

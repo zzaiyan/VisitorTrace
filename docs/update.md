@@ -6,6 +6,7 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+- Fixed Interactive Widget navigation so the basemap and markers share one transform, pointer state is cleared when capture is lost, and high-frequency pan/zoom updates are coalesced per animation frame. This prevents detached markers and stuck gestures in both deployed Widgets and Map Preset previews.
 - Simplified Site integration into four behavior-oriented, ready-to-use snippets and removed duplicate resource-address rows. Map Preset Widget previews now keep the deployed Widget interaction surface unobstructed. The Site detail page loads only eight recent records in a compact six-column table and links directly to the complete records view with the current Site filter applied.
 - Refined map controls with a smaller locate-style Reset icon, made Image fallback previews render at their exact configured pixel dimensions without scaling, and removed redundant Site ID confirmation from Site-scoped destructive operations while retaining Administrator-password verification.
 - Added dual Map Preset previews for the complete Interactive Widget and Image fallback, including Administrator-only rendering for private Sites. Every interactive map now has a lower-left Reset control for position and zoom; iframe and ECharts views expose a shared extensible control registry for future actions.
