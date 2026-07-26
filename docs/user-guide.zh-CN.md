@@ -100,7 +100,7 @@ Admin Console 可管理 Site 设置、Pageview 接收和公开状态、Map Prese
 
 站点管理使用独立的 `/admin/sites` 列表，新建 Site 是列表中的单独操作。每个 Site 页面按全部历史的可交互访客地图、接入代码、站点设置、Map Preset、最近记录和危险操作组织；地图读取管理员权限下的聚合数据，即使 Site 已关闭公开展示仍可使用。站点设置进一步分为基本信息与 Allowed Origins、统计与保留规则、采集与公开控制。
 
-Public Analytics 的日期范围会同时作用于 PV/UV 摘要、趋势、地理地图和各维度表格。支持今天、7/30/90 天、全部及自定义日期；启用 JavaScript 时，趋势图可缩放，地图可平移和缩放。脚本不可用时会自动保留同一日期范围的服务端 SVG 地图和基础趋势图。
+Public Analytics 的日期范围会同时作用于 PV/UV 摘要、趋势、地理地图和各维度表格。支持今天、7/30/90 天、全部及自定义日期；启用 JavaScript 时，趋势图可缩放，地图可平移和缩放，左下角 Reset 控件可恢复初始位置与比例。脚本不可用时会自动保留同一日期范围的服务端 SVG 地图和基础趋势图。
 
 Site 管理页的“聚合分析”使用相同日期范围和交互组件，并额外展示 Path 聚合；该页面受管理员 Session 保护，即使 Site 已关闭公开展示仍可使用。Path 聚合不会出现在 Public Analytics。
 
@@ -138,7 +138,7 @@ Site 页面中的“刷新地理信息”会使用当前 GeoIP 数据库重新�
 <script async src="https://stats.example.com/visitortrace/embed/widget.js?site_id=SITE_ID"></script>
 ```
 
-Loader 从父页面发送 Pageview，因此能保留当前 hostname、path、Origin 校验和 localStorage Visitor ID，随后懒加载独立渲染的 iframe。iframe 使用 Map Preset 或 URL 中的 `w`/`h` 覆写，并把实际尺寸发送给 Loader，使响应式布局保持地图投影比例。鼠标悬浮或键盘聚焦城市点位时会显示 PV、UV 和 GeoIP 署名；在纯触屏设备上，第一次点击点位显示详情，第二次打开公开分析，点击地图其他位置会直接打开公开分析。
+Loader 从父页面发送 Pageview，因此能保留当前 hostname、path、Origin 校验和 localStorage Visitor ID，随后懒加载独立渲染的 iframe。iframe 使用 Map Preset 或 URL 中的 `w`/`h` 覆写，并把实际尺寸发送给 Loader，使响应式布局保持地图投影比例。鼠标悬浮或键盘聚焦城市点位时会显示 PV、UV 和 GeoIP 署名；地图支持指针拖拽、滚轮缩放和触屏平移/双指缩放，左下角 Reset 控件可恢复世界视图。在纯触屏设备上，第一次点击点位显示详情，第二次打开公开分析；未发生拖拽时点击地图其他位置会直接打开公开分析。
 
 `GET /embed/widget?site_id=SITE_ID` 是 Loader 使用的 iframe 文档。该端点只读，不会重复记录 Pageview；应用也可以把它与分离式 Tracker 配合，自行控制 iframe 的放置。文档仅包含内联 SVG、CSS 和少量原生脚本，不加载 ECharts、字体、图标或 CDN 资源。
 
@@ -187,7 +187,7 @@ Site 页面为每段接入代码和每个资源地址提供一键复制。一体
 
 ## Map Preset 与 URL 覆写
 
-后台支持尺寸、标题、PV/UV 标签、字体大小、显示内容、背景、陆地、边界、文字、标记颜色和标记指标。宽度和高度旁的自动按钮会根据当前标题、统计栏和字体大小计算保持世界地图投影比例所需的另一维度。
+后台支持尺寸、标题、PV/UV 标签、字体大小、显示内容、背景、陆地、边界、文字、标记颜色和标记指标。实时预览可在完整交互式 Widget 与 Image fallback 之间切换，无需先保存；私有 Site 通过管理员专用端点获得相同预览。宽度和高度旁的自动按钮会根据当前标题、统计栏和字体大小计算保持世界地图投影比例所需的另一维度。
 
 底图不包含南极洲，左右接缝位于白令海峡附近的 `170°W`，避免使用 `180°` 经线作为页面边界。
 

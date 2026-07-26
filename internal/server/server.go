@@ -114,6 +114,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/sites/{siteID}/records/geoip", s.adminRefreshSiteRecordGeoIP)
 	mux.HandleFunc("POST /admin/sites/{siteID}/reset", s.adminResetSite)
 	mux.HandleFunc("POST /admin/sites/{siteID}/delete", s.adminDeleteSite)
+	mux.HandleFunc("GET /admin/sites/{siteID}/preset-preview", s.adminPresetWidgetPreview)
 	mux.HandleFunc("GET /admin/sites/{siteID}/preset-preview.svg", s.adminPresetPreview)
 	mux.HandleFunc("GET /public/{siteID}/analytics", s.publicAnalytics)
 	mux.HandleFunc("GET /public/{siteID}/analytics-map.svg", s.publicAnalyticsMap)

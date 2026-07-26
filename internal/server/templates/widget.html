@@ -11,14 +11,21 @@
     .widget-link { display: block; width: 100%; height: 100%; color: inherit; text-decoration: none; outline: none; }
     .widget-link:focus-visible { box-shadow: inset 0 0 0 2px #d96e51; }
     svg { display: block; width: 100%; height: 100%; }
+    .visitortrace-map-viewport { cursor: grab; touch-action: none; }
+    body.is-panning .visitortrace-map-viewport { cursor: grabbing; }
     .visitortrace-marker { cursor: pointer; outline: none; }
     .visitortrace-marker circle { transform-box: fill-box; transform-origin: center; transition: filter 120ms ease, fill-opacity 120ms ease, stroke-width 120ms ease, transform 120ms ease; }
     .visitortrace-marker:hover circle, .visitortrace-marker:focus circle { filter: drop-shadow(0 1px 2px rgba(18, 28, 30, .45)); fill-opacity: 1; stroke-width: 1.4; transform: scale(1.18); }
-    .widget-tooltip { position: fixed; z-index: 2; max-width: min(240px, calc(100vw - 16px)); padding: 8px 10px; color: #fff; background: #172123; border: 1px solid rgba(255, 255, 255, .14); border-radius: 4px; box-shadow: 0 5px 18px rgba(18, 28, 30, .22); pointer-events: none; }
+    .widget-tooltip { position: fixed; z-index: 4; max-width: min(240px, calc(100vw - 16px)); padding: 8px 10px; color: #fff; background: #172123; border: 1px solid rgba(255, 255, 255, .14); border-radius: 4px; box-shadow: 0 5px 18px rgba(18, 28, 30, .22); pointer-events: none; }
     .widget-tooltip[hidden] { display: none; }
     .widget-tooltip strong { display: block; overflow: hidden; font-size: 12px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
     .widget-tooltip p { display: flex; gap: 10px; margin: 3px 0 0; color: #e6eceb; font-size: 11px; line-height: 1.35; white-space: nowrap; }
     .widget-tooltip small { display: block; margin-top: 4px; color: #aebcba; font-size: 9px; line-height: 1.3; }
+    .map-controls { position: fixed; z-index: 3; display: flex; gap: 4px; }
+    .map-control { display: grid; width: 27px; height: 27px; place-items: center; padding: 0; border: 1px solid rgba(91, 110, 108, .48); border-radius: 3px; background: rgba(255, 255, 255, .94); color: #34484a; box-shadow: 0 2px 7px rgba(18, 28, 30, .14); cursor: pointer; }
+    .map-control:hover, .map-control:focus-visible { border-color: #2f655a; background: #f3f8f6; color: #214e45; outline: none; }
+    .map-control:focus-visible { box-shadow: 0 0 0 2px rgba(47, 101, 90, .25); }
+    .map-control svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
     @media (prefers-reduced-motion: reduce) { .visitortrace-marker circle { transition: none; } }
   </style>
 </head>
@@ -31,6 +38,7 @@
     <p><span data-value="pv"></span><span data-value="uv"></span></p>
     <small></small>
   </div>
+  <div id="widget-map-controls" class="map-controls" role="toolbar" aria-label="{{.ControlsLabel}}"></div>
   <script>
     (function () {
       "use strict";
@@ -40,8 +48,17 @@
       var pv = tooltip.querySelector('[data-value="pv"]');
       var uv = tooltip.querySelector('[data-value="uv"]');
       var attribution = tooltip.querySelector("small");
+      var svg = root.querySelector("svg");
+      var viewport = root.querySelector(".visitortrace-map-viewport");
+      var mapContent = root.querySelector(".visitortrace-map-content");
+      var controlsHost = document.getElementById("widget-map-controls");
       var active = null;
       var touchArmed = null;
+      var suppressClick = false;
+      var pointers = {};
+      var gesture = null;
+      var gestureMoved = false;
+      var view = { scale: 1, x: 0, y: 0 };
 
       Array.prototype.forEach.call(root.querySelectorAll(".visitortrace-marker > title"), function (node) {
         node.remove();
@@ -54,6 +71,184 @@
           height: Number(root.dataset.height)
         }, "*");
       }
+
+      function clamp(value, minimum, maximum) {
+        return Math.min(maximum, Math.max(minimum, value));
+      }
+
+      function constrainView() {
+        var width = Number(viewport.dataset.width) || 1;
+        var height = Number(viewport.dataset.height) || 1;
+        view.x = clamp(view.x, width * (1 - view.scale), 0);
+        view.y = clamp(view.y, height * (1 - view.scale), 0);
+      }
+
+      function applyView() {
+        constrainView();
+        mapContent.setAttribute("transform", "translate(" + view.x + " " + view.y + ") scale(" + view.scale + ")");
+      }
+
+      function resetView() {
+        view = { scale: 1, x: 0, y: 0 };
+        applyView();
+        hide();
+      }
+
+      function viewportPoint(clientX, clientY) {
+        var point = svg.createSVGPoint();
+        point.x = clientX;
+        point.y = clientY;
+        var matrix = viewport.getScreenCTM();
+        return matrix ? point.matrixTransform(matrix.inverse()) : { x: 0, y: 0 };
+      }
+
+      function pointerValues() {
+        return Object.keys(pointers).map(function (key) { return pointers[key]; });
+      }
+
+      function beginGesture() {
+        var values = pointerValues();
+        if (!values.length) {
+          gesture = null;
+          return;
+        }
+        if (values.length === 1) {
+          var point = viewportPoint(values[0].x, values[0].y);
+          gesture = { type: "pan", point: point, clientX: values[0].x, clientY: values[0].y, x: view.x, y: view.y };
+          return;
+        }
+        var centerX = (values[0].x + values[1].x) / 2;
+        var centerY = (values[0].y + values[1].y) / 2;
+        var center = viewportPoint(centerX, centerY);
+        gesture = {
+          type: "pinch",
+          distance: Math.hypot(values[0].x - values[1].x, values[0].y - values[1].y) || 1,
+          scale: view.scale,
+          contentX: (center.x - view.x) / view.scale,
+          contentY: (center.y - view.y) / view.scale
+        };
+      }
+
+      function placeControls() {
+        if (!viewport || !controlsHost.children.length) return;
+        var matrix = viewport.getScreenCTM();
+        if (!matrix) return;
+        var width = Number(viewport.dataset.width) || 1;
+        var height = Number(viewport.dataset.height) || 1;
+        var topLeft = svg.createSVGPoint();
+        var bottomRight = svg.createSVGPoint();
+        topLeft.x = 0;
+        topLeft.y = 0;
+        bottomRight.x = width;
+        bottomRight.y = height;
+        topLeft = topLeft.matrixTransform(matrix);
+        bottomRight = bottomRight.matrixTransform(matrix);
+        controlsHost.style.left = Math.round(Math.min(topLeft.x, bottomRight.x) + 7) + "px";
+        controlsHost.style.top = Math.round(Math.max(topLeft.y, bottomRight.y) - controlsHost.offsetHeight - 7) + "px";
+      }
+
+      function createResetIcon() {
+        var icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        icon.setAttribute("viewBox", "0 0 24 24");
+        icon.setAttribute("aria-hidden", "true");
+        ["M3 12a9 9 0 1 0 3-6.7L3 8", "M3 3v5h5"].forEach(function (value) {
+          var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", value);
+          icon.appendChild(path);
+        });
+        return icon;
+      }
+
+      var mapControls = {
+        add: function (definition) {
+          if (!definition || !definition.id || typeof definition.activate !== "function") return null;
+          mapControls.remove(definition.id);
+          var button = document.createElement("button");
+          button.type = "button";
+          button.className = "map-control";
+          button.dataset.controlId = definition.id;
+          button.title = definition.label || definition.id;
+          button.setAttribute("aria-label", definition.label || definition.id);
+          if (typeof definition.icon === "function") button.appendChild(definition.icon());
+          button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            definition.activate({ root: root, controls: mapControls, reset: resetView });
+          });
+          controlsHost.appendChild(button);
+          placeControls();
+          return button;
+        },
+        remove: function (id) {
+          var button = Array.prototype.find.call(controlsHost.children, function (candidate) {
+            return candidate.dataset.controlId === String(id);
+          });
+          if (button) button.remove();
+        }
+      };
+      window.VisitorTraceMapControls = mapControls;
+      mapControls.add({ id: "reset", label: {{printf "%q" .ResetLabel}}, icon: createResetIcon, activate: resetView });
+      root.dispatchEvent(new CustomEvent("visitortrace:map-controls-ready", { bubbles: true, detail: { controls: mapControls, reset: resetView } }));
+      window.addEventListener("resize", placeControls, { passive: true });
+
+      viewport.addEventListener("wheel", function (event) {
+        event.preventDefault();
+        var point = viewportPoint(event.clientX, event.clientY);
+        var nextScale = clamp(view.scale * Math.exp(-event.deltaY * 0.0015), 1, 8);
+        var ratio = nextScale / view.scale;
+        view.x = point.x - (point.x - view.x) * ratio;
+        view.y = point.y - (point.y - view.y) * ratio;
+        view.scale = nextScale;
+        applyView();
+        hide();
+      }, { passive: false });
+
+      viewport.addEventListener("pointerdown", function (event) {
+        if (markerFrom(event.target) || (event.pointerType === "mouse" && event.button !== 0)) return;
+        pointers[event.pointerId] = { x: event.clientX, y: event.clientY };
+        if (viewport.setPointerCapture) viewport.setPointerCapture(event.pointerId);
+        if (pointerValues().length === 1) gestureMoved = false;
+        beginGesture();
+        document.body.classList.add("is-panning");
+      });
+
+      viewport.addEventListener("pointermove", function (event) {
+        if (!pointers[event.pointerId]) return;
+        pointers[event.pointerId] = { x: event.clientX, y: event.clientY };
+        var values = pointerValues();
+        if (values.length > 1) {
+          if (!gesture || gesture.type !== "pinch") beginGesture();
+          var distance = Math.hypot(values[0].x - values[1].x, values[0].y - values[1].y) || 1;
+          var center = viewportPoint((values[0].x + values[1].x) / 2, (values[0].y + values[1].y) / 2);
+          view.scale = clamp(gesture.scale * distance / gesture.distance, 1, 8);
+          view.x = center.x - gesture.contentX * view.scale;
+          view.y = center.y - gesture.contentY * view.scale;
+          gestureMoved = true;
+        } else if (gesture && gesture.type === "pan") {
+          var point = viewportPoint(event.clientX, event.clientY);
+          view.x = gesture.x + point.x - gesture.point.x;
+          view.y = gesture.y + point.y - gesture.point.y;
+          if (Math.hypot(event.clientX - gesture.clientX, event.clientY - gesture.clientY) > 3) gestureMoved = true;
+        }
+        applyView();
+        hide();
+        event.preventDefault();
+      });
+
+      function endPointer(event) {
+        if (!pointers[event.pointerId]) return;
+        delete pointers[event.pointerId];
+        if (viewport.releasePointerCapture && viewport.hasPointerCapture && viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+        if (pointerValues().length) {
+          beginGesture();
+        } else {
+          gesture = null;
+          document.body.classList.remove("is-panning");
+          if (gestureMoved) suppressClick = true;
+        }
+      }
+      viewport.addEventListener("pointerup", endPointer);
+      viewport.addEventListener("pointercancel", endPointer);
 
       function markerFrom(target) {
         return target && target.closest ? target.closest(".visitortrace-marker") : null;
@@ -104,6 +299,11 @@
         if (marker && markerFrom(event.relatedTarget) !== marker) hide(marker);
       });
       root.addEventListener("click", function (event) {
+        if (suppressClick) {
+          event.preventDefault();
+          suppressClick = false;
+          return;
+        }
         var marker = markerFrom(event.target);
         if (!marker || !window.matchMedia || !window.matchMedia("(hover: none)").matches) return;
         if (touchArmed !== marker) {

@@ -59,16 +59,17 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 		backgroundFill = "none"
 	}
 	fmt.Fprintf(&output, "<rect width=\"100%%\" height=\"100%%\" fill=\"%s\"/>", backgroundFill)
+	fmt.Fprintf(&output, "<defs><clipPath id=\"visitortrace-map-clip\"><rect width=\"%d\" height=\"%d\"/></clipPath><path id=\"visitortrace-land\" d=\"%s\"/></defs>", options.Width, mapHeight, pathData)
 	if title != "" {
 		fmt.Fprintf(&output, "<text class=\"visitortrace-title\" x=\"%s\" y=\"%d\" text-anchor=\"middle\" fill=\"#%s\" font-family=\"system-ui,sans-serif\" font-size=\"%d\" font-weight=\"600\">%s</text>", format(float64(options.Width)/2), options.FontSize+3, options.Text, options.FontSize, html.EscapeString(title))
 	}
-	fmt.Fprintf(&output, "<g class=\"visitortrace-map-viewport\" transform=\"translate(0 %d)\">", titleHeight)
+	fmt.Fprintf(&output, "<g class=\"visitortrace-map-viewport\" transform=\"translate(0 %d)\" clip-path=\"url(#visitortrace-map-clip)\" data-width=\"%d\" data-height=\"%d\">", titleHeight, options.Width, mapHeight)
+	output.WriteString("<g class=\"visitortrace-map-content\">")
 	fmt.Fprintf(&output, "<g class=\"visitortrace-map\" transform=\"scale(%s %s)\">", format(float64(options.Width)/mapBaseWidth), format(float64(mapHeight)/mapBaseHeight))
-	fmt.Fprintf(&output, "<defs><path id=\"visitortrace-land\" d=\"%s\"/></defs>", pathData)
 	for _, shift := range []float64{-mapBaseOffset, mapBaseWidth - mapBaseOffset} {
 		fmt.Fprintf(&output, "<use href=\"#visitortrace-land\" transform=\"translate(%s 0)\" fill=\"#%s\" stroke=\"#%s\" stroke-width=\"0.7\" vector-effect=\"non-scaling-stroke\"/>", format(shift), options.Land, options.Border)
 	}
-	output.WriteString("</g>")
+	output.WriteString("</g></g>")
 	maxMetric := int64(0)
 	for _, point := range data.Points {
 		if point.Latitude < mapMinLatitude || point.Latitude > mapMaxLatitude {

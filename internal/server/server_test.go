@@ -197,6 +197,7 @@ func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 	for _, want := range []string{
 		`<!doctype html>`, `<html lang="en">`, `width="320" height="180"`, `data-width="320" data-height="180"`, `data-city="Wuhan"`, `id="widget-tooltip"`,
 		`href="/public/` + site.ID + `/analytics"`, `IP geolocation by DB-IP`, `pointerover`, `(hover: none)`, `window.parent.postMessage`, `visitortrace:resize`, `.visitortrace-marker > title`,
+		`id="widget-map-controls"`, `Reset map position and zoom`, `visitortrace-map-content`, `VisitorTraceMapControls`, `visitortrace:map-controls-ready`, `viewport.addEventListener("wheel"`, `type: "pinch"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("interactive widget body is missing %q", want)
@@ -619,12 +620,21 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	if previewResponse.Code != http.StatusOK || !strings.Contains(previewResponse.Body.String(), `width="640" height="320"`) || !strings.Contains(previewResponse.Body.String(), `fill="none"`) {
 		t.Fatalf("admin preset preview = status %d body prefix %q", previewResponse.Code, previewResponse.Body.String()[:min(140, len(previewResponse.Body.String()))])
 	}
+	widgetPreviewRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID+"/preset-preview?w=480&h=240&lang=en", nil)
+	widgetPreviewRequest.Host = "127.0.0.1:8790"
+	widgetPreviewRequest.AddCookie(cookies[0])
+	widgetPreviewResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(widgetPreviewResponse, widgetPreviewRequest)
+	widgetPreviewBody := widgetPreviewResponse.Body.String()
+	if widgetPreviewResponse.Code != http.StatusOK || widgetPreviewResponse.Header().Get("Cache-Control") != "no-store" || !strings.Contains(widgetPreviewBody, `width="480" height="240"`) || !strings.Contains(widgetPreviewBody, `href="/admin/sites/`+site.ID+`/analytics"`) || !strings.Contains(widgetPreviewBody, `id="widget-map-controls"`) {
+		t.Fatalf("admin Interactive Widget preview = status %d headers %#v body %q", widgetPreviewResponse.Code, widgetPreviewResponse.Header(), widgetPreviewBody)
+	}
 	sitePage := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID, nil)
 	sitePage.Host = "127.0.0.1:8790"
 	sitePage.AddCookie(cookies[0])
 	sitePageResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(sitePageResponse, sitePage)
-	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.svg") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/map.js") || !strings.Contains(sitePageResponse.Body.String(), `id="image-widget-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-endpoint"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) || !strings.Contains(sitePageResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) {
+	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.svg") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/map.js") || !strings.Contains(sitePageResponse.Body.String(), `id="image-widget-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-endpoint"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) || !strings.Contains(sitePageResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) || !strings.Contains(sitePageResponse.Body.String(), `id="preset-widget-preview"`) || !strings.Contains(sitePageResponse.Body.String(), `id="preset-image-preview"`) || !strings.Contains(sitePageResponse.Body.String(), `data-preview-mode="widget"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-controls`) {
 		t.Fatalf("admin Site page = status %d, body = %q", sitePageResponse.Code, sitePageResponse.Body.String())
 	}
 	if count := strings.Count(sitePageResponse.Body.String(), `class="copy-control copy-button"`); count != 8 {
@@ -1078,7 +1088,7 @@ func TestPublicAnalyticsHidesSensitiveFields(t *testing.T) {
 	if !strings.Contains(body, "Firefox") || !strings.Contains(body, "Wuhan") || !strings.Contains(body, "Countries or regions") {
 		t.Fatalf("Public Analytics is missing aggregate data: %q", body)
 	}
-	if !strings.Contains(body, `/assets/analytics.js`) || !strings.Contains(body, `"date"`) || !strings.Contains(body, `analytics-map.svg?`) {
+	if !strings.Contains(body, `/assets/analytics.js`) || !strings.Contains(body, `"date"`) || !strings.Contains(body, `analytics-map.svg?`) || !strings.Contains(body, `data-map-controls`) || !strings.Contains(body, `Reset map position and zoom`) {
 		t.Fatalf("Public Analytics enhancement or range map fallback is missing: %q", body)
 	}
 }
@@ -1110,7 +1120,7 @@ func TestAdminAnalyticsIncludesPathsForPrivateSite(t *testing.T) {
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
 	body := response.Body.String()
-	if response.Code != http.StatusOK || !strings.Contains(body, "/admin-only-path") || !strings.Contains(body, "Path performance") || !strings.Contains(body, `id="path-chart"`) || !strings.Contains(body, "Counting rule changes") || !strings.Contains(body, `"window_days":5`) {
+	if response.Code != http.StatusOK || !strings.Contains(body, "/admin-only-path") || !strings.Contains(body, "Path performance") || !strings.Contains(body, `id="path-chart"`) || !strings.Contains(body, "Counting rule changes") || !strings.Contains(body, `"window_days":5`) || !strings.Contains(body, `data-map-controls`) {
 		t.Fatalf("Admin Analytics = status %d body %q", response.Code, body)
 	}
 	siteRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID+"?lang=en", nil)
@@ -1119,8 +1129,16 @@ func TestAdminAnalyticsIncludesPathsForPrivateSite(t *testing.T) {
 	siteResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(siteResponse, siteRequest)
 	siteBody := siteResponse.Body.String()
-	if siteResponse.Code != http.StatusOK || !strings.Contains(siteBody, `id="visitor-map"`) || !strings.Contains(siteBody, `id="geo-chart"`) || !strings.Contains(siteBody, `id="analytics-data"`) || !strings.Contains(siteBody, `"name":"Shanghai"`) || !strings.Contains(siteBody, `/assets/analytics.js`) {
+	if siteResponse.Code != http.StatusOK || !strings.Contains(siteBody, `id="visitor-map"`) || !strings.Contains(siteBody, `id="geo-chart"`) || !strings.Contains(siteBody, `id="analytics-data"`) || !strings.Contains(siteBody, `"name":"Shanghai"`) || !strings.Contains(siteBody, `/assets/analytics.js`) || !strings.Contains(siteBody, `data-map-controls`) || !strings.Contains(siteBody, `id="preset-widget-preview"`) {
 		t.Fatalf("private Site interactive map = status %d body %q", siteResponse.Code, siteBody)
+	}
+	previewRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID+"/preset-preview?lang=en", nil)
+	previewRequest.Host = "127.0.0.1:8790"
+	previewRequest.AddCookie(cookie)
+	previewResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(previewResponse, previewRequest)
+	if previewResponse.Code != http.StatusOK || !strings.Contains(previewResponse.Body.String(), `data-city="Shanghai"`) || !strings.Contains(previewResponse.Body.String(), `href="/admin/sites/`+site.ID+`/analytics"`) {
+		t.Fatalf("private Site Widget preview = status %d body %q", previewResponse.Code, previewResponse.Body.String())
 	}
 	public := httptest.NewRecorder()
 	app.Handler().ServeHTTP(public, httptest.NewRequest(http.MethodGet, "/public/"+site.ID+"/analytics", nil))

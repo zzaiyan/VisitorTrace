@@ -80,17 +80,18 @@ type adminSitesData struct {
 
 type adminSiteData struct {
 	pageLayout
-	Site           store.Site
-	Overview       store.SiteOverview
-	Preset         maprender.Options
-	ChartJSON      template.JS
-	Recent         []store.PageviewRecord
-	OriginsText    string
-	MapPreviewURL  string
-	MapAspect      float64
-	BaseURL        string
-	Saved          string
-	GeoIPAvailable bool
+	Site             store.Site
+	Overview         store.SiteOverview
+	Preset           maprender.Options
+	ChartJSON        template.JS
+	Recent           []store.PageviewRecord
+	OriginsText      string
+	MapPreviewURL    string
+	WidgetPreviewURL string
+	MapAspect        float64
+	BaseURL          string
+	Saved            string
+	GeoIPAvailable   bool
 }
 
 type newSiteData struct {
@@ -397,7 +398,7 @@ func (s *Server) adminSite(w http.ResponseWriter, r *http.Request) {
 	data := adminSiteData{
 		pageLayout: s.adminLayout(r, session, site.Name, "sites"), Site: site, Overview: overview,
 		Preset: preset, ChartJSON: chartJSON, Recent: recent, OriginsText: strings.Join(site.AllowedOrigins, "\n"),
-		MapPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview.svg"), MapAspect: maprender.MapAspect, BaseURL: s.externalBaseURL(r), Saved: adminFlash(r),
+		MapPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview.svg"), WidgetPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview"), MapAspect: maprender.MapAspect, BaseURL: s.externalBaseURL(r), Saved: adminFlash(r),
 		GeoIPAvailable: s.geoIPAvailable(),
 	}
 	if flash := recordGeoIPFlash(r, data.Lang); flash != "" {
@@ -570,6 +571,44 @@ func (s *Server) adminPresetPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(body)
+}
+
+func (s *Server) adminPresetWidgetPreview(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	siteID := r.PathValue("siteID")
+	configuredSite, err := s.Store.GetSite(r.Context(), siteID)
+	if err != nil {
+		http.Error(w, "unknown Site", http.StatusNotFound)
+		return
+	}
+	query := cloneQuery(r.URL.Query())
+	delete(query, "lang")
+	options, err := parseSiteMapOptions(configuredSite, query)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	data, err := s.Store.AdminMapData(r.Context(), siteID)
+	if err != nil {
+		http.Error(w, "could not read map data", http.StatusInternalServerError)
+		return
+	}
+	svgBody, err := maprender.Render(data, options)
+	if err != nil {
+		http.Error(w, "could not render map", http.StatusInternalServerError)
+		return
+	}
+	body, err := s.renderWidgetFrame(configuredSite, options.Width, options.Height, svgBody, adminLanguage(r), s.appPath("/admin/sites/"+siteID+"/analytics"))
+	if err != nil {
+		http.Error(w, "could not render Interactive Widget", http.StatusInternalServerError)
+		return
+	}
+	setWidgetFrameHeaders(w)
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(body)
 }
 

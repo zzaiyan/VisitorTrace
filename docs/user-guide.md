@@ -100,7 +100,7 @@ The Admin Console manages Site settings, collection and publication state, Map P
 
 Site management has a dedicated list at `/admin/sites`; creating a Site is a separate action from that list. Each Site page is organized into an all-history interactive visitor map, integration, settings, Map Preset, recent records, and destructive operations. The map reads Administrator-authorized aggregates and remains available when public publishing is disabled. Site settings group identity and Allowed Origins, counting and retention rules, and collection/publication controls separately.
 
-The selected Public Analytics date range applies consistently to PV/UV summaries, trends, the geographic map, and dimension tables. Presets cover today, 7/30/90 days, all history, and a custom range. With JavaScript, the trend can be zoomed and the map can be panned and zoomed. Without JavaScript, the page retains a server-rendered SVG map and basic trend for the same range.
+The selected Public Analytics date range applies consistently to PV/UV summaries, trends, the geographic map, and dimension tables. Presets cover today, 7/30/90 days, all history, and a custom range. With JavaScript, the trend can be zoomed and the map can be panned and zoomed; the lower-left Reset control restores its initial position and scale. Without JavaScript, the page retains a server-rendered SVG map and basic trend for the same range.
 
 Aggregate Analytics on the Site management page uses the same ranges and interactive components and additionally exposes path aggregates. It requires an Administrator session and remains available when the Site's public view is disabled. Path aggregates never appear in Public Analytics.
 
@@ -138,7 +138,7 @@ For a subpath deployment, use the Base URL shown in the Admin Console:
 <script async src="https://stats.example.com/visitortrace/embed/widget.js?site_id=SITE_ID"></script>
 ```
 
-The loader sends the Pageview from the parent page, preserving its hostname, path, Origin validation, and local-storage Visitor ID, then lazy-loads the independently rendered iframe. The iframe follows the Map Preset or URL `w`/`h` overrides and reports its effective dimensions back to the loader so responsive layouts retain the projection ratio. Hovering or focusing a city marker shows its PV, UV, and GeoIP attribution. On a touch-only device, the first tap on a marker reveals those details and the second opens Public Analytics; clicking elsewhere on the map opens Public Analytics immediately.
+The loader sends the Pageview from the parent page, preserving its hostname, path, Origin validation, and local-storage Visitor ID, then lazy-loads the independently rendered iframe. The iframe follows the Map Preset or URL `w`/`h` overrides and reports its effective dimensions back to the loader so responsive layouts retain the projection ratio. Hovering or focusing a city marker shows its PV, UV, and GeoIP attribution. The map supports pointer dragging, wheel zoom, and touch pan/pinch; its lower-left Reset control restores the world view. On a touch-only device, the first tap on a marker reveals its details and the second opens Public Analytics; tapping elsewhere without dragging opens Public Analytics immediately.
 
 `GET /embed/widget?site_id=SITE_ID` is the iframe document used by the loader. It is read-only and never records a second Pageview. It can also be paired directly with the separated Tracker when an application wants to control iframe placement itself. The document contains only inline SVG, CSS, and a small native script; it does not load ECharts, fonts, icons, or CDN resources.
 
@@ -187,7 +187,7 @@ The Site page provides one-click copy controls for every integration snippet and
 
 ## Map Presets and URL Overrides
 
-The Admin Console configures dimensions, title, PV/UV labels, font size, visible content, background, land, border, text, marker color, and marker metric. The automatic dimension buttons account for the current title, statistics band, and font size before calculating the other dimension required to preserve the world-map projection ratio.
+The Admin Console configures dimensions, title, PV/UV labels, font size, visible content, background, land, border, text, marker color, and marker metric. Its live preview can switch between the complete Interactive Widget and the Image fallback without saving; private Sites use an Administrator-only preview and behave the same way. The automatic dimension buttons account for the current title, statistics band, and font size before calculating the other dimension required to preserve the world-map projection ratio.
 
 The basemap omits Antarctica and places its left/right seam near the Bering Strait at `170°W` instead of using the `180°` meridian as the page boundary.
 

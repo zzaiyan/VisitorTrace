@@ -24,6 +24,8 @@ type widgetFrameData struct {
 	Attribution    string
 	PageviewsLabel string
 	VisitorsLabel  string
+	ControlsLabel  string
+	ResetLabel     string
 	Width          int
 	Height         int
 	SVG            template.HTML
@@ -71,41 +73,55 @@ func (s *Server) widgetFrame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attribution := geoip.AttributionForProvider(s.Config.GeoIPProvider)
-	// maprender escapes every dynamic label before producing the cached SVG.
-	inlineSVG := template.HTML(strings.TrimPrefix(string(cached.body), svgXMLDeclaration))
-	data := widgetFrameData{
-		Language:       language,
-		Title:          configuredSite.Name + " " + translate(language, "visitor_map"),
-		AnalyticsURL:   s.appPath("/public/" + configuredSite.ID + "/analytics"),
-		Attribution:    attribution.Label,
-		PageviewsLabel: translate(language, "pageviews"),
-		VisitorsLabel:  translate(language, "unique_visitors"),
-		Width:          options.Width,
-		Height:         options.Height,
-		SVG:            inlineSVG,
-	}
-	var body bytes.Buffer
-	if err := widgetFrameTemplate.ExecuteTemplate(&body, "widget.html", data); err != nil {
+	body, err := s.renderWidgetFrame(configuredSite, options.Width, options.Height, cached.body, language, s.appPath("/public/"+configuredSite.ID+"/analytics"))
+	if err != nil {
 		s.logger.Error("render Interactive Widget page failed", "site_id", siteID, "error", err)
 		http.Error(w, "could not render Interactive Widget", http.StatusInternalServerError)
 		return
 	}
-	sum := sha256.Sum256(body.Bytes())
+	sum := sha256.Sum256(body)
 	etag := fmt.Sprintf("\"%x\"", sum[:16])
 	w.Header().Set("Cache-Control", "public, max-age=300")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors *")
-	w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+	setWidgetFrameHeaders(w)
 	w.Header().Set("ETag", etag)
-	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	w.Header().Set("Vary", "Accept-Language")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
 	if r.Header.Get("If-None-Match") == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = body.WriteTo(w)
+	_, _ = w.Write(body)
+}
+
+func (s *Server) renderWidgetFrame(configuredSite store.Site, width, height int, svgBody []byte, language, analyticsURL string) ([]byte, error) {
+	attribution := geoip.AttributionForProvider(s.Config.GeoIPProvider)
+	// maprender escapes every dynamic label before producing the SVG.
+	inlineSVG := template.HTML(strings.TrimPrefix(string(svgBody), svgXMLDeclaration))
+	data := widgetFrameData{
+		Language:       language,
+		Title:          configuredSite.Name + " " + translate(language, "visitor_map"),
+		AnalyticsURL:   analyticsURL,
+		Attribution:    attribution.Label,
+		PageviewsLabel: translate(language, "pageviews"),
+		VisitorsLabel:  translate(language, "unique_visitors"),
+		ControlsLabel:  translate(language, "map_controls"),
+		ResetLabel:     translate(language, "reset_map_view"),
+		Width:          width,
+		Height:         height,
+		SVG:            inlineSVG,
+	}
+	var body bytes.Buffer
+	if err := widgetFrameTemplate.ExecuteTemplate(&body, "widget.html", data); err != nil {
+		return nil, err
+	}
+	return body.Bytes(), nil
+}
+
+func setWidgetFrameHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors *")
+	w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 }
 
 func widgetLanguage(r *http.Request, siteDefault string, values []string) (string, error) {

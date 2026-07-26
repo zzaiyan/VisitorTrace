@@ -104,7 +104,7 @@ func TestRenderUsesCenteredNonStretchingTextAndSeparateTitleBand(t *testing.T) {
 	if titleIndex < 0 || mapIndex < 0 || titleIndex > mapIndex {
 		t.Fatal("title is not rendered before the map band")
 	}
-	if !strings.Contains(value, `class="visitortrace-map-viewport" transform="translate(0 22)"`) || !strings.Contains(value, `text-anchor="middle"`) {
+	if !strings.Contains(value, `class="visitortrace-map-viewport" transform="translate(0 22)" clip-path="url(#visitortrace-map-clip)"`) || !strings.Contains(value, `class="visitortrace-map-content"`) || !strings.Contains(value, `text-anchor="middle"`) {
 		t.Fatal("title/map layout is not separated and centered")
 	}
 	if strings.Count(value, `class="visitortrace-stat"`) != 1 {

@@ -26,6 +26,32 @@ echarts.use([
 ]);
 echarts.registerMap("visitortrace-world", repairWorldMap(worldMap));
 
+const mapControlDefinitions = new Map();
+const mapControlHosts = new Set();
+const mapControlsAPI = {
+  add(definition) {
+    if (!definition || !definition.id || typeof definition.activate !== "function") return false;
+    mapControlDefinitions.set(definition.id, definition);
+    mapControlHosts.forEach((host) => renderMapControl(host, definition));
+    return true;
+  },
+  remove(id) {
+    mapControlDefinitions.delete(id);
+    mapControlHosts.forEach((host) => {
+      const button = host.buttons.get(id);
+      if (button) button.remove();
+      host.buttons.delete(id);
+    });
+  },
+};
+window.VisitorTraceMapControls = mapControlsAPI;
+mapControlsAPI.add({
+  id: "reset",
+  label: (context) => context.resetLabel,
+  icon: createResetIcon,
+  activate: (context) => context.reset(),
+});
+
 const dataElement = document.getElementById("analytics-data");
 const trendElement = document.getElementById("trend-chart-interactive");
 const mapElement = document.getElementById("geo-chart");
@@ -46,7 +72,12 @@ if (dataElement && (trendElement || mapElement)) {
     }
     if (mapElement) {
       const map = echarts.init(mapElement, null, { renderer: "svg" });
-      map.setOption(mapOptions(payload.points || [], labels));
+      const options = mapOptions(payload.points || [], labels);
+      map.setOption(options);
+      installMapControls(mapElement, map, () => {
+        map.dispatchAction({ type: "hideTip" });
+        map.setOption({ geo: { center: options.geo.center.slice(), zoom: options.geo.zoom } }, { lazyUpdate: false });
+      });
       charts.push(map);
       observedElements.push(mapElement);
     }
@@ -69,6 +100,61 @@ if (dataElement && (trendElement || mapElement)) {
     document.body.classList.remove("analytics-enhancing");
     console.warn("VisitorTrace analytics enhancement unavailable", error);
   }
+}
+
+function installMapControls(element, chart, reset) {
+  const container = element.parentElement?.querySelector("[data-map-controls]");
+  if (!container) return;
+  const host = {
+    element,
+    chart,
+    container,
+    reset,
+    resetLabel: container.dataset.resetLabel || "Reset map view",
+    buttons: new Map(),
+  };
+  mapControlHosts.add(host);
+  mapControlDefinitions.forEach((definition) => renderMapControl(host, definition));
+  container.classList.add("is-ready");
+  element.visitorTraceMapControls = {
+    add: (definition) => mapControlsAPI.add(definition),
+    remove: (id) => mapControlsAPI.remove(id),
+    chart,
+    reset,
+  };
+  element.dispatchEvent(new CustomEvent("visitortrace:map-controls-ready", {
+    bubbles: true,
+    detail: { chart, controls: element.visitorTraceMapControls },
+  }));
+}
+
+function renderMapControl(host, definition) {
+  const existing = host.buttons.get(definition.id);
+  if (existing) existing.remove();
+  const button = document.createElement("button");
+  const context = { chart: host.chart, element: host.element, controls: mapControlsAPI, reset: host.reset, resetLabel: host.resetLabel };
+  const label = typeof definition.label === "function" ? definition.label(context) : definition.label;
+  button.type = "button";
+  button.className = "map-control";
+  button.dataset.controlId = definition.id;
+  button.title = label || definition.id;
+  button.setAttribute("aria-label", label || definition.id);
+  if (typeof definition.icon === "function") button.appendChild(definition.icon(context));
+  button.addEventListener("click", () => definition.activate(context));
+  host.container.appendChild(button);
+  host.buttons.set(definition.id, button);
+}
+
+function createResetIcon() {
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("aria-hidden", "true");
+  ["M3 12a9 9 0 1 0 3-6.7L3 8", "M3 3v5h5"].forEach((value) => {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", value);
+    icon.appendChild(path);
+  });
+  return icon;
 }
 
 function addDimensionChart(charts, id, options) {
@@ -158,6 +244,8 @@ function mapOptions(points, labels) {
       map: "visitortrace-world",
       aspectScale: 1,
       boundingCoords: [[-170, 90], [190, -60]],
+      center: [10, 15],
+      zoom: 1,
       roam: true,
       top: 6,
       bottom: 6,
