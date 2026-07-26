@@ -626,21 +626,31 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	widgetPreviewResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(widgetPreviewResponse, widgetPreviewRequest)
 	widgetPreviewBody := widgetPreviewResponse.Body.String()
-	if widgetPreviewResponse.Code != http.StatusOK || widgetPreviewResponse.Header().Get("Cache-Control") != "no-store" || !strings.Contains(widgetPreviewBody, `width="480" height="240"`) || !strings.Contains(widgetPreviewBody, `href="/admin/sites/`+site.ID+`/analytics"`) || !strings.Contains(widgetPreviewBody, `id="widget-map-controls"`) {
+	if widgetPreviewResponse.Code != http.StatusOK || widgetPreviewResponse.Header().Get("Cache-Control") != "no-store" || !strings.Contains(widgetPreviewBody, `width="480" height="240"`) || !strings.Contains(widgetPreviewBody, `href="/admin/sites/`+site.ID+`/analytics"`) || !strings.Contains(widgetPreviewBody, `id="widget-map-controls"`) || !strings.Contains(widgetPreviewBody, `viewport.addEventListener("pointerdown"`) || !strings.Contains(widgetPreviewBody, `viewport.addEventListener("wheel"`) {
 		t.Fatalf("admin Interactive Widget preview = status %d headers %#v body %q", widgetPreviewResponse.Code, widgetPreviewResponse.Header(), widgetPreviewBody)
+	}
+	for index := 0; index < 10; index++ {
+		if _, err := st.RecordPageview(context.Background(), store.PageviewObservation{
+			SiteID: site.ID, OccurredAt: time.Now().UTC().Add(-time.Duration(index) * time.Minute), Path: "/", VisitorDigest: bytes.Repeat([]byte{byte(index + 1)}, 32), OriginalIP: "192.0.2.10", OperatingSystem: "Linux", Browser: "Firefox",
+		}); err != nil {
+			t.Fatalf("seed recent record %d: %v", index, err)
+		}
 	}
 	sitePage := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID, nil)
 	sitePage.Host = "127.0.0.1:8790"
 	sitePage.AddCookie(cookies[0])
 	sitePageResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(sitePageResponse, sitePage)
-	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.svg") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/map.js") || !strings.Contains(sitePageResponse.Body.String(), `id="image-widget-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-endpoint"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) || !strings.Contains(sitePageResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) || !strings.Contains(sitePageResponse.Body.String(), `id="preset-widget-preview"`) || !strings.Contains(sitePageResponse.Body.String(), `id="preset-image-preview"`) || !strings.Contains(sitePageResponse.Body.String(), `data-preview-mode="widget"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-controls`) {
+	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.svg") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/map.js") || !strings.Contains(sitePageResponse.Body.String(), `id="image-widget-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) || !strings.Contains(sitePageResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) || !strings.Contains(sitePageResponse.Body.String(), `id="preset-widget-preview"`) || !strings.Contains(sitePageResponse.Body.String(), `id="preset-image-preview"`) || !strings.Contains(sitePageResponse.Body.String(), `class="preview-surface is-widget"`) || !strings.Contains(sitePageResponse.Body.String(), `data-preview-mode="widget"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-controls`) || !strings.Contains(sitePageResponse.Body.String(), "交互式地图 &#43; 采集") || !strings.Contains(sitePageResponse.Body.String(), "图片地图 &#43; 采集") || !strings.Contains(sitePageResponse.Body.String(), "仅采集") || !strings.Contains(sitePageResponse.Body.String(), "仅显示交互式地图") || !strings.Contains(sitePageResponse.Body.String(), `class="table-wrap site-recent-records"`) || !strings.Contains(sitePageResponse.Body.String(), `/admin/records?site_id=`+site.ID) {
 		t.Fatalf("admin Site page = status %d, body = %q", sitePageResponse.Code, sitePageResponse.Body.String())
 	}
-	if count := strings.Count(sitePageResponse.Body.String(), `class="copy-control copy-button"`); count != 8 {
-		t.Fatalf("admin Site page copy controls = %d, want 8", count)
+	if count := strings.Count(sitePageResponse.Body.String(), `class="copy-control copy-button"`); count != 4 {
+		t.Fatalf("admin Site page copy controls = %d, want 4", count)
 	}
-	if body := sitePageResponse.Body.String(); strings.Contains(body, `name="site_id"`) || !strings.Contains(body, `id="preset-image-preview" data-preview-base="/admin/sites/`+site.ID+`/preset-preview.svg" width="640" height="320"`) || !strings.Contains(body, `imagePreview.style.width = width + "px"`) {
+	if count := strings.Count(sitePageResponse.Body.String(), `class="recent-page"`); count != 8 {
+		t.Fatalf("admin Site recent records = %d, want 8", count)
+	}
+	if body := sitePageResponse.Body.String(); strings.Contains(body, `name="site_id"`) || strings.Contains(body, `class="endpoint-field"`) || strings.Contains(body, "Visitor Digest") || !strings.Contains(body, `id="preset-image-preview" data-preview-base="/admin/sites/`+site.ID+`/preset-preview.svg" width="640" height="320"`) || !strings.Contains(body, `imagePreview.style.width = width + "px"`) {
 		t.Fatalf("admin Site page retained Site ID confirmation or lacks fixed-size Image fallback: %q", body)
 	}
 	if _, err := st.DB.Exec(`UPDATE sites SET first_pageview_at = ? WHERE id = ?`, time.Now().UTC().Format(time.RFC3339Nano), site.ID); err != nil {

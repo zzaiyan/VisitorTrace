@@ -390,7 +390,7 @@ func (s *Server) adminSite(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusInternalServerError, "无法读取 Map Preset。")
 		return
 	}
-	recent, err := s.Store.RecentPageviewRecords(r.Context(), siteID, 80)
+	recent, err := s.Store.RecentPageviewRecords(r.Context(), siteID, 8)
 	if err != nil {
 		s.renderError(w, r, http.StatusInternalServerError, "无法读取 Pageview Record。")
 		return
