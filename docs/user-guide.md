@@ -126,7 +126,7 @@ The **Refresh geography** action on a Site page queries the active GeoIP databas
 
 ## Website Integration
 
-The recommended integrated JavaScript Widget records a Pageview and inserts the map:
+The recommended Integrated Interactive Widget records a Pageview and mounts a sandboxed iframe:
 
 ```html
 <script async src="https://stats.example.com/embed/widget.js?site_id=SITE_ID"></script>
@@ -136,6 +136,19 @@ For a subpath deployment, use the Base URL shown in the Admin Console:
 
 ```html
 <script async src="https://stats.example.com/visitortrace/embed/widget.js?site_id=SITE_ID"></script>
+```
+
+The loader sends the Pageview from the parent page, preserving its hostname, path, Origin validation, and local-storage Visitor ID, then lazy-loads the independently rendered iframe. The iframe follows the Map Preset or URL `w`/`h` overrides and reports its effective dimensions back to the loader so responsive layouts retain the projection ratio. Hovering or focusing a city marker shows its PV, UV, and GeoIP attribution. On a touch-only device, the first tap on a marker reveals those details and the second opens Public Analytics; clicking elsewhere on the map opens Public Analytics immediately.
+
+`GET /embed/widget?site_id=SITE_ID` is the iframe document used by the loader. It is read-only and never records a second Pageview. It can also be paired directly with the separated Tracker when an application wants to control iframe placement itself. The document contains only inline SVG, CSS, and a small native script; it does not load ECharts, fonts, icons, or CDN resources.
+
+If the website uses Content Security Policy, allow the VisitorTrace Base URL in `script-src`, `connect-src`, and `frame-src`. The Image Widget additionally requires `img-src`. For example:
+
+```text
+script-src 'self' https://stats.example.com;
+connect-src 'self' https://stats.example.com;
+frame-src https://stats.example.com;
+img-src 'self' https://stats.example.com;
 ```
 
 The integrated Image Widget is a JavaScript-free compatibility variant for static HTML, Markdown renderers that permit remote images, and restrictive publishing systems:
@@ -152,7 +165,7 @@ The integrated Image Widget is a JavaScript-free compatibility variant for stati
 
 Each valid image request records one Pageview before returning the SVG. The request Referer must resolve to one of the Site's Allowed Origins; a missing, malformed, or disallowed Referer still receives the map but is not counted. Because the browser does not run VisitorTrace code, this variant cannot create a local-storage Visitor ID: UV deduplication falls back to the client IP plus User-Agent. The default path comes from the Referer and is often `/` under modern cross-origin referrer policies. A fixed page can set an explicit normalized path, for example `&path=%2Fresearch` (write it as `&amp;path=%2Fresearch` in an HTML attribute).
 
-VisitorTrace returns the Image Widget with `Cache-Control: private, no-store`, but upstream Markdown/image proxies, prefetchers, and caches can still hide the visitor IP, replace the Referer, or combine many views into one request. GitHub Camo and similar services therefore make the image useful for display but unsuitable for accurate Pageview or UV measurement. Use the JavaScript Widget on ordinary web pages whenever possible, and do not add `loading="lazy"` to the Image Widget when every page load should count.
+VisitorTrace returns the Image Widget with `Cache-Control: private, no-store`, but upstream Markdown/image proxies, prefetchers, and caches can still hide the visitor IP, replace the Referer, or combine many views into one request. GitHub Camo and similar services therefore make the image useful for display but unsuitable for accurate Pageview or UV measurement. Use the Interactive Widget on ordinary web pages whenever possible, and do not add `loading="lazy"` to the Image Widget when every page load should count.
 
 The separated Tracker records a Pageview without rendering a map:
 
@@ -170,7 +183,7 @@ The separated integration area also provides a copyable map control snippet for 
      alt="Visitor map">
 ```
 
-The Site page provides one-click copy controls for every integration snippet and resource URL. Integrated access contains the recommended JavaScript Widget and the compatible Image Widget. Separated access provides snippets and resource URLs for both the Tracker and lazy-loaded Map SVG.
+The Site page provides one-click copy controls for every integration snippet and resource URL. Integrated access contains the recommended Interactive Widget loader and the compatible Image Widget. Separated access provides snippets and resource URLs for both the Tracker and lazy-loaded Map SVG.
 
 ## Map Presets and URL Overrides
 

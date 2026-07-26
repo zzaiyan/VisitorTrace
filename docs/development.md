@@ -79,6 +79,8 @@ Embedded Admin CSS and analytics JavaScript URLs carry a revision derived from t
 
 The effective Public Map Options `CacheKey` is namespaced by Site ID. The in-memory LRU has a five-minute TTL, at most 256 variants per Site, and a 32 MiB global SVG-body budget; an in-process flight coalesces misses for one key. Map Preset updates, Site resets, and deletions advance the Site cache generation so a stale in-flight render cannot repopulate invalidated data.
 
+The SVG renderer stores the basemap once in `<defs>` and places the two Bering-seam copies with `<use>`. Marker groups retain native `<title>` elements for standalone SVGs and add escaped city/country/PV/UV attributes for interactive consumers. `GET /embed/widget?site_id=...` renders that SVG inline in a cacheable, sandbox-compatible HTML document with no external runtime dependencies. The document supplies pointer, focus, and two-step touch details, links to Public Analytics, and reports validated preset dimensions to its parent through `postMessage`. It never ingests a Pageview; `widget.js` remains responsible for parent hostname/path collection before mounting the lazy iframe and accepts resize messages only from that iframe's `contentWindow`.
+
 `GET /embed/widget.svg?site_id=...` strips `site_id` and the optional `path` before passing the remaining query to the same strict Map Options parser and renderer. Its response is `private, no-store` and omits the Public Map ETag so conforming clients reach ingestion on every load; the shared bounded in-process render cache still limits CPU use. `GET /api/v1/sites/{siteID}/map.svg` remains read-only and publicly cacheable.
 
 ## Release Signing and Self-Update

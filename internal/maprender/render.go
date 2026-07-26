@@ -50,7 +50,7 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 		mapHeight = 1
 	}
 	var output strings.Builder
-	output.Grow(len(pathData) + 2048)
+	output.Grow(len(pathData) + 3072)
 	output.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
 	fmt.Fprintf(&output, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%d\" height=\"%d\" viewBox=\"0 0 %d %d\" role=\"img\">", options.Width, options.Height, options.Width, options.Height)
 	fmt.Fprintf(&output, "<title>%s</title>", html.EscapeString(mapTitle(data, options)))
@@ -64,8 +64,9 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 	}
 	fmt.Fprintf(&output, "<g class=\"visitortrace-map-viewport\" transform=\"translate(0 %d)\">", titleHeight)
 	fmt.Fprintf(&output, "<g class=\"visitortrace-map\" transform=\"scale(%s %s)\">", format(float64(options.Width)/mapBaseWidth), format(float64(mapHeight)/mapBaseHeight))
+	fmt.Fprintf(&output, "<defs><path id=\"visitortrace-land\" d=\"%s\"/></defs>", pathData)
 	for _, shift := range []float64{-mapBaseOffset, mapBaseWidth - mapBaseOffset} {
-		fmt.Fprintf(&output, "<path d=\"%s\" transform=\"translate(%s 0)\" fill=\"#%s\" stroke=\"#%s\" stroke-width=\"0.7\" vector-effect=\"non-scaling-stroke\"/>", pathData, format(shift), options.Land, options.Border)
+		fmt.Fprintf(&output, "<use href=\"#visitortrace-land\" transform=\"translate(%s 0)\" fill=\"#%s\" stroke=\"#%s\" stroke-width=\"0.7\" vector-effect=\"non-scaling-stroke\"/>", format(shift), options.Land, options.Border)
 	}
 	output.WriteString("</g>")
 	maxMetric := int64(0)
@@ -100,7 +101,7 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 			name = point.CountryCode
 		}
 		tooltip := fmt.Sprintf("%s: %s Pageviews, %s Unique Visitors", name, formatCount(point.Pageviews), formatCount(point.UniqueVisitors))
-		fmt.Fprintf(&output, "<g class=\"visitortrace-marker\"><title>%s</title><circle cx=\"%s\" cy=\"%s\" r=\"%s\" fill=\"#%s\" fill-opacity=\"0.78\" stroke=\"#ffffff\" stroke-width=\"0.6\"/></g>", html.EscapeString(tooltip), format(x), format(y), format(radius), options.Marker)
+		fmt.Fprintf(&output, "<g class=\"visitortrace-marker\" tabindex=\"0\" role=\"link\" aria-label=\"%s\" data-city=\"%s\" data-country=\"%s\" data-pv=\"%d\" data-uv=\"%d\"><title>%s</title><circle cx=\"%s\" cy=\"%s\" r=\"%s\" fill=\"#%s\" fill-opacity=\"0.78\" stroke=\"#ffffff\" stroke-width=\"0.6\"/></g>", html.EscapeString(tooltip), html.EscapeString(name), html.EscapeString(point.CountryCode), point.Pageviews, point.UniqueVisitors, html.EscapeString(tooltip), format(x), format(y), format(radius), options.Marker)
 	}
 	output.WriteString("</g>")
 	footerTop := options.Height - footerHeight

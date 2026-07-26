@@ -120,6 +120,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/sites/{siteID}/pageviews", s.collectPageview)
 	mux.HandleFunc("GET /embed/tracker.js", s.trackerScript)
 	mux.HandleFunc("GET /embed/widget.js", s.widgetScript)
+	mux.HandleFunc("GET /embed/widget", s.widgetFrame)
 	mux.HandleFunc("GET /embed/widget.svg", s.widgetImage)
 	mux.HandleFunc("GET /api/v1/sites/{siteID}/map.svg", s.mapSVG)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

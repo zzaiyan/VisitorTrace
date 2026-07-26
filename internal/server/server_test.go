@@ -152,8 +152,91 @@ func TestIntegratedWidgetScript(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("widget status = %d, body = %q", response.Code, response.Body.String())
 	}
-	if !strings.Contains(response.Body.String(), "visitortrace-widget") || !strings.Contains(response.Body.String(), "/map.svg") {
-		t.Fatal("widget response does not include integrated map insertion")
+	body := response.Body.String()
+	for _, want := range []string{"visitortrace-widget", `new URL("embed/widget", appURL)`, `document.createElement("iframe")`, `allow-scripts allow-popups allow-popups-to-escape-sandbox`, `frame.style.aspectRatio`, `event.source !== frame.contentWindow`, `visitortrace:resize`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("widget response is missing %q", want)
+		}
+	}
+}
+
+func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
+	app, st, site := testServer(t)
+	latitude := 30.5928
+	longitude := 114.3055
+	_, err := st.RecordPageview(context.Background(), store.PageviewObservation{
+		SiteID: site.ID, Hostname: "example.com", Path: "/existing", CountryCode: "CN", RegionCode: "HB", City: "Wuhan",
+		Latitude: &latitude, Longitude: &longitude, VisitorDigest: bytes.Repeat([]byte{1}, 32), OriginalIP: "192.0.2.1", OperatingSystem: "Linux", Browser: "Firefox",
+	})
+	if err != nil {
+		t.Fatalf("RecordPageview() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/embed/widget?site_id="+site.ID+"&w=320&h=180&lang=en", nil)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("interactive widget status = %d, body = %q", response.Code, response.Body.String())
+	}
+	body := response.Body.String()
+	for _, want := range []string{
+		`<!doctype html>`, `<html lang="en">`, `width="320" height="180"`, `data-width="320" data-height="180"`, `data-city="Wuhan"`, `id="widget-tooltip"`,
+		`href="/public/` + site.ID + `/analytics"`, `IP geolocation by DB-IP`, `pointerover`, `(hover: none)`, `window.parent.postMessage`, `visitortrace:resize`, `.visitortrace-marker > title`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("interactive widget body is missing %q", want)
+		}
+	}
+	if strings.Contains(body, svgXMLDeclaration) {
+		t.Fatal("interactive widget retained the standalone SVG XML declaration")
+	}
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	if _, err := writer.Write(response.Body.Bytes()); err != nil {
+		t.Fatalf("compress interactive widget: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close interactive widget compressor: %v", err)
+	}
+	if compressed.Len() > 32*1024 {
+		t.Fatalf("interactive widget gzip size = %d bytes, want <= 32768", compressed.Len())
+	}
+	if response.Header().Get("Cache-Control") != "public, max-age=300" || !strings.HasPrefix(response.Header().Get("Content-Type"), "text/html") || response.Header().Get("Cross-Origin-Resource-Policy") != "cross-origin" || !strings.Contains(response.Header().Get("Content-Security-Policy"), "frame-ancestors *") {
+		t.Fatalf("interactive widget headers = %#v", response.Header())
+	}
+	etag := response.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("interactive widget is missing ETag")
+	}
+	conditional := httptest.NewRequest(http.MethodGet, "/embed/widget?site_id="+site.ID+"&w=320&h=180&lang=en", nil)
+	conditional.Header.Set("If-None-Match", etag)
+	conditionalResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(conditionalResponse, conditional)
+	if conditionalResponse.Code != http.StatusNotModified {
+		t.Fatalf("conditional interactive widget status = %d, want %d", conditionalResponse.Code, http.StatusNotModified)
+	}
+	var count int
+	if err := st.DB.QueryRow(`SELECT COUNT(*) FROM pageviews`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("interactive widget frame created Pageview records: count = %d", count)
+	}
+}
+
+func TestInteractiveWidgetFrameValidatesPublicInput(t *testing.T) {
+	app, st, site := testServer(t)
+	invalid := httptest.NewRecorder()
+	app.Handler().ServeHTTP(invalid, httptest.NewRequest(http.MethodGet, "/embed/widget?site_id="+site.ID+"&lang=invalid", nil))
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid interactive widget language status = %d", invalid.Code)
+	}
+	if _, err := st.DB.Exec(`UPDATE sites SET publish_public = 0 WHERE id = ?`, site.ID); err != nil {
+		t.Fatal(err)
+	}
+	private := httptest.NewRecorder()
+	app.Handler().ServeHTTP(private, httptest.NewRequest(http.MethodGet, "/embed/widget?site_id="+site.ID, nil))
+	if private.Code != http.StatusNotFound {
+		t.Fatalf("private interactive widget status = %d", private.Code)
 	}
 }
 
@@ -341,6 +424,12 @@ func TestSubpathRoutesAndConfiguredBaseURL(t *testing.T) {
 	trackerBody := tracker.Body.String()
 	if tracker.Code != http.StatusOK || !strings.Contains(trackerBody, `new URL("../", scriptURL)`) || strings.Contains(trackerBody, `new URL("/api/v1`) {
 		t.Fatalf("subpath tracker = status %d, body = %q", tracker.Code, trackerBody)
+	}
+	frameRequest := httptest.NewRequest(http.MethodGet, "/visitortrace/embed/widget?site_id="+site.ID+"&lang=en", nil)
+	frameResponse := httptest.NewRecorder()
+	handler.ServeHTTP(frameResponse, frameRequest)
+	if frameResponse.Code != http.StatusOK || !strings.Contains(frameResponse.Body.String(), `href="/visitortrace/public/`+site.ID+`/analytics"`) {
+		t.Fatalf("subpath interactive widget = status %d body %q", frameResponse.Code, frameResponse.Body.String())
 	}
 	imageRequest := httptest.NewRequest(http.MethodGet, "/visitortrace/embed/widget.svg?site_id="+site.ID, nil)
 	imageRequest.Header.Set("Referer", "https://example.com/")

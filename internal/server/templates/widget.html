@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="{{.Language}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{.Title}}</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
+    body { position: relative; font-family: system-ui, sans-serif; }
+    .widget-link { display: block; width: 100%; height: 100%; color: inherit; text-decoration: none; outline: none; }
+    .widget-link:focus-visible { box-shadow: inset 0 0 0 2px #d96e51; }
+    svg { display: block; width: 100%; height: 100%; }
+    .visitortrace-marker { cursor: pointer; outline: none; }
+    .visitortrace-marker circle { transform-box: fill-box; transform-origin: center; transition: filter 120ms ease, fill-opacity 120ms ease, stroke-width 120ms ease, transform 120ms ease; }
+    .visitortrace-marker:hover circle, .visitortrace-marker:focus circle { filter: drop-shadow(0 1px 2px rgba(18, 28, 30, .45)); fill-opacity: 1; stroke-width: 1.4; transform: scale(1.18); }
+    .widget-tooltip { position: fixed; z-index: 2; max-width: min(240px, calc(100vw - 16px)); padding: 8px 10px; color: #fff; background: #172123; border: 1px solid rgba(255, 255, 255, .14); border-radius: 4px; box-shadow: 0 5px 18px rgba(18, 28, 30, .22); pointer-events: none; }
+    .widget-tooltip[hidden] { display: none; }
+    .widget-tooltip strong { display: block; overflow: hidden; font-size: 12px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+    .widget-tooltip p { display: flex; gap: 10px; margin: 3px 0 0; color: #e6eceb; font-size: 11px; line-height: 1.35; white-space: nowrap; }
+    .widget-tooltip small { display: block; margin-top: 4px; color: #aebcba; font-size: 9px; line-height: 1.3; }
+    @media (prefers-reduced-motion: reduce) { .visitortrace-marker circle { transition: none; } }
+  </style>
+</head>
+<body>
+  <a id="widget-link" class="widget-link" href="{{.AnalyticsURL}}" target="_blank" rel="noopener" aria-label="{{.Title}}" data-attribution="{{.Attribution}}" data-pv-label="{{.PageviewsLabel}}" data-uv-label="{{.VisitorsLabel}}" data-width="{{.Width}}" data-height="{{.Height}}">
+    {{.SVG}}
+  </a>
+  <div id="widget-tooltip" class="widget-tooltip" role="status" aria-live="polite" hidden>
+    <strong></strong>
+    <p><span data-value="pv"></span><span data-value="uv"></span></p>
+    <small></small>
+  </div>
+  <script>
+    (function () {
+      "use strict";
+      var root = document.getElementById("widget-link");
+      var tooltip = document.getElementById("widget-tooltip");
+      var title = tooltip.querySelector("strong");
+      var pv = tooltip.querySelector('[data-value="pv"]');
+      var uv = tooltip.querySelector('[data-value="uv"]');
+      var attribution = tooltip.querySelector("small");
+      var active = null;
+      var touchArmed = null;
+
+      Array.prototype.forEach.call(root.querySelectorAll(".visitortrace-marker > title"), function (node) {
+        node.remove();
+      });
+
+      if (window.parent !== window) {
+        window.parent.postMessage({
+          type: "visitortrace:resize",
+          width: Number(root.dataset.width),
+          height: Number(root.dataset.height)
+        }, "*");
+      }
+
+      function markerFrom(target) {
+        return target && target.closest ? target.closest(".visitortrace-marker") : null;
+      }
+
+      function place(marker, event) {
+        var circle = marker.querySelector("circle");
+        var box = circle ? circle.getBoundingClientRect() : marker.getBoundingClientRect();
+        var x = event && typeof event.clientX === "number" ? event.clientX : box.left + box.width / 2;
+        var y = event && typeof event.clientY === "number" ? event.clientY : box.top + box.height / 2;
+        var margin = 8;
+        var left = Math.min(Math.max(margin, x + 12), window.innerWidth - tooltip.offsetWidth - margin);
+        var top = y + 12;
+        if (top + tooltip.offsetHeight > window.innerHeight - margin) top = y - tooltip.offsetHeight - 12;
+        tooltip.style.left = Math.max(margin, left) + "px";
+        tooltip.style.top = Math.max(margin, top) + "px";
+      }
+
+      function show(marker, event) {
+        if (!marker) return;
+        active = marker;
+        title.textContent = marker.dataset.city || marker.dataset.country || "Unknown";
+        pv.textContent = root.dataset.pvLabel + ": " + (marker.dataset.pv || "0");
+        uv.textContent = root.dataset.uvLabel + ": " + (marker.dataset.uv || "0");
+        attribution.textContent = root.dataset.attribution;
+        tooltip.hidden = false;
+        place(marker, event);
+      }
+
+      function hide(marker) {
+        if (marker && active !== marker) return;
+        active = null;
+        tooltip.hidden = true;
+      }
+
+      root.addEventListener("pointerover", function (event) { show(markerFrom(event.target), event); });
+      root.addEventListener("pointermove", function (event) {
+        var marker = markerFrom(event.target);
+        if (marker) show(marker, event);
+      });
+      root.addEventListener("pointerout", function (event) {
+        var marker = markerFrom(event.target);
+        if (marker && markerFrom(event.relatedTarget) !== marker) hide(marker);
+      });
+      root.addEventListener("focusin", function (event) { show(markerFrom(event.target)); });
+      root.addEventListener("focusout", function (event) {
+        var marker = markerFrom(event.target);
+        if (marker && markerFrom(event.relatedTarget) !== marker) hide(marker);
+      });
+      root.addEventListener("click", function (event) {
+        var marker = markerFrom(event.target);
+        if (!marker || !window.matchMedia || !window.matchMedia("(hover: none)").matches) return;
+        if (touchArmed !== marker) {
+          event.preventDefault();
+          touchArmed = marker;
+          show(marker, event);
+        } else {
+          touchArmed = null;
+        }
+      });
+      root.addEventListener("keydown", function (event) {
+        var marker = markerFrom(event.target);
+        if (!marker) return;
+        if (event.key === "Escape") hide(marker);
+        if (event.key === "Enter") {
+          event.preventDefault();
+          root.click();
+        }
+        if (event.key === " ") {
+          event.preventDefault();
+          show(marker);
+        }
+      });
+    }());
+  </script>
+</body>
+</html>

@@ -247,6 +247,10 @@ location / {
     client_max_body_size 210m;
     proxy_pass http://127.0.0.1:8790;
     proxy_http_version 1.1;
+
+    gzip on;
+    gzip_vary on;
+    gzip_types application/javascript image/svg+xml;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -267,6 +271,10 @@ location /visitortrace/ {
     client_max_body_size 210m;
     proxy_pass http://127.0.0.1:8790;
     proxy_http_version 1.1;
+
+    gzip on;
+    gzip_vary on;
+    gzip_types application/javascript image/svg+xml;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

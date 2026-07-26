@@ -6,7 +6,8 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
-No unreleased changes.
+- Replaced the Integrated JavaScript Widget's static image with a sandboxed, independently rendered iframe. City markers now expose mouse, keyboard, and touch details with GeoIP attribution, and map clicks open Public Analytics without moving Pageview collection out of the parent-page loader.
+- Reduced every SVG map by defining the world basemap once and reusing it across the Bering Strait seam instead of serializing the same path twice. The iframe reports its effective Map Preset dimensions to the loader so responsive embedding preserves the projection ratio.
 
 ## 0.1.4 - 2026-07-27
 

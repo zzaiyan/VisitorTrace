@@ -75,6 +75,9 @@ func TestRenderEscapesLabelsAndIncludesMap(t *testing.T) {
 	if !strings.Contains(value, "&lt;Site&gt;") || !strings.Contains(value, "<path") || !strings.Contains(value, "Wuhan") {
 		t.Fatalf("rendered SVG is missing escaped title, basemap, or marker")
 	}
+	if !strings.Contains(value, `data-city="Wuhan"`) || !strings.Contains(value, `data-country="CN"`) || !strings.Contains(value, `data-pv="12" data-uv="8"`) || !strings.Contains(value, `tabindex="0" role="link"`) {
+		t.Fatal("rendered marker is missing interactive metadata")
+	}
 	if strings.Contains(value, "DB-IP") {
 		t.Fatal("provider attribution was drawn inside SVG")
 	}
@@ -124,7 +127,7 @@ func TestRenderUsesBeringStraitLongitudeBoundary(t *testing.T) {
 	if !strings.Contains(value, `cx="0.00"`) || !strings.Contains(value, `cx="120.00"`) {
 		t.Fatalf("markers do not use the 170W map boundary")
 	}
-	if strings.Count(value, `<path d=`) != 2 {
-		t.Fatalf("wrapped basemap path count = %d, want 2", strings.Count(value, `<path d=`))
+	if strings.Count(value, `<path id="visitortrace-land" d=`) != 1 || strings.Count(value, `<use href="#visitortrace-land"`) != 2 {
+		t.Fatalf("wrapped basemap does not reuse one path: paths=%d uses=%d", strings.Count(value, `<path id="visitortrace-land" d=`), strings.Count(value, `<use href="#visitortrace-land"`))
 	}
 }

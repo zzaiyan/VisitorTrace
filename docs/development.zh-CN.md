@@ -79,6 +79,8 @@ Pageview Record 列表使用 `(occurred_at, id)` 复合游标，查询顺序由�
 
 Public Map 的有效 Options `CacheKey` 与 Site ID 组成缓存键。内存 LRU 的 TTL 为 5 分钟，每个 Site 最多 256 个变体，全局 SVG body 最多 32 MiB；同键 miss 通过进程内 flight 合并。Map Preset 更新、Site 清空和删除会递增 Site 缓存代次，避免正在渲染的旧结果在失效后重新写回。
 
+SVG Renderer 在 `<defs>` 中只保存一次底图路径，再通过 `<use>` 放置白令海峡接缝两侧的副本。城市点位保留供 SVG 单独打开时使用的原生 `<title>`，同时增加经过转义的城市、国家、PV、UV 属性供交互层读取。`GET /embed/widget?site_id=...` 把该 SVG 内联到可缓存、兼容 sandbox 且不依赖外部运行库的 HTML 文档中，提供指针、焦点、两段式触屏详情和公开分析跳转，并通过 `postMessage` 向父页面报告已校验的预设尺寸。该文档不采集 Pageview；`widget.js` 仍负责从父页面采集 hostname/path，再挂载懒加载 iframe，并且只接受来自该 iframe `contentWindow` 的尺寸消息。
+
 `GET /embed/widget.svg?site_id=...` 会先移除 `site_id` 和可选 `path`，再把其他查询参数交给同一套严格 Map Options 解析器和渲染器。响应使用 `private, no-store` 且不返回 Public Map ETag，使遵守缓存指令的客户端每次加载都会到达采集端点；进程内仍复用有界地图缓存以控制 CPU。`GET /api/v1/sites/{siteID}/map.svg` 保持只读和公开缓存语义。
 
 ## 发布签名与自更新

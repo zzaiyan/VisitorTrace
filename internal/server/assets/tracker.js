@@ -5,13 +5,13 @@
   if (!script) return;
 
   var scriptURL = new URL(script.src, document.baseURI);
-	var appURL = new URL("../", scriptURL);
+  var appURL = new URL("../", scriptURL);
   var siteID = scriptURL.searchParams.get("site_id");
   if (!siteID) return;
 
   var endpoint = new URL(
-		"api/v1/sites/" + encodeURIComponent(siteID) + "/pageviews",
-		appURL
+    "api/v1/sites/" + encodeURIComponent(siteID) + "/pageviews",
+    appURL
   ).href;
   var state = window.__visitorTraceState || (window.__visitorTraceState = {});
   var siteState = state[siteID] || (state[siteID] = { sent: {}, visitorID: null });
@@ -69,33 +69,46 @@
   window.VisitorTrace = window.VisitorTrace || {};
   window.VisitorTrace.track = send;
   if (integrated) {
-    var mapURL = new URL(
-			"api/v1/sites/" + encodeURIComponent(siteID) + "/map.svg",
-			appURL
-    );
+    var frameURL = new URL("embed/widget", appURL);
     scriptURL.searchParams.forEach(function (value, key) {
-      if (key !== "site_id") mapURL.searchParams.append(key, value);
+      frameURL.searchParams.append(key, value);
     });
     var wrapper = document.createElement("span");
     wrapper.className = "visitortrace-widget";
-    var link = document.createElement("a");
-    link.href = new URL(
-			"public/" + encodeURIComponent(siteID) + "/analytics",
-			appURL
-    ).href;
-    link.target = "_blank";
-    link.rel = "noopener";
-    var image = document.createElement("img");
-    image.src = mapURL.href;
+    wrapper.style.display = "inline-block";
+    wrapper.style.width = "100%";
+    var frame = document.createElement("iframe");
+    frame.src = frameURL.href;
     var width = parseInt(scriptURL.searchParams.get("w"), 10);
     var height = parseInt(scriptURL.searchParams.get("h"), 10);
-	if (width >= 160 && width <= 1200) image.width = width;
-	if (height >= 90 && height <= 800) image.height = height;
-    image.loading = "eager";
-    image.alt = "Visitor map";
-    image.title = "VisitorTrace Public Map | IP geolocation data";
-    link.appendChild(image);
-    wrapper.appendChild(link);
+    width = width >= 160 && width <= 1200 ? width : 720;
+    height = height >= 90 && height <= 800 ? height : 400;
+
+    function sizeFrame(nextWidth, nextHeight) {
+      if (!isFinite(nextWidth) || !isFinite(nextHeight) || nextWidth < 160 || nextWidth > 1200 || nextHeight < 90 || nextHeight > 800) return;
+      width = nextWidth;
+      height = nextHeight;
+      wrapper.style.maxWidth = width + "px";
+      frame.width = width;
+      frame.height = height;
+      frame.style.aspectRatio = width + " / " + height;
+    }
+
+    frame.loading = "lazy";
+    frame.title = "VisitorTrace interactive visitor map";
+    frame.setAttribute("scrolling", "no");
+    frame.setAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox");
+    frame.style.display = "block";
+    frame.style.width = "100%";
+    frame.style.height = "auto";
+    frame.style.border = "0";
+    sizeFrame(width, height);
+    window.addEventListener("message", function (event) {
+      var data = event.data;
+      if (event.source !== frame.contentWindow || !data || data.type !== "visitortrace:resize") return;
+      sizeFrame(Number(data.width), Number(data.height));
+    });
+    wrapper.appendChild(frame);
     if (script.parentNode) script.parentNode.insertBefore(wrapper, script.nextSibling);
   }
   send(window.location.pathname);
