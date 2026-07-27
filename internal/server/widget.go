@@ -24,8 +24,6 @@ type widgetFrameData struct {
 	Attribution    string
 	PageviewsLabel string
 	VisitorsLabel  string
-	ControlsLabel  string
-	ResetLabel     string
 	Width          int
 	Height         int
 	SVG            template.HTML
@@ -104,8 +102,6 @@ func (s *Server) renderWidgetFrame(configuredSite store.Site, width, height int,
 		Attribution:    attribution.Label,
 		PageviewsLabel: translate(language, "pageviews"),
 		VisitorsLabel:  translate(language, "unique_visitors"),
-		ControlsLabel:  translate(language, "map_controls"),
-		ResetLabel:     translate(language, "reset_map_view"),
 		Width:          width,
 		Height:         height,
 		SVG:            inlineSVG,

@@ -197,7 +197,7 @@ func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 	for _, want := range []string{
 		`<!doctype html>`, `<html lang="en">`, `width="320" height="180"`, `data-width="320" data-height="180"`, `data-city="Wuhan"`, `id="widget-tooltip"`,
 		`href="/public/` + site.ID + `/analytics"`, `IP geolocation by DB-IP`, `pointerover`, `(hover: none)`, `window.parent.postMessage`, `visitortrace:resize`, `.visitortrace-marker > title`,
-		`id="widget-map-controls"`, `Reset map position and zoom`, `visitortrace-map-content`, `visitortrace-marker-layer`, `VisitorTraceMapControls`, `visitortrace:map-controls-ready`, `viewport.addEventListener("wheel"`, `viewport.addEventListener("lostpointercapture"`, `window.requestAnimationFrame(renderView)`, `type: "pinch"`, `M2 12h3m14 0h3M12 2v3m0 14v3`,
+		`visitortrace-map-content`, `visitortrace-marker-layer`, `root.addEventListener("click"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("interactive widget body is missing %q", want)
@@ -205,6 +205,11 @@ func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 	}
 	if strings.Contains(body, svgXMLDeclaration) {
 		t.Fatal("interactive widget retained the standalone SVG XML declaration")
+	}
+	for _, unwanted := range []string{`id="widget-map-controls"`, `addEventListener("wheel"`, `addEventListener("pointerdown"`, `setPointerCapture`, `VisitorTraceMapControls`, `resetView`, `touch-action: none`, `cursor: grab`} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("interactive widget retained advanced map interaction %q", unwanted)
+		}
 	}
 	var compressed bytes.Buffer
 	writer := gzip.NewWriter(&compressed)
@@ -626,7 +631,7 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	widgetPreviewResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(widgetPreviewResponse, widgetPreviewRequest)
 	widgetPreviewBody := widgetPreviewResponse.Body.String()
-	if widgetPreviewResponse.Code != http.StatusOK || widgetPreviewResponse.Header().Get("Cache-Control") != "no-store" || !strings.Contains(widgetPreviewBody, `width="480" height="240"`) || !strings.Contains(widgetPreviewBody, `href="/admin/sites/`+site.ID+`/analytics"`) || !strings.Contains(widgetPreviewBody, `id="widget-map-controls"`) || !strings.Contains(widgetPreviewBody, `viewport.addEventListener("pointerdown"`) || !strings.Contains(widgetPreviewBody, `viewport.addEventListener("wheel"`) {
+	if widgetPreviewResponse.Code != http.StatusOK || widgetPreviewResponse.Header().Get("Cache-Control") != "no-store" || !strings.Contains(widgetPreviewBody, `width="480" height="240"`) || !strings.Contains(widgetPreviewBody, `href="/admin/sites/`+site.ID+`/analytics"`) || !strings.Contains(widgetPreviewBody, `id="widget-tooltip"`) || !strings.Contains(widgetPreviewBody, `root.addEventListener("pointerover"`) || strings.Contains(widgetPreviewBody, `id="widget-map-controls"`) || strings.Contains(widgetPreviewBody, `addEventListener("wheel"`) || strings.Contains(widgetPreviewBody, `addEventListener("pointerdown"`) {
 		t.Fatalf("admin Interactive Widget preview = status %d headers %#v body %q", widgetPreviewResponse.Code, widgetPreviewResponse.Header(), widgetPreviewBody)
 	}
 	for index := 0; index < 10; index++ {

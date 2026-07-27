@@ -181,13 +181,13 @@ The separated integration area also provides a display-only Interactive Map load
 <script async src="https://stats.example.com/embed/map.js?site_id=SITE_ID"></script>
 ```
 
-`map.js` never records a Pageview. It mounts the same sandboxed iframe as the Integrated Widget, including lazy loading, Map Preset and URL overrides, responsive aspect-ratio updates, marker details, touch behavior, and Public Analytics navigation. Loading only `tracker.js` remains the lowest-cost choice when no map should be rendered; loading only `map.js` renders public statistics without collecting the host page.
+`map.js` never records a Pageview. It mounts the same sandboxed iframe as the Integrated Widget, including lazy loading, Map Preset and URL overrides, responsive aspect-ratio updates, mouse/touch marker details, and Public Analytics navigation. Loading only `tracker.js` remains the lowest-cost choice when no map should be rendered; loading only `map.js` renders public statistics without collecting the host page.
 
 The Site page provides one-click copy controls for four ready-to-use snippets: **Interactive map + tracking**, **Image map + tracking**, **Tracking only**, and **Interactive map only**. Separate resource-address rows are intentionally omitted because each address is already present in its complete snippet; raw endpoint forms remain documented here for programmatic use.
 
 ## Map Presets and URL Overrides
 
-The Admin Console configures dimensions, title, PV/UV labels, font size, visible content, background, land, border, text, marker color, and marker metric. Its live preview can switch between the complete Interactive Widget and the Image fallback without saving; the Widget preview supports the same marker details, pointer/touch pan, wheel/pinch zoom, Reset action, and Analytics navigation as the deployed Widget. Private Sites use an Administrator-only preview with the same behavior. The automatic dimension buttons account for the current title, statistics band, and font size before calculating the other dimension required to preserve the world-map projection ratio.
+The Admin Console configures dimensions, title, PV/UV labels, font size, visible content, background, land, border, text, marker color, and marker metric. Its live preview can switch between the Interactive Widget and the Image fallback without saving. The Widget preview matches the deployed Widget: hovering or focusing a marker shows its details, touch devices reveal details before navigation, and clicking opens Analytics. The Widget intentionally omits pan, zoom, and Reset; the full Public and Admin Analytics maps retain those advanced interactions. Private Sites use an Administrator-only preview with the same Widget behavior. The automatic dimension buttons account for the current title, statistics band, and font size before calculating the other dimension required to preserve the world-map projection ratio.
 
 The basemap omits Antarctica and places its left/right seam near the Bering Strait at `170°W` instead of using the `180°` meridian as the page boundary.
 

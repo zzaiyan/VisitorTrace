@@ -6,10 +6,10 @@
 
 ## 尚未发布
 
-- 修复交互式 Widget 的地图操作：底图与圆点改为共享同一变换，指针捕获丢失时会清理手势状态，并按动画帧合并高频平移/缩放更新，避免正式 Widget 与 Map Preset 预览出现圆点脱离和手势卡死。
+- 交互式 Widget 精简为圆点悬停/聚焦/触屏详情与点击进入分析页；移除平移、缩放、Reset、手势状态和 Widget 控件注册表，高级地图交互仅保留在完整的 Public Analytics 与 Admin Analytics 中。
 - Site 接入区精简为四段按行为命名、可直接使用的代码，并移除重复的资源地址。Map Preset 的 Widget 预览不再经过滚动容器干预，可保持正式 Widget 的完整交互。Site 详情仅加载 8 条最近记录，以六个核心字段紧凑展示，并可带当前 Site 筛选直接进入完整访问明细。
-- 地图 Reset 控件改用更小的定位样式图标；Image fallback 预览按配置的像素尺寸原样显示，不再缩放；Site 专属危险操作移除重复的 Site ID 确认，同时保留管理员密码验证。
-- Map Preset 新增完整交互式 Widget 与 Image fallback 双模式预览，并支持私有 Site 的管理员专用渲染。所有交互式地图均在左下角提供位置与缩放 Reset 控件；iframe 与 ECharts 视图同时开放统一的可扩展控件注册表，便于后续增加操作。
+- ECharts 地图的 Reset 控件改用更小的定位样式图标；Image fallback 预览按配置的像素尺寸原样显示，不再缩放；Site 专属危险操作移除重复的 Site ID 确认，同时保留管理员密码验证。
+- Map Preset 新增轻量交互式 Widget 与 Image fallback 双模式预览，并支持私有 Site 的管理员专用渲染；ECharts 分析地图开放可扩展控件注册表，便于后续增加操作。
 - 将分离式接入从静态 Map SVG 升级为独立的 `map.js` Loader。该 Loader 不执行采集，而是挂载与一体式模式相同的懒加载、响应式交互 Widget，可与 `tracker.js` 组合、独立延迟加载，或单独用于只读展示。
 - 将一体式 JavaScript Widget 的静态图片替换为独立渲染、受 sandbox 隔离的 iframe。城市点位支持鼠标、键盘和触屏查看详情及 GeoIP 署名；点击地图会打开公开分析，同时 Pageview 采集仍由父页面 Loader 完成。
 - SVG 地图改为只定义一次世界底图，并在白令海峡接缝两侧复用，不再序列化两份相同路径。iframe 会把 Map Preset 的实际尺寸发送给 Loader，使响应式嵌入保持地图投影比例。
