@@ -6,6 +6,10 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.2.0 - 2026-07-27
+
 - Made every Widget, including the Administrator Map Preset preview, link to Public Analytics instead of an Admin route. Native anchor dragging is disabled and movement is treated as a cancelled click, so hover and click interaction recover immediately after a drag attempt.
 - Simplified the Interactive Widget to marker hover/focus/touch details and click-through Analytics navigation. Pan, zoom, Reset, gesture state, and the Widget control registry were removed; those advanced interactions remain available on full Public and Admin Analytics maps.
 - Simplified Site integration into four behavior-oriented, ready-to-use snippets and removed duplicate resource-address rows. Map Preset Widget previews now keep the deployed Widget interaction surface unobstructed. The Site detail page loads only eight recent records in a compact six-column table and links directly to the complete records view with the current Site filter applied.
@@ -14,6 +18,7 @@ This file records user-facing changes for each published VisitorTrace release.
 - Upgraded separated integration from a static Map SVG to an independent `map.js` loader. It performs no collection and mounts the same lazy, responsive Interactive Widget as integrated mode, so it can be paired with `tracker.js`, deferred independently, or used alone for read-only display.
 - Replaced the Integrated JavaScript Widget's static image with a sandboxed, independently rendered iframe. City markers now expose mouse, keyboard, and touch details with GeoIP attribution, and map clicks open Public Analytics without moving Pageview collection out of the parent-page loader.
 - Reduced every SVG map by defining the world basemap once and reusing it across the Bering Strait seam instead of serializing the same path twice. The iframe reports its effective Map Preset dimensions to the loader so responsive embedding preserves the projection ratio.
+- This release keeps SQLite schema 10. Existing 0.1.4 installations can upgrade through signed self-update or the same-schema manual systemd update script.
 
 ## 0.1.4 - 2026-07-27
 

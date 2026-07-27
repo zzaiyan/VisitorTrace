@@ -6,6 +6,10 @@
 
 ## 尚未发布
 
+暂无未发布变更。
+
+## 0.2.0 - 2026-07-27
+
 - 所有 Widget（包括管理员 Map Preset 预览）统一跳转 Public Analytics，不再进入管理路由；同时禁用锚点原生拖放，并把移动操作判定为取消点击，使拖动尝试结束后悬停和点击立即恢复。
 - 交互式 Widget 精简为圆点悬停/聚焦/触屏详情与点击进入分析页；移除平移、缩放、Reset、手势状态和 Widget 控件注册表，高级地图交互仅保留在完整的 Public Analytics 与 Admin Analytics 中。
 - Site 接入区精简为四段按行为命名、可直接使用的代码，并移除重复的资源地址。Map Preset 的 Widget 预览不再经过滚动容器干预，可保持正式 Widget 的完整交互。Site 详情仅加载 8 条最近记录，以六个核心字段紧凑展示，并可带当前 Site 筛选直接进入完整访问明细。
@@ -14,6 +18,7 @@
 - 将分离式接入从静态 Map SVG 升级为独立的 `map.js` Loader。该 Loader 不执行采集，而是挂载与一体式模式相同的懒加载、响应式交互 Widget，可与 `tracker.js` 组合、独立延迟加载，或单独用于只读展示。
 - 将一体式 JavaScript Widget 的静态图片替换为独立渲染、受 sandbox 隔离的 iframe。城市点位支持鼠标、键盘和触屏查看详情及 GeoIP 署名；点击地图会打开公开分析，同时 Pageview 采集仍由父页面 Loader 完成。
 - SVG 地图改为只定义一次世界底图，并在白令海峡接缝两侧复用，不再序列化两份相同路径。iframe 会把 Map Preset 的实际尺寸发送给 Loader，使响应式嵌入保持地图投影比例。
+- 本版本继续使用 SQLite Schema 10。已有 0.1.4 安装可通过签名自更新或同 Schema 的 systemd 手动更新脚本升级。
 
 ## 0.1.4 - 2026-07-27
 
