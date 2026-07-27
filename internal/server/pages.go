@@ -601,7 +601,7 @@ func (s *Server) adminPresetWidgetPreview(w http.ResponseWriter, r *http.Request
 		http.Error(w, "could not render map", http.StatusInternalServerError)
 		return
 	}
-	body, err := s.renderWidgetFrame(configuredSite, options.Width, options.Height, svgBody, adminLanguage(r), s.appPath("/admin/sites/"+siteID+"/analytics"))
+	body, err := s.renderWidgetFrame(configuredSite, options.Width, options.Height, svgBody, adminLanguage(r))
 	if err != nil {
 		http.Error(w, "could not render Interactive Widget", http.StatusInternalServerError)
 		return

@@ -196,7 +196,7 @@ func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 	body := response.Body.String()
 	for _, want := range []string{
 		`<!doctype html>`, `<html lang="en">`, `width="320" height="180"`, `data-width="320" data-height="180"`, `data-city="Wuhan"`, `id="widget-tooltip"`,
-		`href="/public/` + site.ID + `/analytics"`, `IP geolocation by DB-IP`, `pointerover`, `(hover: none)`, `window.parent.postMessage`, `visitortrace:resize`, `.visitortrace-marker > title`,
+		`href="/public/` + site.ID + `/analytics"`, `draggable="false"`, `IP geolocation by DB-IP`, `dragstart`, `pointerover`, `(hover: none)`, `window.parent.postMessage`, `visitortrace:resize`, `.visitortrace-marker > title`,
 		`visitortrace-map-content`, `visitortrace-marker-layer`, `root.addEventListener("click"`,
 	} {
 		if !strings.Contains(body, want) {
@@ -206,7 +206,7 @@ func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 	if strings.Contains(body, svgXMLDeclaration) {
 		t.Fatal("interactive widget retained the standalone SVG XML declaration")
 	}
-	for _, unwanted := range []string{`id="widget-map-controls"`, `addEventListener("wheel"`, `addEventListener("pointerdown"`, `setPointerCapture`, `VisitorTraceMapControls`, `resetView`, `touch-action: none`, `cursor: grab`} {
+	for _, unwanted := range []string{`id="widget-map-controls"`, `addEventListener("wheel"`, `setPointerCapture`, `VisitorTraceMapControls`, `resetView`, `touch-action: none`, `cursor: grab`} {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("interactive widget retained advanced map interaction %q", unwanted)
 		}
@@ -631,7 +631,7 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	widgetPreviewResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(widgetPreviewResponse, widgetPreviewRequest)
 	widgetPreviewBody := widgetPreviewResponse.Body.String()
-	if widgetPreviewResponse.Code != http.StatusOK || widgetPreviewResponse.Header().Get("Cache-Control") != "no-store" || !strings.Contains(widgetPreviewBody, `width="480" height="240"`) || !strings.Contains(widgetPreviewBody, `href="/admin/sites/`+site.ID+`/analytics"`) || !strings.Contains(widgetPreviewBody, `id="widget-tooltip"`) || !strings.Contains(widgetPreviewBody, `root.addEventListener("pointerover"`) || strings.Contains(widgetPreviewBody, `id="widget-map-controls"`) || strings.Contains(widgetPreviewBody, `addEventListener("wheel"`) || strings.Contains(widgetPreviewBody, `addEventListener("pointerdown"`) {
+	if widgetPreviewResponse.Code != http.StatusOK || widgetPreviewResponse.Header().Get("Cache-Control") != "no-store" || !strings.Contains(widgetPreviewBody, `width="480" height="240"`) || !strings.Contains(widgetPreviewBody, `href="/public/`+site.ID+`/analytics"`) || strings.Contains(widgetPreviewBody, `href="/admin/sites/`+site.ID+`/analytics"`) || !strings.Contains(widgetPreviewBody, `id="widget-tooltip"`) || !strings.Contains(widgetPreviewBody, `root.addEventListener("pointerover"`) || !strings.Contains(widgetPreviewBody, `root.addEventListener("dragstart"`) || strings.Contains(widgetPreviewBody, `id="widget-map-controls"`) || strings.Contains(widgetPreviewBody, `addEventListener("wheel"`) || strings.Contains(widgetPreviewBody, `setPointerCapture`) {
 		t.Fatalf("admin Interactive Widget preview = status %d headers %#v body %q", widgetPreviewResponse.Code, widgetPreviewResponse.Header(), widgetPreviewBody)
 	}
 	for index := 0; index < 10; index++ {
@@ -1155,7 +1155,7 @@ func TestAdminAnalyticsIncludesPathsForPrivateSite(t *testing.T) {
 	previewRequest.AddCookie(cookie)
 	previewResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(previewResponse, previewRequest)
-	if previewResponse.Code != http.StatusOK || !strings.Contains(previewResponse.Body.String(), `data-city="Shanghai"`) || !strings.Contains(previewResponse.Body.String(), `href="/admin/sites/`+site.ID+`/analytics"`) {
+	if previewResponse.Code != http.StatusOK || !strings.Contains(previewResponse.Body.String(), `data-city="Shanghai"`) || !strings.Contains(previewResponse.Body.String(), `href="/public/`+site.ID+`/analytics"`) || strings.Contains(previewResponse.Body.String(), `href="/admin/sites/`+site.ID+`/analytics"`) {
 		t.Fatalf("private Site Widget preview = status %d body %q", previewResponse.Code, previewResponse.Body.String())
 	}
 	public := httptest.NewRecorder()

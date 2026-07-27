@@ -6,6 +6,7 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+- Made every Widget, including the Administrator Map Preset preview, link to Public Analytics instead of an Admin route. Native anchor dragging is disabled and movement is treated as a cancelled click, so hover and click interaction recover immediately after a drag attempt.
 - Simplified the Interactive Widget to marker hover/focus/touch details and click-through Analytics navigation. Pan, zoom, Reset, gesture state, and the Widget control registry were removed; those advanced interactions remain available on full Public and Admin Analytics maps.
 - Simplified Site integration into four behavior-oriented, ready-to-use snippets and removed duplicate resource-address rows. Map Preset Widget previews now keep the deployed Widget interaction surface unobstructed. The Site detail page loads only eight recent records in a compact six-column table and links directly to the complete records view with the current Site filter applied.
 - Refined ECharts map controls with a smaller locate-style Reset icon, made Image fallback previews render at their exact configured pixel dimensions without scaling, and removed redundant Site ID confirmation from Site-scoped destructive operations while retaining Administrator-password verification.

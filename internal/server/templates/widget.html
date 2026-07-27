@@ -8,7 +8,8 @@
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
     body { position: relative; font-family: system-ui, sans-serif; }
-    .widget-link { display: block; width: 100%; height: 100%; color: inherit; text-decoration: none; outline: none; }
+    .widget-link { display: block; width: 100%; height: 100%; color: inherit; text-decoration: none; outline: none; user-select: none; -webkit-user-drag: none; }
+    .widget-link * { -webkit-user-drag: none; }
     .widget-link:focus-visible { box-shadow: inset 0 0 0 2px #d96e51; }
     svg { display: block; width: 100%; height: 100%; }
     .visitortrace-marker { cursor: pointer; outline: none; }
@@ -23,7 +24,7 @@
   </style>
 </head>
 <body>
-  <a id="widget-link" class="widget-link" href="{{.AnalyticsURL}}" target="_blank" rel="noopener" aria-label="{{.Title}}" data-attribution="{{.Attribution}}" data-pv-label="{{.PageviewsLabel}}" data-uv-label="{{.VisitorsLabel}}" data-width="{{.Width}}" data-height="{{.Height}}">
+  <a id="widget-link" class="widget-link" href="{{.AnalyticsURL}}" target="_blank" rel="noopener" draggable="false" aria-label="{{.Title}}" data-attribution="{{.Attribution}}" data-pv-label="{{.PageviewsLabel}}" data-uv-label="{{.VisitorsLabel}}" data-width="{{.Width}}" data-height="{{.Height}}">
     {{.SVG}}
   </a>
   <div id="widget-tooltip" class="widget-tooltip" role="status" aria-live="polite" hidden>
@@ -42,6 +43,8 @@
       var attribution = tooltip.querySelector("small");
       var active = null;
       var touchArmed = null;
+      var press = null;
+      var suppressClick = false;
 
       Array.prototype.forEach.call(root.querySelectorAll(".visitortrace-marker > title"), function (node) {
         node.remove();
@@ -89,8 +92,15 @@
         tooltip.hidden = true;
       }
 
+      root.addEventListener("dragstart", function (event) { event.preventDefault(); });
+      root.addEventListener("pointerdown", function (event) {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        press = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+        suppressClick = false;
+      });
       root.addEventListener("pointerover", function (event) { show(markerFrom(event.target), event); });
       root.addEventListener("pointermove", function (event) {
+        if (press && press.id === event.pointerId && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 4) press.moved = true;
         var marker = markerFrom(event.target);
         if (marker) show(marker, event);
       });
@@ -98,12 +108,25 @@
         var marker = markerFrom(event.target);
         if (marker && markerFrom(event.relatedTarget) !== marker) hide(marker);
       });
+      function endPress(event) {
+        if (!press || press.id !== event.pointerId) return;
+        suppressClick = press.moved;
+        press = null;
+      }
+      root.addEventListener("pointerup", endPress);
+      root.addEventListener("pointercancel", function () { press = null; suppressClick = false; });
+      window.addEventListener("blur", function () { press = null; suppressClick = false; hide(); });
       root.addEventListener("focusin", function (event) { show(markerFrom(event.target)); });
       root.addEventListener("focusout", function (event) {
         var marker = markerFrom(event.target);
         if (marker && markerFrom(event.relatedTarget) !== marker) hide(marker);
       });
       root.addEventListener("click", function (event) {
+        if (suppressClick) {
+          event.preventDefault();
+          suppressClick = false;
+          return;
+        }
         var marker = markerFrom(event.target);
         if (!marker || !window.matchMedia || !window.matchMedia("(hover: none)").matches) return;
         if (touchArmed !== marker) {

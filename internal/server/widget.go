@@ -71,7 +71,7 @@ func (s *Server) widgetFrame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := s.renderWidgetFrame(configuredSite, options.Width, options.Height, cached.body, language, s.appPath("/public/"+configuredSite.ID+"/analytics"))
+	body, err := s.renderWidgetFrame(configuredSite, options.Width, options.Height, cached.body, language)
 	if err != nil {
 		s.logger.Error("render Interactive Widget page failed", "site_id", siteID, "error", err)
 		http.Error(w, "could not render Interactive Widget", http.StatusInternalServerError)
@@ -91,14 +91,14 @@ func (s *Server) widgetFrame(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
-func (s *Server) renderWidgetFrame(configuredSite store.Site, width, height int, svgBody []byte, language, analyticsURL string) ([]byte, error) {
+func (s *Server) renderWidgetFrame(configuredSite store.Site, width, height int, svgBody []byte, language string) ([]byte, error) {
 	attribution := geoip.AttributionForProvider(s.Config.GeoIPProvider)
 	// maprender escapes every dynamic label before producing the SVG.
 	inlineSVG := template.HTML(strings.TrimPrefix(string(svgBody), svgXMLDeclaration))
 	data := widgetFrameData{
 		Language:       language,
 		Title:          configuredSite.Name + " " + translate(language, "visitor_map"),
-		AnalyticsURL:   analyticsURL,
+		AnalyticsURL:   s.appPath("/public/" + configuredSite.ID + "/analytics"),
 		Attribution:    attribution.Label,
 		PageviewsLabel: translate(language, "pageviews"),
 		VisitorsLabel:  translate(language, "unique_visitors"),

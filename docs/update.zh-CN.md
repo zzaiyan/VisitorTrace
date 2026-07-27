@@ -6,6 +6,7 @@
 
 ## 尚未发布
 
+- 所有 Widget（包括管理员 Map Preset 预览）统一跳转 Public Analytics，不再进入管理路由；同时禁用锚点原生拖放，并把移动操作判定为取消点击，使拖动尝试结束后悬停和点击立即恢复。
 - 交互式 Widget 精简为圆点悬停/聚焦/触屏详情与点击进入分析页；移除平移、缩放、Reset、手势状态和 Widget 控件注册表，高级地图交互仅保留在完整的 Public Analytics 与 Admin Analytics 中。
 - Site 接入区精简为四段按行为命名、可直接使用的代码，并移除重复的资源地址。Map Preset 的 Widget 预览不再经过滚动容器干预，可保持正式 Widget 的完整交互。Site 详情仅加载 8 条最近记录，以六个核心字段紧凑展示，并可带当前 Site 筛选直接进入完整访问明细。
 - ECharts 地图的 Reset 控件改用更小的定位样式图标；Image fallback 预览按配置的像素尺寸原样显示，不再缩放；Site 专属危险操作移除重复的 Site ID 确认，同时保留管理员密码验证。
