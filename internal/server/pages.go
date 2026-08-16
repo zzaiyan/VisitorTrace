@@ -96,11 +96,12 @@ type adminSiteData struct {
 
 type newSiteData struct {
 	pageLayout
-	Name            string
-	Timezone        string
-	Origins         string
-	DedupWindowDays int
-	RetentionDays   int
+	Name               string
+	Timezone           string
+	Origins            string
+	DedupWindowDays    int
+	RetentionDays      int
+	RetentionUnlimited bool
 }
 
 type adminSettingsData struct {
@@ -346,10 +347,10 @@ func (s *Server) adminCreateSite(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "站点表单无效。")
 		return
 	}
-	data := newSiteData{pageLayout: s.adminLayout(r, session, "新增 Site", "sites"), Name: r.FormValue("name"), Timezone: r.FormValue("timezone"), Origins: r.FormValue("origins"), DedupWindowDays: intFormValue(r, "dedup_window_days", 1), RetentionDays: intFormValue(r, "retention_days", 30)}
+	data := newSiteData{pageLayout: s.adminLayout(r, session, "新增 Site", "sites"), Name: r.FormValue("name"), Timezone: r.FormValue("timezone"), Origins: r.FormValue("origins"), DedupWindowDays: intFormValue(r, "dedup_window_days", 1), RetentionDays: intFormValue(r, "retention_days", 30), RetentionUnlimited: r.FormValue("retention_mode") == "unlimited"}
 	created, err := s.Store.CreateSite(r.Context(), store.CreateSiteParams{
 		Name: data.Name, Timezone: data.Timezone, AllowedOrigins: splitLines(data.Origins),
-		DedupWindowDays: data.DedupWindowDays, RetentionDays: data.RetentionDays,
+		DedupWindowDays: data.DedupWindowDays, RetentionDays: data.RetentionDays, RetentionUnlimited: data.RetentionUnlimited,
 	})
 	if err != nil {
 		data.Error = err.Error()
@@ -425,7 +426,7 @@ func (s *Server) adminUpdateSite(w http.ResponseWriter, r *http.Request) {
 	_, err := s.Store.UpdateSite(r.Context(), siteID, store.UpdateSiteParams{
 		Name: r.FormValue("name"), Timezone: r.FormValue("timezone"), AllowedOrigins: splitLines(r.FormValue("origins")),
 		AcceptPageviews: r.FormValue("accept_pageviews") == "on", PublishPublic: r.FormValue("publish_public") == "on", PublicLanguage: r.FormValue("public_language"),
-		DedupWindowDays: intFormValue(r, "dedup_window_days", 1), RetentionDays: intFormValue(r, "retention_days", 30),
+		DedupWindowDays: intFormValue(r, "dedup_window_days", 1), RetentionDays: intFormValue(r, "retention_days", 30), RetentionUnlimited: r.FormValue("retention_mode") == "unlimited",
 	})
 	if err != nil {
 		s.redirectWithError(w, r, "/admin/sites/"+siteID, err.Error())

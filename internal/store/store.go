@@ -14,7 +14,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 10
+const schemaVersion = 11
 
 const MinimumSQLiteVersion = "3.51.3"
 

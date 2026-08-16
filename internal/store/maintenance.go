@@ -32,7 +32,6 @@ func (s *Store) CleanupBatch(ctx context.Context, now time.Time, batchSize int) 
 		if err != nil {
 			return total, fmt.Errorf("load Site %s timezone: %w", configuredSite.ID, err)
 		}
-		cutoff := now.UTC().AddDate(0, 0, -configuredSite.RetentionDays)
 		localDate := now.In(location).Format(time.DateOnly)
 		s.writeMu.Lock()
 		tx, err := s.DB.BeginTx(ctx, nil)
@@ -40,19 +39,24 @@ func (s *Store) CleanupBatch(ctx context.Context, now time.Time, batchSize int) 
 			s.writeMu.Unlock()
 			return total, fmt.Errorf("begin cleanup transaction: %w", err)
 		}
-		pageviews, err := tx.ExecContext(ctx, `
-			DELETE FROM pageviews
-			WHERE id IN (
-				SELECT id FROM pageviews
-				WHERE site_id = ? AND julianday(occurred_at) < julianday(?)
-				ORDER BY occurred_at, id
-				LIMIT ?
-			)
-		`, configuredSite.ID, cutoff.Format(time.RFC3339Nano), batchSize)
-		if err != nil {
-			_ = tx.Rollback()
-			s.writeMu.Unlock()
-			return total, fmt.Errorf("delete expired Pageview Records for Site %s: %w", configuredSite.ID, err)
+		var pageviewCount int64
+		if !configuredSite.RetentionUnlimited {
+			cutoff := now.UTC().AddDate(0, 0, -configuredSite.RetentionDays)
+			pageviews, err := tx.ExecContext(ctx, `
+				DELETE FROM pageviews
+				WHERE id IN (
+					SELECT id FROM pageviews
+					WHERE site_id = ? AND julianday(occurred_at) < julianday(?)
+					ORDER BY occurred_at, id
+					LIMIT ?
+				)
+			`, configuredSite.ID, cutoff.Format(time.RFC3339Nano), batchSize)
+			if err != nil {
+				_ = tx.Rollback()
+				s.writeMu.Unlock()
+				return total, fmt.Errorf("delete expired Pageview Records for Site %s: %w", configuredSite.ID, err)
+			}
+			pageviewCount, _ = pageviews.RowsAffected()
 		}
 		registrations, err := tx.ExecContext(ctx, `
 			DELETE FROM visitor_registrations
@@ -74,9 +78,8 @@ func (s *Store) CleanupBatch(ctx context.Context, now time.Time, batchSize int) 
 			return total, fmt.Errorf("commit cleanup transaction: %w", err)
 		}
 		s.writeMu.Unlock()
-		count, _ := pageviews.RowsAffected()
-		total.PageviewRecords += count
-		count, _ = registrations.RowsAffected()
+		total.PageviewRecords += pageviewCount
+		count, _ := registrations.RowsAffected()
 		total.VisitorRegistrations += count
 	}
 

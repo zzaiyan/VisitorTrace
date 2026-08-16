@@ -84,6 +84,42 @@ func TestCleanupBatchIsBounded(t *testing.T) {
 	}
 }
 
+func TestCleanupBatchPreservesUnlimitedPageviewRecords(t *testing.T) {
+	ctx := context.Background()
+	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	configuredSite, err := st.CreateSite(ctx, CreateSiteParams{
+		Name: "Archive", AllowedOrigins: []string{"https://example.com"}, RetentionDays: 1, RetentionUnlimited: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, time.July, 22, 12, 0, 0, 0, time.UTC)
+	if _, err := st.RecordPageview(ctx, PageviewObservation{
+		SiteID: configuredSite.ID, OccurredAt: now.Add(-48 * time.Hour), Path: "/archive",
+		VisitorDigest: bytes.Repeat([]byte{1}, 32), OriginalIP: "192.0.2.1", OperatingSystem: "Linux", Browser: "Firefox",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := st.CleanupBatch(ctx, now, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.PageviewRecords != 0 || result.VisitorRegistrations == 0 {
+		t.Fatalf("CleanupBatch() = %#v", result)
+	}
+	var records int
+	if err := st.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM pageviews WHERE site_id = ?`, configuredSite.ID).Scan(&records); err != nil {
+		t.Fatal(err)
+	}
+	if records != 1 {
+		t.Fatalf("unlimited Site retained %d Pageview Records, want 1", records)
+	}
+}
+
 func TestOperationStatusLifecycle(t *testing.T) {
 	ctx := context.Background()
 	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")

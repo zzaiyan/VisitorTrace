@@ -63,11 +63,15 @@ Initialization asks for an Administrator password containing at least eight char
   --origin "https://example.com"
 ```
 
-Each Site has an independent Site ID, Allowed Origins, statistics timezone, visitor deduplication window, Pageview Record retention period, and Map Preset.
+Each Site has an independent Site ID, Allowed Origins, statistics timezone, visitor deduplication window, Pageview Record retention policy, and Map Preset.
 
 The timezone field is a searchable IANA timezone dropdown. Type a city or timezone fragment to narrow the browser-supported list. The statistics timezone is locked after the first Pageview because changing it would shift historical aggregation dates; reset the Site data before choosing a different timezone.
 
 Changing the visitor deduplication window schedules a new rule for the next midnight in the Site timezone and anchors the new sequence at that date. Saving does not alter the current window immediately, and completed aggregates are never recalculated. Administrative aggregate trends mark each effective date.
+
+Record retention can be **Timed** from 1 to 90 days or **Unlimited**. Choosing Unlimited makes the day field read-only while preserving its last value, so switching back restores the previous finite period. Unlimited retention keeps every Pageview Record and therefore requires monitoring SQLite size and available disk space.
+
+For CLI creation, add `--retention-unlimited`; the optional `--retention` value is retained as the finite fallback.
 
 ## Start the Service
 
@@ -321,11 +325,11 @@ For scheduled backups, configure the operating system to run `visitortrace backu
 
 The service runs maintenance once at startup and then every hour. Maintenance removes, per Site:
 
-- Pageview Records whose actual age exceeds the configured retention period;
+- Pageview Records whose actual age exceeds a timed retention period; Unlimited Sites skip this deletion;
 - visitor registrations for completed deduplication windows;
 - expired Administrator sessions and sessions idle for at least 12 hours.
 
-Deletion uses bounded transactional batches to avoid blocking ingestion for an extended period. Daily aggregates and map statistics remain after individual records expire. Reducing the retention period makes newly out-of-range records eligible at the next run; extending it cannot recover records already deleted.
+Deletion uses bounded transactional batches to avoid blocking ingestion for an extended period. Daily aggregates and map statistics remain after individual records expire. Reducing the retention period or switching from Unlimited to Timed makes newly out-of-range records eligible at the next run; extending it or switching to Unlimited cannot recover records already deleted. Unlimited retention affects only Pageview Records: completed visitor-window registrations and expired Administrator sessions are still removed.
 
 Run the same maintenance flow manually with:
 

@@ -33,7 +33,7 @@ func TestCreateGetAndListSite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSite() error = %v", err)
 	}
-	if got.Name != want.Name || got.Timezone != "Asia/Shanghai" || got.DedupWindowDays != 1 || got.RetentionDays != 30 || got.PublicLanguage != "auto" {
+	if got.Name != want.Name || got.Timezone != "Asia/Shanghai" || got.DedupWindowDays != 1 || got.RetentionDays != 30 || got.RetentionUnlimited || got.PublicLanguage != "auto" {
 		t.Fatalf("GetSite() = %#v", got)
 	}
 	if len(got.HMACKey) != 32 {
@@ -46,6 +46,30 @@ func TestCreateGetAndListSite(t *testing.T) {
 	}
 	if len(items) != 1 || len(items[0].HMACKey) != 0 {
 		t.Fatalf("ListSites() = %#v", items)
+	}
+}
+
+func TestUpdateSiteUnlimitedRetentionPreservesFiniteDays(t *testing.T) {
+	ctx := context.Background()
+	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	created, err := st.CreateSite(ctx, CreateSiteParams{Name: "Archive", AllowedOrigins: []string{"https://example.com"}, RetentionDays: 45})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := st.UpdateSite(ctx, created.ID, UpdateSiteParams{
+		Name: created.Name, Timezone: created.Timezone, AllowedOrigins: created.AllowedOrigins,
+		AcceptPageviews: true, PublishPublic: true, PublicLanguage: "auto", DedupWindowDays: 1,
+		RetentionDays: 45, RetentionUnlimited: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !updated.RetentionUnlimited || updated.RetentionDays != 45 {
+		t.Fatalf("updated retention = unlimited:%v days:%d", updated.RetentionUnlimited, updated.RetentionDays)
 	}
 }
 

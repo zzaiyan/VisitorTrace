@@ -160,6 +160,12 @@ var migrations = []migration{
 			`CREATE INDEX pageviews_site_collection_time ON pageviews (site_id, collection_method, occurred_at DESC, id DESC)`,
 		},
 	},
+	{
+		version: 11,
+		statements: []string{
+			`ALTER TABLE sites ADD COLUMN retention_unlimited INTEGER NOT NULL DEFAULT 0 CHECK (retention_unlimited IN (0, 1))`,
+		},
+	},
 }
 
 func (s *Store) initializeBaseSchema(ctx context.Context, passwordHash string) error {

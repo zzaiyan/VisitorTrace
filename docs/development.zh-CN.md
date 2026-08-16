@@ -49,7 +49,7 @@ Pageview 写入事务同时保存逐条记录、访客窗口登记和持久化�
 
 JavaScript 采集请求先从已经通过 `Allowed Origin` 校验的 `Origin` 请求头提取规范化 `hostname`；内嵌 tracker 也会上报 `window.location.hostname`，两者不一致时服务端拒绝非空上报。Image Widget 改为从 `Referer` 提取并校验 Origin；Referer 不可用或来源不允许时退化为只绘图。记录路径取显式 `path` 参数或 Referer 路径；由于没有浏览器 Visitor ID，访客摘要回退为 IP 与 User-Agent 的 HMAC。机器人、限流、来源无效或已关闭采集的图片请求仍会返回地图，但不会写入。两条采集路径最终使用相同的 Pageview/聚合原子事务。
 
-每条 Pageview Record 都保存 hostname，并新增 hostname 聚合维度。访客登记的内部作用域为 `(Site、hostname、窗口、维度、访客)`，因此共享一个配置 Site 的不同域名会分别计 UV，即使它们产生了相同的 Visitor Digest。Migration 9 增加 Pageview hostname 列和索引；迁移前的明细 hostname 为空，迁移前的聚合无法反推出域名维度。Migration 10 为逐条记录增加 `collection_method`（`js` 或 `image`），历史记录默认标记为 `js`；该字段可筛选、可导出，但不会形成新的持久化聚合维度。
+每条 Pageview Record 都保存 hostname，并新增 hostname 聚合维度。访客登记的内部作用域为 `(Site、hostname、窗口、维度、访客)`，因此共享一个配置 Site 的不同域名会分别计 UV，即使它们产生了相同的 Visitor Digest。Migration 9 增加 Pageview hostname 列和索引；迁移前的明细 hostname 为空，迁移前的聚合无法反推出域名维度。Migration 10 为逐条记录增加 `collection_method`（`js` 或 `image`），历史记录默认标记为 `js`；该字段可筛选、可导出，但不会形成新的持久化聚合维度。Migration 11 增加 Site 级显式标记 `retention_unlimited`，已有 Site 默认继续使用限时保留，原有天数保持不变。
 
 `site_deduplication_rules` 以 Site 本地日期保存计数规则历史。修改周期时，事务会在下一本地日期 upsert 新规则；Pageview 按其本地日期选择最近已生效规则，并从该规则的生效日计算新窗口锚点。已有 `visitor_registrations.window_end` 保持原值，仅可能延后临时登记的清理，不会改变新规则下的计数。
 
@@ -59,7 +59,7 @@ JavaScript 采集请求先从已经通过 `Allowed Origin` 校验的 `Origin` �
 
 Hostname 聚合不属于敏感数据，Public Analytics 和 Admin Analytics 都会展示。管理员访问明细筛选和 CSV 导出包含已保存的 hostname；聚合导出支持 `hostname` 维度。
 
-`serve` 启动一个轻量级维护循环，启动时和每小时调用同一套清理逻辑。`visitortrace maintenance` 为人工诊断和外部调度提供等价入口。每个删除事务限制批量大小；`operation_status` 保存最近一次维护状态，供运行状态页面读取。
+`serve` 启动一个轻量级维护循环，启动时和每小时调用同一套清理逻辑。`visitortrace maintenance` 为人工诊断和外部调度提供等价入口。每个删除事务限制批量大小；`operation_status` 保存最近一次维护状态，供运行状态页面读取。设置 `retention_unlimited` 的 Site 只跳过 Pageview Record 删除，已经结束的访客登记仍会清理，全局管理员 Session 清理也始终执行。
 
 管理员密码以 Argon2id 哈希保存。后台修改和 `visitortrace password reset` 都在同一事务中更新凭据并撤销全部 Session。Session 记录保存最近密码验证时间，供更新等高风险操作实施短时重新验证。
 

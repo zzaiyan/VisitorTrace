@@ -400,6 +400,7 @@ func runSiteCreate(args []string) int {
 	timezone := fs.String("timezone", "Asia/Shanghai", "IANA Site timezone")
 	dedupWindow := fs.Int("dedup-window", 1, "Unique Visitor deduplication window in days")
 	retention := fs.Int("retention", 30, "Pageview Record retention in days")
+	retentionUnlimited := fs.Bool("retention-unlimited", false, "retain Pageview Records indefinitely")
 	var origins stringList
 	fs.Var(&origins, "origin", "Allowed Origin; repeat for multiple origins")
 	if err := fs.Parse(args); err != nil {
@@ -423,11 +424,12 @@ func runSiteCreate(args []string) int {
 		return 1
 	}
 	created, err := st.CreateSite(ctx, store.CreateSiteParams{
-		Name:            *name,
-		Timezone:        *timezone,
-		AllowedOrigins:  origins,
-		DedupWindowDays: *dedupWindow,
-		RetentionDays:   *retention,
+		Name:               *name,
+		Timezone:           *timezone,
+		AllowedOrigins:     origins,
+		DedupWindowDays:    *dedupWindow,
+		RetentionDays:      *retention,
+		RetentionUnlimited: *retentionUnlimited,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "site create: %v\n", err)

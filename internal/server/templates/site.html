@@ -11,7 +11,7 @@
   <div><span>Pageviews</span><strong>{{formatCount .Overview.Pageviews}}</strong></div>
   <div><span>Unique Visitors</span><strong>{{formatCount .Overview.UniqueVisitors}}</strong></div>
   <div><span>Pageview Records</span><strong>{{formatCount .Overview.PageviewRecords}}</strong></div>
-  <div><span>{{t "retention"}}</span><strong>{{.Site.RetentionDays}} {{t "day"}}</strong></div>
+  <div><span>{{t "retention"}}</span><strong>{{if .Site.RetentionUnlimited}}{{t "retention_unlimited"}}{{else}}{{.Site.RetentionDays}} {{t "day"}}{{end}}</strong></div>
 </section>
 
 <section class="section-block" id="visitor-map">
@@ -86,7 +86,17 @@
       <div class="site-settings-group-heading"><span>02</span><h3>{{t "statistics_policy"}}</h3></div>
       <div class="site-settings-fields field-grid two">
         <label class="field"><span>{{t "dedup_window"}}</span><div class="input-unit"><input type="number" name="dedup_window_days" min="1" max="30" value="{{.Site.DedupWindowDays}}" required><span>{{t "day"}}</span></div><small>{{t "dedup_change_help"}}</small></label>
-        <label class="field"><span>{{t "record_retention"}}</span><div class="input-unit"><input type="number" name="retention_days" min="1" max="90" value="{{.Site.RetentionDays}}" required><span>{{t "day"}}</span></div></label>
+        <div class="field retention-field" data-retention-policy>
+          <span>{{t "record_retention"}}</span>
+          <div class="retention-control">
+            <div class="retention-mode" role="radiogroup" aria-label="{{t "record_retention"}}">
+              <label><input type="radio" name="retention_mode" value="limited" {{if not .Site.RetentionUnlimited}}checked{{end}}><span>{{t "retention_limited"}}</span></label>
+              <label><input type="radio" name="retention_mode" value="unlimited" {{if .Site.RetentionUnlimited}}checked{{end}}><span>{{t "retention_unlimited"}}</span></label>
+            </div>
+            <div class="input-unit retention-days" data-retention-days><input type="number" name="retention_days" min="1" max="90" value="{{.Site.RetentionDays}}" required><span>{{t "day"}}</span></div>
+          </div>
+          <small>{{t "retention_policy_help"}}</small>
+        </div>
       </div>
     </div>
     <div class="site-settings-group">
@@ -180,6 +190,7 @@
 </section>
 <script type="application/json" id="analytics-data">{{.ChartJSON}}</script>
 <script defer src="{{assetPath "/assets/analytics.js"}}"></script>
+{{template "retention-policy-script" .}}
 <script>
 (function () {
   var form = document.getElementById("preset-form");

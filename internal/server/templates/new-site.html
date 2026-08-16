@@ -12,9 +12,19 @@
     {{template "iana-timezone-list" .}}
     <div class="field-grid two">
       <label class="field"><span>{{t "dedup_window"}}</span><div class="input-unit"><input type="number" name="dedup_window_days" min="1" max="30" value="{{.DedupWindowDays}}" required><span>{{t "day"}}</span></div></label>
-      <label class="field"><span>{{t "record_retention"}}</span><div class="input-unit"><input type="number" name="retention_days" min="1" max="90" value="{{.RetentionDays}}" required><span>{{t "day"}}</span></div></label>
+      <div class="field retention-field" data-retention-policy>
+        <span>{{t "record_retention"}}</span>
+        <div class="retention-control">
+          <div class="retention-mode" role="radiogroup" aria-label="{{t "record_retention"}}">
+            <label><input type="radio" name="retention_mode" value="limited" {{if not .RetentionUnlimited}}checked{{end}}><span>{{t "retention_limited"}}</span></label>
+            <label><input type="radio" name="retention_mode" value="unlimited" {{if .RetentionUnlimited}}checked{{end}}><span>{{t "retention_unlimited"}}</span></label>
+          </div>
+          <div class="input-unit retention-days" data-retention-days><input type="number" name="retention_days" min="1" max="90" value="{{.RetentionDays}}" required><span>{{t "day"}}</span></div>
+        </div>
+      </div>
     </div>
     <div class="form-actions"><button class="button primary" type="submit">{{t "create_site"}}</button></div>
   </form>
 </section>
+{{template "retention-policy-script" .}}
 {{end}}

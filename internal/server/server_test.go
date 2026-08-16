@@ -571,7 +571,7 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	newSiteRequest.AddCookie(cookies[0])
 	newSiteResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(newSiteResponse, newSiteRequest)
-	if newSiteResponse.Code != http.StatusOK || !strings.Contains(newSiteResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) || !strings.Contains(newSiteResponse.Body.String(), `<datalist id="iana-timezones">`) || !strings.Contains(newSiteResponse.Body.String(), `Intl.supportedValuesOf("timeZone")`) {
+	if newSiteResponse.Code != http.StatusOK || !strings.Contains(newSiteResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) || !strings.Contains(newSiteResponse.Body.String(), `<datalist id="iana-timezones">`) || !strings.Contains(newSiteResponse.Body.String(), `Intl.supportedValuesOf("timeZone")`) || !strings.Contains(newSiteResponse.Body.String(), `name="retention_mode" value="limited" checked`) || !strings.Contains(newSiteResponse.Body.String(), `data-retention-policy`) {
 		t.Fatalf("new Site timezone selector = status %d, body = %q", newSiteResponse.Code, newSiteResponse.Body.String())
 	}
 	csrfMatch := regexp.MustCompile(`name="csrf" value="([a-f0-9]{64})"`).FindStringSubmatch(response.Body.String())
@@ -605,7 +605,7 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	}
 	settingsForm := url.Values{
 		"csrf": {csrfMatch[1]}, "name": {site.Name}, "timezone": {site.Timezone},
-		"origins": {"https://example.com"}, "dedup_window_days": {"1"}, "retention_days": {"30"},
+		"origins": {"https://example.com"}, "dedup_window_days": {"1"}, "retention_days": {"30"}, "retention_mode": {"unlimited"},
 		"accept_pageviews": {"on"}, "publish_public": {"on"},
 	}
 	settingsRequest := httptest.NewRequest(http.MethodPost, "/admin/sites/"+site.ID+"/settings", strings.NewReader(settingsForm.Encode()))
@@ -616,6 +616,10 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	app.Handler().ServeHTTP(settingsResponse, settingsRequest)
 	if settingsResponse.Code != http.StatusSeeOther || settingsResponse.Header().Get("Location") != "/admin/sites/"+site.ID+"?saved=settings#settings" {
 		t.Fatalf("settings update status = %d, body = %q", settingsResponse.Code, settingsResponse.Body.String())
+	}
+	updatedSite, err := st.GetSite(context.Background(), site.ID)
+	if err != nil || !updatedSite.RetentionUnlimited || updatedSite.RetentionDays != 30 {
+		t.Fatalf("updated Site retention = %#v, %v", updatedSite, err)
 	}
 	previewRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID+"/preset-preview.svg", nil)
 	previewRequest.Host = "127.0.0.1:8790"
@@ -646,7 +650,7 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	sitePage.AddCookie(cookies[0])
 	sitePageResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(sitePageResponse, sitePage)
-	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.svg") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/map.js") || !strings.Contains(sitePageResponse.Body.String(), `id="image-widget-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) || !strings.Contains(sitePageResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) || !strings.Contains(sitePageResponse.Body.String(), `id="preset-widget-preview"`) || !strings.Contains(sitePageResponse.Body.String(), `id="preset-image-preview"`) || !strings.Contains(sitePageResponse.Body.String(), `class="preview-surface is-widget"`) || !strings.Contains(sitePageResponse.Body.String(), `data-preview-mode="widget"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-controls`) || !strings.Contains(sitePageResponse.Body.String(), "交互式地图 &#43; 采集") || !strings.Contains(sitePageResponse.Body.String(), "图片地图 &#43; 采集") || !strings.Contains(sitePageResponse.Body.String(), "仅采集") || !strings.Contains(sitePageResponse.Body.String(), "仅显示交互式地图") || !strings.Contains(sitePageResponse.Body.String(), `class="table-wrap site-recent-records"`) || !strings.Contains(sitePageResponse.Body.String(), `/admin/records?site_id=`+site.ID) {
+	if sitePageResponse.Code != http.StatusOK || !strings.Contains(sitePageResponse.Body.String(), "地图预设") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.js") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/widget.svg") || !strings.Contains(sitePageResponse.Body.String(), "http://127.0.0.1:8790/embed/map.js") || !strings.Contains(sitePageResponse.Body.String(), `id="image-widget-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="width"`) || !strings.Contains(sitePageResponse.Body.String(), `data-auto-dimension="height"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-aspect="2.4"`) || !strings.Contains(sitePageResponse.Body.String(), `name="bg_transparent"`) || !strings.Contains(sitePageResponse.Body.String(), `id="map-control-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `id="tracker-snippet"`) || !strings.Contains(sitePageResponse.Body.String(), `class="site-settings-group"`) || !strings.Contains(sitePageResponse.Body.String(), `class="settings-jump site-section-nav"`) || !strings.Contains(sitePageResponse.Body.String(), `name="timezone" value="Asia/Shanghai" list="iana-timezones"`) || !strings.Contains(sitePageResponse.Body.String(), `id="preset-widget-preview"`) || !strings.Contains(sitePageResponse.Body.String(), `id="preset-image-preview"`) || !strings.Contains(sitePageResponse.Body.String(), `class="preview-surface is-widget"`) || !strings.Contains(sitePageResponse.Body.String(), `data-preview-mode="widget"`) || !strings.Contains(sitePageResponse.Body.String(), `data-map-controls`) || !strings.Contains(sitePageResponse.Body.String(), "交互式地图 &#43; 采集") || !strings.Contains(sitePageResponse.Body.String(), "图片地图 &#43; 采集") || !strings.Contains(sitePageResponse.Body.String(), "仅采集") || !strings.Contains(sitePageResponse.Body.String(), "仅显示交互式地图") || !strings.Contains(sitePageResponse.Body.String(), `class="table-wrap site-recent-records"`) || !strings.Contains(sitePageResponse.Body.String(), `/admin/records?site_id=`+site.ID) || !strings.Contains(sitePageResponse.Body.String(), `name="retention_mode" value="unlimited" checked`) || !strings.Contains(sitePageResponse.Body.String(), `<strong>无限</strong>`) {
 		t.Fatalf("admin Site page = status %d, body = %q", sitePageResponse.Code, sitePageResponse.Body.String())
 	}
 	if count := strings.Count(sitePageResponse.Body.String(), `class="copy-control copy-button"`); count != 4 {

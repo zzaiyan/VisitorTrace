@@ -39,6 +39,28 @@
 </script>
 {{end}}
 
+{{define "retention-policy-script"}}
+<script>
+(function () {
+  document.querySelectorAll("[data-retention-policy]").forEach(function (policy) {
+    var days = policy.querySelector("[data-retention-days]");
+    var input = days && days.querySelector('input[name="retention_days"]');
+    var modes = policy.querySelectorAll('input[name="retention_mode"]');
+    if (!days || !input || !modes.length) return;
+    function update() {
+      var unlimited = policy.querySelector('input[name="retention_mode"]:checked').value === "unlimited";
+      input.readOnly = unlimited;
+      input.required = !unlimited;
+      input.setAttribute("aria-disabled", unlimited ? "true" : "false");
+      days.classList.toggle("is-inactive", unlimited);
+    }
+    modes.forEach(function (mode) { mode.addEventListener("change", update); });
+    update();
+  });
+}());
+</script>
+{{end}}
+
 {{define "layout"}}
 <!doctype html>
 <html lang="{{language}}">

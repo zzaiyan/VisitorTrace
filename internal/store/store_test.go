@@ -108,7 +108,7 @@ func TestMigrateFromSchemaV1(t *testing.T) {
 	}
 }
 
-func TestMigrateFromSchemaV9AddsCollectionMethod(t *testing.T) {
+func TestMigrateFromSchemaV10AddsUnlimitedRetention(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "visitortrace.sqlite3")
 	ctx := context.Background()
 	st, err := open(ctx, path)
@@ -124,33 +124,42 @@ func TestMigrateFromSchemaV9AddsCollectionMethod(t *testing.T) {
 			t.Fatalf("apply migration %d: %v", item.version, err)
 		}
 	}
-	if version, err := st.SchemaVersion(ctx); err != nil || version != 9 {
+	if version, err := st.SchemaVersion(ctx); err != nil || version != 10 {
 		t.Fatalf("pre-migration schema = %d, %v", version, err)
+	}
+	if _, err := st.DB.ExecContext(ctx, `
+		INSERT INTO sites (id, name, timezone, allowed_origins, hmac_key, created_at, updated_at)
+		VALUES ('migration-site', 'Migration', 'UTC', '["https://example.com"]', ?, '2026-07-26T00:00:00Z', '2026-07-26T00:00:00Z')
+	`, bytes.Repeat([]byte{1}, 32)); err != nil {
+		t.Fatal(err)
 	}
 	if err := st.Migrate(ctx); err != nil {
 		t.Fatalf("Migrate() error = %v", err)
 	}
 	var columns int
-	if err := st.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('pageviews') WHERE name = 'collection_method'`).Scan(&columns); err != nil {
+	if err := st.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('sites') WHERE name = 'retention_unlimited'`).Scan(&columns); err != nil {
 		t.Fatal(err)
 	}
 	if columns != 1 {
-		t.Fatalf("collection_method columns = %d, want 1", columns)
+		t.Fatalf("retention_unlimited columns = %d, want 1", columns)
 	}
-	site, err := st.CreateSite(ctx, CreateSiteParams{Name: "Migration", AllowedOrigins: []string{"https://example.com"}})
-	if err != nil {
+	var unlimited int
+	if err := st.DB.QueryRowContext(ctx, `SELECT retention_unlimited FROM sites WHERE id = 'migration-site'`).Scan(&unlimited); err != nil {
 		t.Fatal(err)
+	}
+	if unlimited != 0 {
+		t.Fatalf("migrated retention_unlimited = %d, want 0", unlimited)
 	}
 	if _, err := st.DB.ExecContext(ctx, `
 		INSERT INTO pageviews (
 			site_id, occurred_at, local_date, hostname, path, visitor_digest,
 			original_ip, operating_system, browser
 		) VALUES (?, '2026-07-26T00:00:00Z', '2026-07-26', 'example.com', '/', ?, '192.0.2.1', 'Linux', 'Firefox')
-	`, site.ID, bytes.Repeat([]byte{1}, 32)); err != nil {
+	`, "migration-site", bytes.Repeat([]byte{2}, 32)); err != nil {
 		t.Fatal(err)
 	}
 	var method string
-	if err := st.DB.QueryRowContext(ctx, `SELECT collection_method FROM pageviews WHERE site_id = ?`, site.ID).Scan(&method); err != nil {
+	if err := st.DB.QueryRowContext(ctx, `SELECT collection_method FROM pageviews WHERE site_id = ?`, "migration-site").Scan(&method); err != nil {
 		t.Fatal(err)
 	}
 	if method != CollectionMethodJS {

@@ -14,28 +14,30 @@ import (
 )
 
 type Site struct {
-	ID              string
-	Name            string
-	Timezone        string
-	AllowedOrigins  []string
-	AcceptPageviews bool
-	PublishPublic   bool
-	PublicLanguage  string
-	DedupWindowDays int
-	RetentionDays   int
-	FirstPageviewAt *time.Time
-	HMACKey         []byte
-	MapPresetJSON   string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID                 string
+	Name               string
+	Timezone           string
+	AllowedOrigins     []string
+	AcceptPageviews    bool
+	PublishPublic      bool
+	PublicLanguage     string
+	DedupWindowDays    int
+	RetentionDays      int
+	RetentionUnlimited bool
+	FirstPageviewAt    *time.Time
+	HMACKey            []byte
+	MapPresetJSON      string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type CreateSiteParams struct {
-	Name            string
-	Timezone        string
-	AllowedOrigins  []string
-	DedupWindowDays int
-	RetentionDays   int
+	Name               string
+	Timezone           string
+	AllowedOrigins     []string
+	DedupWindowDays    int
+	RetentionDays      int
+	RetentionUnlimited bool
 }
 
 func (s *Store) CreateSite(ctx context.Context, params CreateSiteParams) (Site, error) {
@@ -93,9 +95,9 @@ func (s *Store) CreateSite(ctx context.Context, params CreateSiteParams) (Site, 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO sites (
 			id, name, timezone, allowed_origins, accept_pageviews, publish_public,
-			dedup_window_days, retention_days, hmac_key, created_at, updated_at
-		) VALUES (?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?)
-	`, id, name, timezone, string(originJSON), dedupWindow, retention, key, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
+			dedup_window_days, retention_days, retention_unlimited, hmac_key, created_at, updated_at
+		) VALUES (?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?)
+	`, id, name, timezone, string(originJSON), dedupWindow, retention, boolInt(params.RetentionUnlimited), key, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 	if err != nil {
 		return Site{}, fmt.Errorf("create Site: %w", err)
 	}
@@ -109,34 +111,35 @@ func (s *Store) CreateSite(ctx context.Context, params CreateSiteParams) (Site, 
 		return Site{}, fmt.Errorf("commit create Site transaction: %w", err)
 	}
 	return Site{
-		ID:              id,
-		Name:            name,
-		Timezone:        timezone,
-		AllowedOrigins:  origins,
-		AcceptPageviews: true,
-		PublishPublic:   true,
-		PublicLanguage:  "auto",
-		DedupWindowDays: dedupWindow,
-		RetentionDays:   retention,
-		HMACKey:         key,
-		MapPresetJSON:   "{}",
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		ID:                 id,
+		Name:               name,
+		Timezone:           timezone,
+		AllowedOrigins:     origins,
+		AcceptPageviews:    true,
+		PublishPublic:      true,
+		PublicLanguage:     "auto",
+		DedupWindowDays:    dedupWindow,
+		RetentionDays:      retention,
+		RetentionUnlimited: params.RetentionUnlimited,
+		HMACKey:            key,
+		MapPresetJSON:      "{}",
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}, nil
 }
 
 func (s *Store) GetSite(ctx context.Context, id string) (Site, error) {
 	var result Site
 	var originsJSON string
-	var accept, publish, dedup, retention int
+	var accept, publish, dedup, retention, retentionUnlimited int
 	var firstPageview sql.NullString
 	var created, updated string
 	var key []byte
 	err := s.DB.QueryRowContext(ctx, `
 		SELECT id, name, timezone, allowed_origins, accept_pageviews, publish_public,
-		       dedup_window_days, retention_days, first_pageview_at, hmac_key, map_preset, public_language, created_at, updated_at
+		       dedup_window_days, retention_days, retention_unlimited, first_pageview_at, hmac_key, map_preset, public_language, created_at, updated_at
 		FROM sites WHERE id = ?
-	`, id).Scan(&result.ID, &result.Name, &result.Timezone, &originsJSON, &accept, &publish, &dedup, &retention, &firstPageview, &key, &result.MapPresetJSON, &result.PublicLanguage, &created, &updated)
+	`, id).Scan(&result.ID, &result.Name, &result.Timezone, &originsJSON, &accept, &publish, &dedup, &retention, &retentionUnlimited, &firstPageview, &key, &result.MapPresetJSON, &result.PublicLanguage, &created, &updated)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return Site{}, fmt.Errorf("Site %q not found", id)
@@ -150,6 +153,7 @@ func (s *Store) GetSite(ctx context.Context, id string) (Site, error) {
 	result.PublishPublic = publish == 1
 	result.DedupWindowDays = dedup
 	result.RetentionDays = retention
+	result.RetentionUnlimited = retentionUnlimited == 1
 	result.HMACKey = append([]byte(nil), key...)
 	if firstPageview.Valid {
 		value, err := time.Parse(time.RFC3339Nano, firstPageview.String)
@@ -170,14 +174,15 @@ func (s *Store) GetSite(ctx context.Context, id string) (Site, error) {
 }
 
 type UpdateSiteParams struct {
-	Name            string
-	Timezone        string
-	AllowedOrigins  []string
-	AcceptPageviews bool
-	PublishPublic   bool
-	PublicLanguage  string
-	DedupWindowDays int
-	RetentionDays   int
+	Name               string
+	Timezone           string
+	AllowedOrigins     []string
+	AcceptPageviews    bool
+	PublishPublic      bool
+	PublicLanguage     string
+	DedupWindowDays    int
+	RetentionDays      int
+	RetentionUnlimited bool
 }
 
 func (s *Store) UpdateSite(ctx context.Context, id string, params UpdateSiteParams) (Site, error) {
@@ -250,9 +255,9 @@ func (s *Store) UpdateSite(ctx context.Context, id string, params UpdateSitePara
 	_, err = tx.ExecContext(ctx, `
 		UPDATE sites
 		SET name = ?, timezone = ?, allowed_origins = ?, accept_pageviews = ?, publish_public = ?,
-		    dedup_window_days = ?, retention_days = ?, public_language = ?, updated_at = ?
+		    dedup_window_days = ?, retention_days = ?, retention_unlimited = ?, public_language = ?, updated_at = ?
 		WHERE id = ?
-	`, name, params.Timezone, string(originJSON), boolInt(params.AcceptPageviews), boolInt(params.PublishPublic), params.DedupWindowDays, params.RetentionDays, params.PublicLanguage, now, id)
+	`, name, params.Timezone, string(originJSON), boolInt(params.AcceptPageviews), boolInt(params.PublishPublic), params.DedupWindowDays, params.RetentionDays, boolInt(params.RetentionUnlimited), params.PublicLanguage, now, id)
 	if err != nil {
 		return Site{}, fmt.Errorf("update Site: %w", err)
 	}

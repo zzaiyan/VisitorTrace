@@ -119,6 +119,16 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .input-unit { display: flex; align-items: center; }
 .input-unit input { min-width: 0; border-radius: 4px 0 0 4px; }
 .input-unit span { display: grid; height: 42px; min-width: 38px; place-items: center; border: 1px solid #cfdad8; border-left: 0; background: #f2f5f3; color: var(--muted); font-size: 11px; font-weight: 500; }
+.retention-control { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(90px, .8fr); gap: 8px; }
+.retention-mode { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: 42px; padding: 2px; border: 1px solid #cfdad8; border-radius: 4px; background: #eef3f1; }
+.retention-mode label { position: relative; min-width: 0; cursor: pointer; }
+.retention-mode input { position: absolute; width: 1px; height: 1px; margin: -1px; opacity: 0; }
+.retention-mode label > span { display: grid; height: 36px; place-items: center; border-radius: 3px; color: var(--muted); font-size: 10px; font-weight: 700; white-space: nowrap; }
+.retention-mode label:hover > span { color: var(--ink); }
+.retention-mode input:checked + span { background: white; color: var(--green-dark); box-shadow: 0 1px 3px rgba(24,35,41,.14); }
+.retention-mode input:focus-visible + span { outline: 2px solid var(--green); outline-offset: -1px; }
+.retention-days { transition: opacity 120ms ease; }
+.retention-days.is-inactive { opacity: .48; }
 .input-auto { display: grid; width: 40px; height: 42px; flex: 0 0 40px; padding: 0; place-items: center; border: 1px solid #cfdad8; border-left: 0; border-radius: 0 4px 4px 0; background: white; color: var(--green); cursor: pointer; font-size: 17px; line-height: 1; }
 .input-auto:hover { background: #e2f0e9; color: var(--green-dark); }
 .input-auto:focus-visible { position: relative; outline: 2px solid var(--green); outline-offset: -2px; }
