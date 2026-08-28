@@ -1,7 +1,7 @@
 {{define "content"}}
 <header class="public-header">
   <a class="brand" href="{{appPath (printf "/public/%s/analytics" .Site.ID)}}"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>
-  <div class="public-header-meta"><span class="public-site-id">{{.Site.ID}}</span><nav class="language-nav" aria-label="Language"><a href="{{languageURL "zh-CN"}}" {{if languageIs "zh-CN"}}aria-current="page"{{end}}>中文</a><a href="{{languageURL "en"}}" {{if languageIs "en"}}aria-current="page"{{end}}>EN</a></nav></div>
+  <div class="public-header-meta"><span class="public-site-id">{{.Site.ID}}</span><a class="button ghost public-admin-link" href="{{appPath (printf "/admin/sites/%s" .Site.ID)}}">{{t "admin_console"}}</a><nav class="language-nav" aria-label="Language"><a href="{{languageURL "zh-CN"}}" {{if languageIs "zh-CN"}}aria-current="page"{{end}}>中文</a><a href="{{languageURL "en"}}" {{if languageIs "en"}}aria-current="page"{{end}}>EN</a></nav></div>
 </header>
 <main class="public-main">
   <header class="analytics-heading">

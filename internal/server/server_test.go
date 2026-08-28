@@ -1110,7 +1110,7 @@ func TestPublicAnalyticsHidesSensitiveFields(t *testing.T) {
 	if !strings.Contains(body, "Firefox") || !strings.Contains(body, "Wuhan") || !strings.Contains(body, "Countries or regions") {
 		t.Fatalf("Public Analytics is missing aggregate data: %q", body)
 	}
-	if !strings.Contains(body, `/assets/analytics.js`) || !strings.Contains(body, `"date"`) || !strings.Contains(body, `analytics-map.svg?`) || !strings.Contains(body, `data-map-controls`) || !strings.Contains(body, `Reset map position and zoom`) {
+	if !strings.Contains(body, `/assets/analytics.js`) || !strings.Contains(body, `"date"`) || !strings.Contains(body, `analytics-map.svg?`) || !strings.Contains(body, `data-map-controls`) || !strings.Contains(body, `Reset map position and zoom`) || !strings.Contains(body, `href="/admin/sites/`+site.ID+`"`) || !strings.Contains(body, "Admin Console") {
 		t.Fatalf("Public Analytics enhancement or range map fallback is missing: %q", body)
 	}
 }
