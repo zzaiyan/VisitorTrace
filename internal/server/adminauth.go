@@ -31,7 +31,8 @@ func (s *Server) adminLogin(w http.ResponseWriter, r *http.Request) {
 		s.handleAdminLogin(w, r)
 		return
 	}
-	layout := pageLayout{Title: "管理员登录", Lang: adminLanguage(r)}
+	language := adminLanguage(r)
+	layout := pageLayout{Title: translate(language, "admin_login"), Lang: language}
 	if r.URL.Query().Get("changed") == "1" {
 		layout.Flash = "管理员密码已更新，请重新登录。"
 	}
@@ -219,10 +220,12 @@ func safeNext(value, fallback string) string {
 }
 
 func (s *Server) renderLoginError(w http.ResponseWriter, r *http.Request, message string) {
-	s.renderPage(w, r, "login", loginPageData{pageLayout: pageLayout{Title: "管理员登录", Error: message, Lang: adminLanguage(r)}, Next: safeNext(r.FormValue("next"), "/admin")})
+	language := adminLanguage(r)
+	s.renderPage(w, r, "login", loginPageData{pageLayout: pageLayout{Title: translate(language, "admin_login"), Error: message, Lang: language}, Next: safeNext(r.FormValue("next"), "/admin")})
 }
 
 func (s *Server) renderError(w http.ResponseWriter, r *http.Request, status int, message string) {
 	w.WriteHeader(status)
-	s.renderPage(w, r, "error", errorPageData{pageLayout: pageLayout{Title: "请求未完成", Lang: adminLanguage(r)}, Status: status, Message: message})
+	language := adminLanguage(r)
+	s.renderPage(w, r, "error", errorPageData{pageLayout: pageLayout{Title: translate(language, "request_incomplete"), Lang: language}, Status: status, Message: message})
 }

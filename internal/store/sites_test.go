@@ -71,6 +71,14 @@ func TestUpdateSiteUnlimitedRetentionPreservesFiniteDays(t *testing.T) {
 	if !updated.RetentionUnlimited || updated.RetentionDays != 45 {
 		t.Fatalf("updated retention = unlimited:%v days:%d", updated.RetentionUnlimited, updated.RetentionDays)
 	}
+	updated.PublicLanguage = "ja"
+	if updated, err = st.UpdateSite(ctx, created.ID, UpdateSiteParams{
+		Name: updated.Name, Timezone: updated.Timezone, AllowedOrigins: updated.AllowedOrigins,
+		AcceptPageviews: updated.AcceptPageviews, PublishPublic: updated.PublishPublic, PublicLanguage: updated.PublicLanguage,
+		DedupWindowDays: updated.DedupWindowDays, RetentionDays: updated.RetentionDays, RetentionUnlimited: updated.RetentionUnlimited,
+	}); err != nil || updated.PublicLanguage != "ja" {
+		t.Fatalf("Japanese PublicLanguage = %q, %v", updated.PublicLanguage, err)
+	}
 }
 
 func TestResetAndDeleteSite(t *testing.T) {

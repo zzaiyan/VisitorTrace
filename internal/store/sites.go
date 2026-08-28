@@ -209,8 +209,8 @@ func (s *Store) UpdateSite(ctx context.Context, id string, params UpdateSitePara
 	if params.PublicLanguage == "" {
 		params.PublicLanguage = "auto"
 	}
-	if params.PublicLanguage != "auto" && params.PublicLanguage != "zh-CN" && params.PublicLanguage != "en" {
-		return Site{}, fmt.Errorf("public language must be auto, zh-CN, or en")
+	if params.PublicLanguage != "auto" && params.PublicLanguage != "zh-CN" && params.PublicLanguage != "ja" && params.PublicLanguage != "en" {
+		return Site{}, fmt.Errorf("public language must be auto, zh-CN, ja, or en")
 	}
 	originJSON, err := json.Marshal(origins)
 	if err != nil {

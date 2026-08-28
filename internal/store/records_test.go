@@ -22,7 +22,9 @@ func TestRefreshPageviewGeoIPRebuildsRetainedGeography(t *testing.T) {
 	}
 	latitude := 30.5928
 	longitude := 114.3055
-	base := time.Now().UTC().Add(-time.Hour)
+	// Keep the fixture inside an active deduplication window regardless of the
+	// local calendar date on which the test runs.
+	base := time.Now().UTC().Add(2 * time.Hour)
 	records := []PageviewObservation{
 		{OriginalIP: "192.0.2.1", VisitorDigest: bytes.Repeat([]byte{1}, 32), City: "Wuhan"},
 		{OriginalIP: "192.0.2.1", VisitorDigest: bytes.Repeat([]byte{1}, 32), City: "Wuhan"},

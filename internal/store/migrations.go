@@ -166,6 +166,15 @@ var migrations = []migration{
 			`ALTER TABLE sites ADD COLUMN retention_unlimited INTEGER NOT NULL DEFAULT 0 CHECK (retention_unlimited IN (0, 1))`,
 		},
 	},
+	{
+		version: 12,
+		statements: []string{
+			`PRAGMA writable_schema = ON`,
+			`UPDATE sqlite_master SET sql = replace(sql, "CHECK (public_language IN ('auto', 'zh-CN', 'en'))", "CHECK (public_language IN ('auto', 'zh-CN', 'ja', 'en'))") WHERE type = 'table' AND name = 'sites'`,
+			`PRAGMA writable_schema = OFF`,
+			`PRAGMA schema_version = 999`,
+		},
+	},
 }
 
 func (s *Store) initializeBaseSchema(ctx context.Context, passwordHash string) error {

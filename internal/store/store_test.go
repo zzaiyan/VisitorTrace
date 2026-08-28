@@ -119,7 +119,10 @@ func TestMigrateFromSchemaV10AddsUnlimitedRetention(t *testing.T) {
 	if err := st.initializeBaseSchema(ctx, "test-hash"); err != nil {
 		t.Fatal(err)
 	}
-	for _, item := range migrations[:len(migrations)-1] {
+	for _, item := range migrations {
+		if item.version > 10 {
+			break
+		}
 		if err := st.applyMigration(ctx, item); err != nil {
 			t.Fatalf("apply migration %d: %v", item.version, err)
 		}
@@ -149,6 +152,9 @@ func TestMigrateFromSchemaV10AddsUnlimitedRetention(t *testing.T) {
 	}
 	if unlimited != 0 {
 		t.Fatalf("migrated retention_unlimited = %d, want 0", unlimited)
+	}
+	if _, err := st.DB.ExecContext(ctx, `UPDATE sites SET public_language = 'ja' WHERE id = 'migration-site'`); err != nil {
+		t.Fatalf("Japanese public language is not accepted after migration: %v", err)
 	}
 	if _, err := st.DB.ExecContext(ctx, `
 		INSERT INTO pageviews (

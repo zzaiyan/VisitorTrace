@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -40,7 +41,7 @@ var messages = map[string]map[string]string{
 		"administrator_password": "管理员密码", "check_and_update": "检查并更新", "online_update": "在线更新", "online_update_help": "从已配置的发布清单地址获取并安装新版本。",
 		"local_update": "本地文件更新", "local_update_help": "上传同一正式 Release 的签名清单与当前平台二进制。", "signed_manifest": "签名清单 manifest.json", "release_binary": "发布二进制", "install_local_update": "验证并更新",
 		"sensitive_admin_only": "敏感数据，仅管理员可见", "export_filtered_csv": "导出当前筛选 CSV", "filters": "筛选条件", "clear_filters": "清除筛选",
-		"all_sites": "全部 Site", "from_utc": "起始时间（UTC）", "to_utc": "结束时间（UTC）", "hostname": "访问域名", "hostnames": "访问域名", "path": "路径", "original_ip": "原始 IP",
+		"all_sites": "全部 Site", "from_utc": "起始时间（UTC）", "to_utc": "结束时间（UTC）", "hostname": "访问域名", "hostnames": "访问域名", "path": "路径", "original_ip": "原始 IP", "site_label": "Site", "visitor_digest": "Visitor Digest",
 		"country_code": "国家代码", "region_code": "地区代码", "per_page": "每页", "apply_filters": "应用筛选", "row_records": "逐条记录", "this_page": "本页",
 		"items": "条", "time": "时间", "location": "位置", "system": "系统", "newer_records": "较新记录", "older_records": "较早记录",
 		"no_matching_records": "没有符合条件的 Pageview Record", "export_aggregates": "导出聚合", "choose_site": "选择 Site", "dimension": "维度", "overall": "整体",
@@ -96,7 +97,7 @@ var messages = map[string]map[string]string{
 		"administrator_password": "Administrator password", "check_and_update": "Check and update", "online_update": "Online update", "online_update_help": "Fetch and install a release from the configured manifest URL.",
 		"local_update": "Local files", "local_update_help": "Upload the signed manifest and platform binary from the same official Release.", "signed_manifest": "Signed manifest.json", "release_binary": "Release binary", "install_local_update": "Verify and update",
 		"sensitive_admin_only": "Sensitive data, visible to administrators only", "export_filtered_csv": "Export filtered CSV", "filters": "Filters", "clear_filters": "Clear filters",
-		"all_sites": "All Sites", "from_utc": "Start time (UTC)", "to_utc": "End time (UTC)", "hostname": "Hostname", "hostnames": "Hostnames", "path": "Path", "original_ip": "Original IP",
+		"all_sites": "All Sites", "from_utc": "Start time (UTC)", "to_utc": "End time (UTC)", "hostname": "Hostname", "hostnames": "Hostnames", "path": "Path", "original_ip": "Original IP", "site_label": "Site", "visitor_digest": "Visitor Digest",
 		"country_code": "Country code", "region_code": "Region code", "per_page": "Per page", "apply_filters": "Apply filters", "row_records": "Individual records", "this_page": "This page",
 		"items": "items", "time": "Time", "location": "Location", "system": "System", "newer_records": "Newer records", "older_records": "Older records",
 		"no_matching_records": "No matching Pageview Records", "export_aggregates": "Export aggregates", "choose_site": "Choose Site", "dimension": "Dimension", "overall": "Overall",
@@ -137,7 +138,7 @@ func translate(lang, key string) string {
 	return key
 }
 
-func validLanguage(value string) bool { return value == "zh-CN" || value == "en" }
+func validLanguage(value string) bool { return value == "zh-CN" || value == "ja" || value == "en" }
 
 func requestedLanguage(r *http.Request, cookieName string) string {
 	if value := r.URL.Query().Get("lang"); validLanguage(value) {
@@ -163,11 +164,53 @@ func publicLanguage(r *http.Request, siteDefault string) string {
 	if validLanguage(siteDefault) {
 		return siteDefault
 	}
-	accepted := strings.ToLower(r.Header.Get("Accept-Language"))
-	if strings.Contains(accepted, "zh") || !strings.Contains(accepted, "en") {
-		return "zh-CN"
+	if accepted := preferredLanguage(r.Header.Get("Accept-Language")); accepted != "" {
+		return accepted
 	}
-	return "en"
+	return "zh-CN"
+}
+
+func preferredLanguage(header string) string {
+	bestLanguage := ""
+	bestQuality := -1.0
+	for _, item := range strings.Split(header, ",") {
+		parts := strings.Split(item, ";")
+		languageTag := strings.ToLower(strings.TrimSpace(parts[0]))
+		if languageTag == "" {
+			continue
+		}
+		quality := 1.0
+		for _, parameter := range parts[1:] {
+			key, value, ok := strings.Cut(strings.TrimSpace(parameter), "=")
+			if !ok || !strings.EqualFold(strings.TrimSpace(key), "q") {
+				continue
+			}
+			parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+			if err != nil || parsed < 0 {
+				quality = 0
+			} else {
+				quality = parsed
+			}
+		}
+		if quality <= 0 {
+			continue
+		}
+
+		language := ""
+		switch {
+		case strings.HasPrefix(languageTag, "zh"):
+			language = "zh-CN"
+		case strings.HasPrefix(languageTag, "ja"):
+			language = "ja"
+		case strings.HasPrefix(languageTag, "en"):
+			language = "en"
+		}
+		if language != "" && quality > bestQuality {
+			bestLanguage = language
+			bestQuality = quality
+		}
+	}
+	return bestLanguage
 }
 
 func (s *Server) rememberRequestedLanguage(w http.ResponseWriter, r *http.Request) {

@@ -126,16 +126,15 @@ func widgetLanguage(r *http.Request, siteDefault string, values []string) (strin
 	}
 	if len(values) == 1 {
 		if !validLanguage(values[0]) {
-			return "", fmt.Errorf("lang must be zh-CN or en")
+			return "", fmt.Errorf("lang must be zh-CN, ja, or en")
 		}
 		return values[0], nil
 	}
 	if validLanguage(siteDefault) {
 		return siteDefault, nil
 	}
-	accepted := strings.ToLower(r.Header.Get("Accept-Language"))
-	if strings.Contains(accepted, "en") && !strings.Contains(accepted, "zh") {
-		return "en", nil
+	if accepted := preferredLanguage(r.Header.Get("Accept-Language")); accepted != "" {
+		return accepted, nil
 	}
 	return "zh-CN", nil
 }

@@ -15,6 +15,11 @@ func TestLanguageResolution(t *testing.T) {
 	if got := publicLanguage(automatic, "auto"); got != "en" {
 		t.Fatalf("publicLanguage(auto) = %q", got)
 	}
+	japanese := httptest.NewRequest("GET", "/public/site/analytics", nil)
+	japanese.Header.Set("Accept-Language", "ja-JP,ja;q=0.9,en;q=0.8")
+	if got := publicLanguage(japanese, "auto"); got != "ja" {
+		t.Fatalf("publicLanguage(japanese auto) = %q", got)
+	}
 	fixed := httptest.NewRequest("GET", "/public/site/analytics", nil)
 	fixed.Header.Set("Accept-Language", "zh-CN")
 	if got := publicLanguage(fixed, "en"); got != "en" {
@@ -26,5 +31,21 @@ func TestLanguageResolution(t *testing.T) {
 	}
 	if got := languageURL(override, "en"); got != "/public/site/analytics?lang=en&range=30d" {
 		t.Fatalf("languageURL() = %q", got)
+	}
+	if !validLanguage("ja") {
+		t.Fatal("Japanese is not accepted as a valid language")
+	}
+}
+
+func TestJapaneseTranslationsAreComplete(t *testing.T) {
+	for key := range messages["en"] {
+		if japaneseMessages[key] == "" {
+			t.Errorf("Japanese translation is missing key %q", key)
+		}
+	}
+	for key := range japaneseMessages {
+		if messages["en"][key] == "" {
+			t.Errorf("Japanese translation has unknown key %q", key)
+		}
 	}
 }

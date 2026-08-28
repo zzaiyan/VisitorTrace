@@ -108,7 +108,7 @@ The selected Public Analytics date range applies consistently to PV/UV summaries
 
 Aggregate Analytics on the Site management page uses the same ranges and interactive components and additionally exposes path aggregates. It requires an Administrator session and remains available when the Site's public view is disabled. Path aggregates never appear in Public Analytics.
 
-The Admin Console defaults to Simplified Chinese and stores the Chinese or English choice in the browser. Every Site can set Public Analytics to automatic, Simplified Chinese, or English. Automatic mode follows the visitor's `Accept-Language`; the public language switch and `lang=zh-CN` or `lang=en` URL parameter override that default. SVG titles and PV/UV labels remain explicit Map Preset content and are not translated with the interface.
+The Admin Console defaults to Simplified Chinese and stores the selected Chinese, Japanese, or English choice in the browser. Every Site can set Public Analytics to automatic, Simplified Chinese, Japanese, or English. Automatic mode follows the visitor's weighted `Accept-Language` preference; the public language switch and `lang=zh-CN`, `lang=ja`, or `lang=en` URL parameter override that default. SVG titles and PV/UV labels remain explicit Map Preset content and are not translated with the interface.
 
 The top of the Admin dashboard reports application version and uptime, SQLite version/schema/size, available disk space, the GeoIP file, and the latest local backup. A task table retains the latest backup, maintenance cleanup, and GeoIP update outcomes. Low disk, a backup older than 48 hours, GeoIP data older than 35 days, stalled cleanup, or failed operations produce warnings. The page can trigger an immediate backup, cleanup, or GeoIP check.
 

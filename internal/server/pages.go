@@ -938,6 +938,9 @@ func formatBytes(input any) string {
 
 func formatDuration(value time.Duration, lang string) string {
 	if value < time.Minute {
+		if lang == "ja" {
+			return "1 分未満"
+		}
 		if lang == "en" {
 			return "< 1 minute"
 		}
@@ -947,16 +950,25 @@ func formatDuration(value time.Duration, lang string) string {
 	hours := value % (24 * time.Hour) / time.Hour
 	minutes := value % time.Hour / time.Minute
 	if days > 0 {
+		if lang == "ja" {
+			return fmt.Sprintf("%d 日 %d 時間", days, hours)
+		}
 		if lang == "en" {
 			return fmt.Sprintf("%d d %d h", days, hours)
 		}
 		return fmt.Sprintf("%d 天 %d 小时", days, hours)
 	}
 	if hours > 0 {
+		if lang == "ja" {
+			return fmt.Sprintf("%d 時間 %d 分", hours, minutes)
+		}
 		if lang == "en" {
 			return fmt.Sprintf("%d h %d min", hours, minutes)
 		}
 		return fmt.Sprintf("%d 小时 %d 分钟", hours, minutes)
+	}
+	if lang == "ja" {
+		return fmt.Sprintf("%d 分", minutes)
 	}
 	if lang == "en" {
 		return fmt.Sprintf("%d min", minutes)
@@ -986,7 +998,13 @@ func operationWarning(value, lang string) string {
 		"backup_missing": "尚未创建备份", "backup_stale": "最近备份超过 48 小时", "cleanup_stale": "自动清理超过 2 小时未成功完成",
 		"backup_failed": "最近备份失败", "cleanup_failed": "最近清理失败", "geoip_update_failed": "最近 GeoIP 更新失败", "self_update_failed": "最近自更新失败",
 	}
-	if lang == "en" {
+	if lang == "ja" {
+		labels = map[string]string{
+			"disk_low": "空きディスク容量が少なくなっています", "geoip_missing": "GeoIP データベースを利用できません", "geoip_stale": "GeoIP データベースが35日以上更新されていません",
+			"backup_missing": "バックアップが作成されていません", "backup_stale": "最新バックアップが48時間以上前です", "cleanup_stale": "クリーンアップが2時間以上成功していません",
+			"backup_failed": "最新バックアップに失敗しました", "cleanup_failed": "最新クリーンアップに失敗しました", "geoip_update_failed": "最新 GeoIP 更新に失敗しました", "self_update_failed": "最新の自動更新に失敗しました",
+		}
+	} else if lang == "en" {
 		labels = map[string]string{
 			"disk_low": "Available disk space is low", "geoip_missing": "GeoIP database is unavailable", "geoip_stale": "GeoIP database is over 35 days old",
 			"backup_missing": "No backup has been created", "backup_stale": "Latest backup is over 48 hours old", "cleanup_stale": "Cleanup has not succeeded for over 2 hours",
@@ -1001,7 +1019,9 @@ func operationWarning(value, lang string) string {
 
 func operationLabel(value, lang string) string {
 	labels := map[string]string{"backup": "备份", "cleanup": "维护清理", "geoip_update": "GeoIP 更新", "self_update": "版本更新"}
-	if lang == "en" {
+	if lang == "ja" {
+		labels = map[string]string{"backup": "バックアップ", "cleanup": "メンテナンス", "geoip_update": "GeoIP 更新", "self_update": "バージョン更新"}
+	} else if lang == "en" {
 		labels = map[string]string{"backup": "Backup", "cleanup": "Maintenance cleanup", "geoip_update": "GeoIP update", "self_update": "Version update"}
 	}
 	if label := labels[value]; label != "" {
@@ -1012,7 +1032,9 @@ func operationLabel(value, lang string) string {
 
 func operationState(value, lang string) string {
 	labels := map[string]string{"success": "成功", "failed": "失败", "running": "运行中"}
-	if lang == "en" {
+	if lang == "ja" {
+		labels = map[string]string{"success": "成功", "failed": "失敗", "running": "実行中"}
+	} else if lang == "en" {
 		labels = map[string]string{"success": "Success", "failed": "Failed", "running": "Running"}
 	}
 	if label := labels[value]; label != "" {

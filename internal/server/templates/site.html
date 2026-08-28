@@ -8,14 +8,14 @@
 {{if .Error}}<div class="notice danger" role="alert">{{.Error}}</div>{{end}}
 <nav class="settings-jump site-section-nav" aria-label="{{t "site_sections"}}"><a href="#visitor-map">{{t "visitor_map"}}</a><a href="#integration">{{t "integration_code"}}</a><a href="#settings">{{t "site_settings"}}</a><a href="#preset">{{t "map_preset"}}</a><a href="#records">{{t "recent_records"}}</a><a href="#danger">{{t "danger_zone"}}</a></nav>
 <section class="metric-strip" aria-label="{{t "cumulative_stats"}}">
-  <div><span>Pageviews</span><strong>{{formatCount .Overview.Pageviews}}</strong></div>
-  <div><span>Unique Visitors</span><strong>{{formatCount .Overview.UniqueVisitors}}</strong></div>
-  <div><span>Pageview Records</span><strong>{{formatCount .Overview.PageviewRecords}}</strong></div>
+  <div><span>{{t "pageviews"}}</span><strong>{{formatCount .Overview.Pageviews}}</strong></div>
+  <div><span>{{t "unique_visitors"}}</span><strong>{{formatCount .Overview.UniqueVisitors}}</strong></div>
+  <div><span>{{t "records"}}</span><strong>{{formatCount .Overview.PageviewRecords}}</strong></div>
   <div><span>{{t "retention"}}</span><strong>{{if .Site.RetentionUnlimited}}{{t "retention_unlimited"}}{{else}}{{.Site.RetentionDays}} {{t "day"}}{{end}}</strong></div>
 </section>
 
 <section class="section-block" id="visitor-map">
-  <div class="section-heading"><div><p class="eyebrow">GEOGRAPHY</p><h2>{{t "visitor_map"}}</h2></div><span class="muted">{{t "all_history"}}</span></div>
+  <div class="section-heading"><div><p class="eyebrow">{{t "geographic_distribution"}}</p><h2>{{t "visitor_map"}}</h2></div><span class="muted">{{t "all_history"}}</span></div>
   <div class="analytics-map site-analytics-map">
     <div class="interactive-map-shell"><div id="geo-chart" class="interactive-chart geo-chart" role="img" aria-label="{{.Site.Name}} {{t "visitor_map"}}"></div><div class="map-controls" data-map-controls data-reset-label="{{t "reset_map_view"}}" role="toolbar" aria-label="{{t "map_controls"}}"></div></div>
     <a class="chart-fallback" href="{{.MapPreviewURL}}" target="_blank" rel="noopener"><img src="{{.MapPreviewURL}}" alt="{{.Site.Name}} {{t "visitor_map"}}"></a>
@@ -104,7 +104,7 @@
       <div class="site-settings-fields">
         <label class="setting-toggle"><span><strong>{{t "accept_pageviews"}}</strong><small>{{t "public_ingest_endpoint"}}</small></span><span class="switch-control"><input type="checkbox" name="accept_pageviews" role="switch" {{if .Site.AcceptPageviews}}checked{{end}}><span aria-hidden="true"></span></span></label>
         <label class="setting-toggle"><span><strong>{{t "publish_data"}}</strong><small>{{t "map_and_analytics"}}</small></span><span class="switch-control"><input type="checkbox" name="publish_public" role="switch" {{if .Site.PublishPublic}}checked{{end}}><span aria-hidden="true"></span></span></label>
-        <label class="field public-language-field"><span>{{t "public_language"}}</span><select name="public_language"><option value="auto" {{if selected .Site.PublicLanguage "auto"}}selected{{end}}>{{t "language_auto"}}</option><option value="zh-CN" {{if selected .Site.PublicLanguage "zh-CN"}}selected{{end}}>简体中文</option><option value="en" {{if selected .Site.PublicLanguage "en"}}selected{{end}}>English</option></select></label>
+        <label class="field public-language-field"><span>{{t "public_language"}}</span><select name="public_language"><option value="auto" {{if selected .Site.PublicLanguage "auto"}}selected{{end}}>{{t "language_auto"}}</option><option value="zh-CN" {{if selected .Site.PublicLanguage "zh-CN"}}selected{{end}}>简体中文</option><option value="ja" {{if selected .Site.PublicLanguage "ja"}}selected{{end}}>日本語</option><option value="en" {{if selected .Site.PublicLanguage "en"}}selected{{end}}>English</option></select></label>
       </div>
     </div>
     <div class="site-settings-actions"><button class="button primary" type="submit">{{t "save_settings"}}</button></div>

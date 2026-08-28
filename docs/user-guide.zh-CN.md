@@ -108,7 +108,7 @@ Public Analytics 的日期范围会同时作用于 PV/UV 摘要、趋势、地�
 
 Site 管理页的“聚合分析”使用相同日期范围和交互组件，并额外展示 Path 聚合；该页面受管理员 Session 保护，即使 Site 已关闭公开展示仍可使用。Path 聚合不会出现在 Public Analytics。
 
-后台默认使用简体中文，语言开关会把中文或英文偏好保存在浏览器中。每个 Site 可把 Public Analytics 默认语言设为“自动”、简体中文或英文；自动模式读取访客的 `Accept-Language`。公开页的语言开关以及 `lang=zh-CN`、`lang=en` URL 参数可覆写默认值。Map Preset 中的 SVG 标题和 PV/UV 标签不随界面语言自动改写。
+后台默认使用简体中文，语言开关会把中文、日语或英文偏好保存在浏览器中。每个 Site 可把 Public Analytics 默认语言设为“自动”、简体中文、日语或英文；自动模式按访客带权重的 `Accept-Language` 偏好选择语言。公开页的语言开关以及 `lang=zh-CN`、`lang=ja`、`lang=en` URL 参数可覆写默认值。Map Preset 中的 SVG 标题和 PV/UV 标签不随界面语言自动改写。
 
 管理总览顶部显示应用版本与运行时长、SQLite 版本/Schema/占用、可用磁盘空间、GeoIP 文件和最近本地备份。任务表记录最近一次备份、维护清理和 GeoIP 更新的结果；低磁盘、超过 48 小时没有新备份、超过 35 天的 GeoIP、清理停滞或任务失败会显示告警。页面可直接触发立即备份、立即清理和 GeoIP 检查。
 

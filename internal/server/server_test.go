@@ -203,6 +203,12 @@ func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 			t.Fatalf("interactive widget body is missing %q", want)
 		}
 	}
+	japaneseRequest := httptest.NewRequest(http.MethodGet, "/embed/widget?site_id="+site.ID+"&lang=ja", nil)
+	japaneseResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(japaneseResponse, japaneseRequest)
+	if japaneseResponse.Code != http.StatusOK || !strings.Contains(japaneseResponse.Body.String(), `<html lang="ja">`) || !strings.Contains(japaneseResponse.Body.String(), "訪問者") {
+		t.Fatalf("Japanese interactive widget = %d, body = %q", japaneseResponse.Code, japaneseResponse.Body.String())
+	}
 	if strings.Contains(body, svgXMLDeclaration) {
 		t.Fatal("interactive widget retained the standalone SVG XML declaration")
 	}
@@ -1112,6 +1118,12 @@ func TestPublicAnalyticsHidesSensitiveFields(t *testing.T) {
 	}
 	if !strings.Contains(body, `/assets/analytics.js`) || !strings.Contains(body, `"date"`) || !strings.Contains(body, `analytics-map.svg?`) || !strings.Contains(body, `data-map-controls`) || !strings.Contains(body, `Reset map position and zoom`) || !strings.Contains(body, `href="/admin/sites/`+site.ID+`"`) || !strings.Contains(body, "Admin Console") {
 		t.Fatalf("Public Analytics enhancement or range map fallback is missing: %q", body)
+	}
+	japaneseRequest := httptest.NewRecorder()
+	japanese := httptest.NewRequest(http.MethodGet, "/public/"+site.ID+"/analytics?range=30d&lang=ja", nil)
+	app.Handler().ServeHTTP(japaneseRequest, japanese)
+	if japaneseRequest.Code != http.StatusOK || !strings.Contains(japaneseRequest.Body.String(), `<html lang="ja">`) || !strings.Contains(japaneseRequest.Body.String(), "訪問者マップ") {
+		t.Fatalf("Japanese Public Analytics = %d, body = %q", japaneseRequest.Code, japaneseRequest.Body.String())
 	}
 }
 

@@ -167,4 +167,4 @@ VisitorTrace is licensed under GPL-3.0. Contributions must be available under te
 
 ## Published Documentation Boundary
 
-The English and Chinese README, user, deployment, and development guides are published with the repository. Root-level `ARCHITECTURE.md` and `CONTEXT.md`, together with `docs/adr`, `docs/research`, and `docs/internal`, are local design material excluded by `.gitignore` and must not be committed to GitHub.
+The English and Chinese README, user, deployment, and development guides are published with the repository, while the application interface supports Simplified Chinese, Japanese, and English. Root-level `ARCHITECTURE.md` and `CONTEXT.md`, together with `docs/adr`, `docs/research`, and `docs/internal`, are local design material excluded by `.gitignore` and must not be committed to GitHub.

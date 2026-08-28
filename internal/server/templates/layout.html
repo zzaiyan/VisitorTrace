@@ -81,7 +81,7 @@
       <a href="{{appPath "/admin/records"}}" {{if eq .Active "records"}}aria-current="page"{{end}}>{{t "records"}}</a>
       <a href="{{appPath "/admin/settings"}}" {{if eq .Active "settings"}}aria-current="page"{{end}}>{{t "settings"}}</a>
     </nav>
-    <nav class="language-nav admin-language-nav" aria-label="Language"><a href="{{languageURL "zh-CN"}}" {{if languageIs "zh-CN"}}aria-current="page"{{end}}>中文</a><a href="{{languageURL "en"}}" {{if languageIs "en"}}aria-current="page"{{end}}>EN</a></nav>
+    <nav class="language-nav admin-language-nav" aria-label="Language"><a href="{{languageURL "zh-CN"}}" {{if languageIs "zh-CN"}}aria-current="page"{{end}}>中文</a><a href="{{languageURL "ja"}}" {{if languageIs "ja"}}aria-current="page"{{end}}>日本語</a><a href="{{languageURL "en"}}" {{if languageIs "en"}}aria-current="page"{{end}}>EN</a></nav>
     <form class="logout-form" method="post" action="{{appPath "/admin/logout"}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <button class="button ghost full" type="submit">{{t "logout"}}</button>

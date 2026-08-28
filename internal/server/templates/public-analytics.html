@@ -1,28 +1,28 @@
 {{define "content"}}
 <header class="public-header">
   <a class="brand" href="{{appPath (printf "/public/%s/analytics" .Site.ID)}}"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>
-  <div class="public-header-meta"><span class="public-site-id">{{.Site.ID}}</span><a class="button ghost public-admin-link" href="{{appPath (printf "/admin/sites/%s" .Site.ID)}}">{{t "admin_console"}}</a><nav class="language-nav" aria-label="Language"><a href="{{languageURL "zh-CN"}}" {{if languageIs "zh-CN"}}aria-current="page"{{end}}>中文</a><a href="{{languageURL "en"}}" {{if languageIs "en"}}aria-current="page"{{end}}>EN</a></nav></div>
+  <div class="public-header-meta"><span class="public-site-id">{{.Site.ID}}</span><a class="button ghost public-admin-link" href="{{appPath (printf "/admin/sites/%s" .Site.ID)}}">{{t "admin_console"}}</a><nav class="language-nav" aria-label="Language"><a href="{{languageURL "zh-CN"}}" {{if languageIs "zh-CN"}}aria-current="page"{{end}}>中文</a><a href="{{languageURL "ja"}}" {{if languageIs "ja"}}aria-current="page"{{end}}>日本語</a><a href="{{languageURL "en"}}" {{if languageIs "en"}}aria-current="page"{{end}}>EN</a></nav></div>
 </header>
 <main class="public-main">
   <header class="analytics-heading">
-    <div><p class="eyebrow">PUBLIC ANALYTICS</p><h1>{{.Site.Name}}</h1><p class="subhead">{{.Analytics.StartDate}} {{t "date_to"}} {{.Analytics.EndDate}}</p></div>
+    <div><p class="eyebrow">{{t "public_analytics"}}</p><h1>{{.Site.Name}}</h1><p class="subhead">{{.Analytics.StartDate}} {{t "date_to"}} {{.Analytics.EndDate}}</p></div>
     <nav class="range-nav" aria-label="{{t "analytics_range"}}"><a href="?range=today" {{if selected .Range "today"}}aria-current="page"{{end}}>{{t "today"}}</a><a href="?range=7d" {{if selected .Range "7d"}}aria-current="page"{{end}}>7 {{t "days"}}</a><a href="?range=30d" {{if selected .Range "30d"}}aria-current="page"{{end}}>30 {{t "days"}}</a><a href="?range=90d" {{if selected .Range "90d"}}aria-current="page"{{end}}>90 {{t "days"}}</a><a href="?range=all" {{if selected .Range "all"}}aria-current="page"{{end}}>{{t "all"}}</a></nav>
   </header>
   <section class="metric-strip public-metrics" aria-label="{{t "analytics_summary"}}">
-    <div><span>Pageviews</span><strong>{{formatCount .Analytics.Pageviews}}</strong></div>
-    <div><span>Unique Visitors</span><strong>{{formatCount .Analytics.UniqueVisitors}}</strong></div>
+    <div><span>{{t "pageviews"}}</span><strong>{{formatCount .Analytics.Pageviews}}</strong></div>
+    <div><span>{{t "unique_visitors"}}</span><strong>{{formatCount .Analytics.UniqueVisitors}}</strong></div>
     <div><span>{{t "cities"}}</span><strong>{{len .Analytics.Cities}}</strong></div>
     <div><span>{{t "countries_regions"}}</span><strong>{{len .Analytics.Countries}}</strong></div>
   </section>
   <section class="analytics-grid">
     <div class="analytics-map">
-      <div class="section-heading"><div><p class="eyebrow">GEOGRAPHY</p><h2>{{t "visitor_map"}}</h2></div><span class="muted">{{t "selected_range"}}</span></div>
+      <div class="section-heading"><div><p class="eyebrow">{{t "geographic_distribution"}}</p><h2>{{t "visitor_map"}}</h2></div><span class="muted">{{t "selected_range"}}</span></div>
       <div class="interactive-map-shell"><div id="geo-chart" class="interactive-chart geo-chart" role="img" aria-label="{{.Site.Name}} {{t "visitor_map"}}"></div><div class="map-controls" data-map-controls data-reset-label="{{t "reset_map_view"}}" role="toolbar" aria-label="{{t "map_controls"}}"></div></div>
       <a class="chart-fallback" href="{{.MapURL}}" target="_blank" rel="noopener"><img src="{{.MapURL}}" alt="{{.Site.Name}} {{t "visitor_map"}}"></a>
       {{with geoAttribution}}<a class="attribution" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}
     </div>
     <div class="trend-panel">
-      <div class="section-heading"><div><p class="eyebrow">TREND</p><h2>{{t "visit_trend"}}</h2></div></div>
+      <div class="section-heading"><div><p class="eyebrow">{{t "visit_trend"}}</p><h2>{{t "visit_trend"}}</h2></div></div>
       <div id="trend-chart-interactive" class="interactive-chart trend-chart-interactive" role="img" aria-label="{{t "daily_visit_trend"}}"></div>
       <div class="chart-fallback"><div class="trend-chart" id="trend-chart" aria-label="{{t "daily_visit_trend"}}">{{range .Analytics.Daily}}<span class="trend-bar" data-value="{{.Pageviews}}" title="{{.Date}} · {{.Pageviews}} PV / {{.UniqueVisitors}} UV"></span>{{else}}<p class="muted">{{t "no_data"}}</p>{{end}}</div>
       <div class="trend-legend"><span><i class="legend-pv"></i>Pageviews</span><span>{{len .Analytics.Daily}} {{t "active_dates"}}</span></div></div>

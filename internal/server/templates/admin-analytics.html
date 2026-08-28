@@ -1,20 +1,20 @@
 {{define "content"}}
 <header class="page-header analytics-heading">
-  <div><p class="eyebrow">SITE ANALYTICS · {{.Site.ID}}</p><h1>{{.Site.Name}}</h1><p class="subhead">{{.Analytics.StartDate}} {{t "date_to"}} {{.Analytics.EndDate}}</p></div>
+  <div><p class="eyebrow">{{t "aggregate_analytics"}} · {{.Site.ID}}</p><h1>{{.Site.Name}}</h1><p class="subhead">{{.Analytics.StartDate}} {{t "date_to"}} {{.Analytics.EndDate}}</p></div>
   <div class="header-actions"><a class="button ghost" href="{{appPath (printf "/admin/sites/%s" .Site.ID)}}">{{t "back_to_site"}}</a>{{if .Site.PublishPublic}}<a class="button ghost" href="{{appPath (printf "/public/%s/analytics" .Site.ID)}}" target="_blank" rel="noopener">{{t "public_analytics"}}</a>{{end}}</div>
 </header>
 <nav class="range-nav admin-range-nav" aria-label="{{t "analytics_range"}}"><a href="?range=today" {{if selected .Range "today"}}aria-current="page"{{end}}>{{t "today"}}</a><a href="?range=7d" {{if selected .Range "7d"}}aria-current="page"{{end}}>7 {{t "days"}}</a><a href="?range=30d" {{if selected .Range "30d"}}aria-current="page"{{end}}>30 {{t "days"}}</a><a href="?range=90d" {{if selected .Range "90d"}}aria-current="page"{{end}}>90 {{t "days"}}</a><a href="?range=all" {{if selected .Range "all"}}aria-current="page"{{end}}>{{t "all"}}</a></nav>
 
 <section class="metric-strip public-metrics" aria-label="{{t "analytics_summary"}}">
-  <div><span>Pageviews</span><strong>{{formatCount .Analytics.Pageviews}}</strong></div>
-  <div><span>Unique Visitors</span><strong>{{formatCount .Analytics.UniqueVisitors}}</strong></div>
+  <div><span>{{t "pageviews"}}</span><strong>{{formatCount .Analytics.Pageviews}}</strong></div>
+  <div><span>{{t "unique_visitors"}}</span><strong>{{formatCount .Analytics.UniqueVisitors}}</strong></div>
   <div><span>{{t "cities"}}</span><strong>{{len .Analytics.Cities}}</strong></div>
   <div><span>{{t "path"}}</span><strong>{{len .Analytics.Paths}}</strong></div>
 </section>
 
 <section class="analytics-grid">
-  <div class="analytics-map"><div class="section-heading"><div><p class="eyebrow">GEOGRAPHY</p><h2>{{t "geographic_distribution"}}</h2></div></div><div class="interactive-map-shell"><div id="geo-chart" class="interactive-chart geo-chart admin-chart-visible" role="img" aria-label="{{t "geographic_distribution"}}"></div><div class="map-controls" data-map-controls data-reset-label="{{t "reset_map_view"}}" role="toolbar" aria-label="{{t "map_controls"}}"></div></div><noscript><p class="muted">{{t "no_data"}}</p></noscript></div>
-  <div class="trend-panel"><div class="section-heading"><div><p class="eyebrow">TREND</p><h2>{{t "visit_trend"}}</h2></div></div><div id="trend-chart-interactive" class="interactive-chart trend-chart-interactive admin-chart-visible" role="img" aria-label="{{t "daily_visit_trend"}}"></div><div class="chart-fallback"><div class="trend-chart" id="trend-chart">{{range .Analytics.Daily}}<span class="trend-bar" data-value="{{.Pageviews}}" title="{{.Date}} · {{.Pageviews}} PV / {{.UniqueVisitors}} UV"></span>{{else}}<p class="muted">{{t "no_data"}}</p>{{end}}</div></div></div>
+  <div class="analytics-map"><div class="section-heading"><div><p class="eyebrow">{{t "geographic_distribution"}}</p><h2>{{t "geographic_distribution"}}</h2></div></div><div class="interactive-map-shell"><div id="geo-chart" class="interactive-chart geo-chart admin-chart-visible" role="img" aria-label="{{t "geographic_distribution"}}"></div><div class="map-controls" data-map-controls data-reset-label="{{t "reset_map_view"}}" role="toolbar" aria-label="{{t "map_controls"}}"></div></div><noscript><p class="muted">{{t "no_data"}}</p></noscript></div>
+  <div class="trend-panel"><div class="section-heading"><div><p class="eyebrow">{{t "visit_trend"}}</p><h2>{{t "visit_trend"}}</h2></div></div><div id="trend-chart-interactive" class="interactive-chart trend-chart-interactive admin-chart-visible" role="img" aria-label="{{t "daily_visit_trend"}}"></div><div class="chart-fallback"><div class="trend-chart" id="trend-chart">{{range .Analytics.Daily}}<span class="trend-bar" data-value="{{.Pageviews}}" title="{{.Date}} · {{.Pageviews}} PV / {{.UniqueVisitors}} UV"></span>{{else}}<p class="muted">{{t "no_data"}}</p>{{end}}</div></div></div>
 </section>
 {{if .Analytics.DeduplicationRules}}<section class="rule-change-band" aria-label="{{t "counting_rule_changes"}}"><strong>{{t "counting_rule_changes"}}</strong>{{range .Analytics.DeduplicationRules}}<span>{{t "effective_from"}} {{.EffectiveDate}} · {{.WindowDays}} {{t "days"}}</span>{{end}}</section>{{end}}
 

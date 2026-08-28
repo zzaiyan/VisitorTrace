@@ -167,4 +167,4 @@ VisitorTrace 采用 GPL-3.0。贡献内容必须能够按与该许可证兼容�
 
 ## 发布文档边界
 
-中英文 README、用户指南、部署指南和开发指南随仓库发布。项目根目录的 `ARCHITECTURE.md`、`CONTEXT.md`，以及 `docs/adr`、`docs/research`、`docs/internal` 是本地设计资料，受 `.gitignore` 排除，不应提交到 GitHub。
+中英文 README、用户指南、部署指南和开发指南随仓库发布，应用界面支持简体中文、日语和英文。项目根目录的 `ARCHITECTURE.md`、`CONTEXT.md`，以及 `docs/adr`、`docs/research`、`docs/internal` 是本地设计资料，受 `.gitignore` 排除，不应提交到 GitHub。

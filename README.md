@@ -17,7 +17,7 @@ A tiny self-hosted visitor map and Pageview tracker for personal homepages, blog
 - Pluggable local GeoIP lookup and Admin-managed updates for DB-IP, MaxMind, and IP2Location
 - SVG visitor maps with provider-specific attribution
 - Interactive visitor maps on Site management and date-linked Public/Admin Analytics
-- Simplified Chinese and English interfaces with a per-Site public default
+- Simplified Chinese, Japanese, and English interfaces with a per-Site public default
 - A password-protected Admin Console
 - Filterable, cursor-paginated, CSV-exportable Pageview Records
 - Backup, cleanup, GeoIP, and resource health overview
