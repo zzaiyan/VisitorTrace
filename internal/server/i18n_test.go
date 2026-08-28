@@ -39,11 +39,11 @@ func TestLanguageResolution(t *testing.T) {
 
 func TestJapaneseTranslationsAreComplete(t *testing.T) {
 	for key := range messages["en"] {
-		if japaneseMessages[key] == "" {
+		if messages["ja"][key] == "" {
 			t.Errorf("Japanese translation is missing key %q", key)
 		}
 	}
-	for key := range japaneseMessages {
+	for key := range messages["ja"] {
 		if messages["en"][key] == "" {
 			t.Errorf("Japanese translation has unknown key %q", key)
 		}
