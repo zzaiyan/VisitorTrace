@@ -127,7 +127,7 @@
           <div><dt><code>bg</code> / <code>land</code> / <code>border</code> / <code>text</code> / <code>marker</code></dt><dd>{{t "url_param_colors"}}</dd></div>
           <div><dt><code>metric</code></dt><dd>{{t "url_param_metric"}}</dd></div>
         </dl>
-        <code class="url-override-example">?w=640&amp;h=360&amp;show=title,pv&amp;metric=uv</code>
+        <code class="url-override-example" aria-live="polite"></code>
       </div>
     </div>
   </div>
@@ -248,6 +248,7 @@
   var previewSurface = document.querySelector(".preview-surface");
   var widgetPreview = document.getElementById("preset-widget-preview");
   var imagePreview = document.getElementById("preset-image-preview");
+  var overrideExample = document.querySelector(".url-override-example");
   var modeButtons = Array.prototype.slice.call(document.querySelectorAll("[data-preview-mode]"));
   if (!form || !previewSurface || !widgetPreview || !imagePreview || !modeButtons.length) return;
   var timer;
@@ -270,6 +271,10 @@
     query.forEach(function (value, key) { url.searchParams.set(key, value); });
     return url.href;
   }
+  function updateOverrideExample(query) {
+    if (!overrideExample) return;
+    overrideExample.textContent = "?" + query.toString();
+  }
   function sizeWidget(width, height) {
     if (!isFinite(width) || !isFinite(height) || width < 160 || width > 1200 || height < 90 || height > 800) return;
     widgetPreview.width = width;
@@ -286,6 +291,7 @@
   }
   function update() {
     var query = previewQuery();
+    updateOverrideExample(query);
     var preview = activeMode === "widget" ? widgetPreview : imagePreview;
     var nextURL = previewURL(preview.dataset.previewBase, query);
     if (loadedURLs[activeMode] !== nextURL) {
@@ -328,6 +334,7 @@
     if (event.source !== widgetPreview.contentWindow || !data || data.type !== "visitortrace:resize") return;
     sizeWidget(Number(data.width), Number(data.height));
   });
+  updateOverrideExample(previewQuery());
   sizeWidget(Number(form.elements.w.value), Number(form.elements.h.value));
   sizeImage(Number(form.elements.w.value), Number(form.elements.h.value));
   function chromeHeight() {
