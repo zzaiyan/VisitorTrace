@@ -140,6 +140,24 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .metric-strip strong { display: block; margin-top: 12px; font-size: 27px; font-weight: 700; letter-spacing: 0; }
 .section-block { margin-top: 34px; border-top: 1px solid var(--line); }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 23px 0 20px; }
+.url-override-help { position: relative; flex: 0 0 auto; }
+.url-override-trigger { display: inline-flex; min-height: 30px; align-items: center; gap: 7px; padding: 4px 0; border: 0; background: transparent; color: var(--muted); cursor: help; font-size: 11px; font-weight: 700; }
+.url-override-trigger:hover, .url-override-trigger:focus-visible { color: var(--green); outline: none; }
+.url-override-trigger:focus-visible { text-decoration: underline; text-decoration-color: var(--coral); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.help-mark { display: inline-grid; width: 16px; height: 16px; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: 10px; font-weight: 800; line-height: 1; }
+.url-override-panel { position: absolute; z-index: 8; top: calc(100% + 8px); right: 0; width: min(430px, calc(100vw - 32px)); padding: 17px 18px 16px; border: 1px solid #c5d2cf; background: white; color: var(--ink); box-shadow: 0 12px 30px rgba(24,35,41,.16); cursor: default; }
+.url-override-panel::before { position: absolute; top: -6px; right: 18px; width: 10px; height: 10px; border-top: 1px solid #c5d2cf; border-left: 1px solid #c5d2cf; background: white; content: ""; transform: rotate(45deg); }
+.url-override-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.url-override-panel-heading strong { font-size: 13px; }
+.url-override-close { display: grid; width: 24px; height: 24px; place-items: center; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 20px; line-height: 1; }
+.url-override-close:hover, .url-override-close:focus-visible { color: var(--coral); outline: none; }
+.url-override-panel > p { margin: 8px 0 12px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.url-override-panel dl { display: grid; gap: 7px; margin: 0; }
+.url-override-panel dl > div { display: grid; grid-template-columns: minmax(112px, auto) minmax(0, 1fr); gap: 12px; align-items: baseline; }
+.url-override-panel dt { color: var(--green-dark); font-size: 10px; font-weight: 800; }
+.url-override-panel dd { margin: 0; color: #526063; font-size: 10px; line-height: 1.4; }
+.url-override-panel dd code, .url-override-panel dt code { color: inherit; font-size: 10px; }
+.url-override-example { display: block; margin-top: 13px; padding: 8px 9px; overflow-wrap: anywhere; border: 1px solid var(--line); background: #f3f7f5; color: var(--green-dark); font-size: 10px; line-height: 1.4; white-space: normal; }
 .settings-jump { display: flex; flex-wrap: wrap; gap: 4px 24px; margin: -10px 0 12px; border-bottom: 1px solid var(--line); }
 .settings-jump a { padding: 12px 0 10px; border-bottom: 2px solid transparent; color: var(--muted); font-size: 11px; font-weight: 700; text-decoration: none; }
 .settings-jump a:hover, .settings-jump a:focus-visible { border-bottom-color: var(--coral); color: var(--ink); outline: none; }

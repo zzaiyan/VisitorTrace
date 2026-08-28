@@ -112,7 +112,25 @@
 </section>
 
 <section class="section-block" id="preset">
-  <div class="section-heading"><div><p class="eyebrow">MAP PRESET</p><h2>{{t "map_preset"}}</h2></div><span class="muted">{{t "url_overrides"}}</span></div>
+  <div class="section-heading"><div><p class="eyebrow">MAP PRESET</p><h2>{{t "map_preset"}}</h2></div>
+    <div class="url-override-help" data-url-override-help>
+      <button class="url-override-trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="url-override-panel"><span>{{t "url_overrides"}}</span><span class="help-mark" aria-hidden="true">?</span></button>
+      <div id="url-override-panel" class="url-override-panel" role="dialog" aria-label="{{t "url_override_title"}}" hidden>
+        <div class="url-override-panel-heading"><strong>{{t "url_override_title"}}</strong><button class="url-override-close" type="button" title="{{t "close"}}" aria-label="{{t "close"}}">&times;</button></div>
+        <p>{{t "url_override_help"}}</p>
+        <dl>
+          <div><dt><code>w</code> / <code>h</code></dt><dd>{{t "url_param_dimensions"}}</dd></div>
+          <div><dt><code>title</code></dt><dd>{{t "url_param_title"}}</dd></div>
+          <div><dt><code>pv_label</code> / <code>uv_label</code></dt><dd>{{t "url_param_labels"}}</dd></div>
+          <div><dt><code>show</code></dt><dd>{{t "url_param_show"}}</dd></div>
+          <div><dt><code>fs</code></dt><dd>{{t "url_param_font"}}</dd></div>
+          <div><dt><code>bg</code> / <code>land</code> / <code>border</code> / <code>text</code> / <code>marker</code></dt><dd>{{t "url_param_colors"}}</dd></div>
+          <div><dt><code>metric</code></dt><dd>{{t "url_param_metric"}}</dd></div>
+        </dl>
+        <code class="url-override-example">?w=640&amp;h=360&amp;show=title,pv&amp;metric=uv</code>
+      </div>
+    </div>
+  </div>
   <div class="preset-layout">
     <div class="preview-stage">
       <div class="preview-mode-switch" role="tablist" aria-label="{{t "preview_mode"}}">
@@ -193,6 +211,39 @@
 {{template "retention-policy-script" .}}
 <script>
 (function () {
+  var help = document.querySelector("[data-url-override-help]");
+  if (help) {
+    var trigger = help.querySelector(".url-override-trigger");
+    var panel = help.querySelector(".url-override-panel");
+    var close = help.querySelector(".url-override-close");
+    var hideTimer;
+    var suppressTriggerFocus = false;
+    function setOpen(open) {
+      clearTimeout(hideTimer);
+      panel.hidden = !open;
+      trigger.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    function hideSoon() {
+      clearTimeout(hideTimer);
+      hideTimer = window.setTimeout(function () {
+        if (!help.matches(":hover") && document.activeElement !== trigger && !panel.contains(document.activeElement)) setOpen(false);
+      }, 120);
+    }
+    help.addEventListener("pointerenter", function (event) { if (event.pointerType !== "touch") setOpen(true); });
+    help.addEventListener("pointerleave", hideSoon);
+    trigger.addEventListener("focus", function () {
+      if (suppressTriggerFocus) {
+        suppressTriggerFocus = false;
+        return;
+      }
+      setOpen(true);
+    });
+    trigger.addEventListener("click", function () { setOpen(panel.hidden); });
+    trigger.addEventListener("blur", hideSoon);
+    close.addEventListener("click", function () { suppressTriggerFocus = true; setOpen(false); trigger.focus(); });
+    document.addEventListener("pointerdown", function (event) { if (!help.contains(event.target)) setOpen(false); });
+    help.addEventListener("keydown", function (event) { if (event.key === "Escape") { event.preventDefault(); setOpen(false); trigger.focus(); } });
+  }
   var form = document.getElementById("preset-form");
   var previewSurface = document.querySelector(".preview-surface");
   var widgetPreview = document.getElementById("preset-widget-preview");
