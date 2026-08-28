@@ -6,6 +6,10 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+- No unreleased changes.
+
+## 0.2.2 - 2026-08-29
+
 - Added complete Japanese interface support, including explicit and browser-preference language selection for the Admin Console, Public Analytics, Interactive Widget, and Site defaults. Language switches use the order Chinese, Japanese, English. The SQLite schema advances from 11 to 12 so existing Sites can persist `ja` as their public language.
 
 ## 0.2.1 - 2026-08-28

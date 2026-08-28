@@ -49,7 +49,7 @@ Pageview 写入事务同时保存逐条记录、访客窗口登记和持久化�
 
 JavaScript 采集请求先从已经通过 `Allowed Origin` 校验的 `Origin` 请求头提取规范化 `hostname`；内嵌 tracker 也会上报 `window.location.hostname`，两者不一致时服务端拒绝非空上报。Image Widget 改为从 `Referer` 提取并校验 Origin；Referer 不可用或来源不允许时退化为只绘图。记录路径取显式 `path` 参数或 Referer 路径；由于没有浏览器 Visitor ID，访客摘要回退为 IP 与 User-Agent 的 HMAC。机器人、限流、来源无效或已关闭采集的图片请求仍会返回地图，但不会写入。两条采集路径最终使用相同的 Pageview/聚合原子事务。
 
-每条 Pageview Record 都保存 hostname，并新增 hostname 聚合维度。访客登记的内部作用域为 `(Site、hostname、窗口、维度、访客)`，因此共享一个配置 Site 的不同域名会分别计 UV，即使它们产生了相同的 Visitor Digest。Migration 9 增加 Pageview hostname 列和索引；迁移前的明细 hostname 为空，迁移前的聚合无法反推出域名维度。Migration 10 为逐条记录增加 `collection_method`（`js` 或 `image`），历史记录默认标记为 `js`；该字段可筛选、可导出，但不会形成新的持久化聚合维度。Migration 11 增加 Site 级显式标记 `retention_unlimited`，已有 Site 默认继续使用限时保留，原有天数保持不变。
+每条 Pageview Record 都保存 hostname，并新增 hostname 聚合维度。访客登记的内部作用域为 `(Site、hostname、窗口、维度、访客)`，因此共享一个配置 Site 的不同域名会分别计 UV，即使它们产生了相同的 Visitor Digest。Migration 9 增加 Pageview hostname 列和索引；迁移前的明细 hostname 为空，迁移前的聚合无法反推出域名维度。Migration 10 为逐条记录增加 `collection_method`（`js` 或 `image`），历史记录默认标记为 `js`；该字段可筛选、可导出，但不会形成新的持久化聚合维度。Migration 11 增加 Site 级显式标记 `retention_unlimited`，已有 Site 默认继续使用限时保留，原有天数保持不变。Migration 12 扩展 Site 公开语言约束，允许保存日语（`ja`），不改变已有 Site 数据。
 
 `site_deduplication_rules` 以 Site 本地日期保存计数规则历史。修改周期时，事务会在下一本地日期 upsert 新规则；Pageview 按其本地日期选择最近已生效规则，并从该规则的生效日计算新窗口锚点。已有 `visitor_registrations.window_end` 保持原值，仅可能延后临时登记的清理，不会改变新规则下的计数。
 
@@ -114,15 +114,15 @@ Release 工作流只把公钥嵌入正式二进制。私钥仅暴露给受 Envir
 
 ```sh
 make build \
-  VERSION=0.2.1 \
+  VERSION=0.2.2 \
   UPDATE_PUBLIC_KEY="BASE64_RAW_ED25519_PUBLIC_KEY"
 ```
 
 发布使用语义化版本标签。确认 `main` 的 CI 通过后创建并推送标签：
 
 ```sh
-git tag -a v0.2.1 -m "VisitorTrace v0.2.1"
-git push origin v0.2.1
+git tag -a v0.2.2 -m "VisitorTrace v0.2.2"
+git push origin v0.2.2
 ```
 
 `.github/workflows/release.yml` 会重新执行测试，使用 `CGO_ENABLED=0` 构建 `visitortrace-<版本>-linux-amd64` 和 `visitortrace-<版本>-linux-arm64`，并将版本、Commit、构建时间、数据库 Schema 和公钥嵌入二进制。工作流从实际文件生成 SHA-256、大小和更新清单，再用最终公钥验签。每个 Release 还会包含未经修改的 GPL 文本和由同一标签 Commit 生成的源码归档，所有文件都纳入 `checksums.txt`。验证完成的文件先上传到草稿 Release，全部成功后才公开；任务重跑可以刷新同一草稿，不能覆盖已经发布的版本。含 `-` 的 SemVer 标签会发布为 prerelease，不会替换稳定版 `releases/latest`。
@@ -131,10 +131,10 @@ git push origin v0.2.1
 
 ```sh
 go run ./tools/release-manifest generate \
-  --version 0.2.1 \
+  --version 0.2.2 \
   --published-at 2026-08-28T00:00:00Z \
-  --asset linux-amd64=dist/visitortrace-0.2.1-linux-amd64 \
-  --asset linux-arm64=dist/visitortrace-0.2.1-linux-arm64 \
+  --asset linux-amd64=dist/visitortrace-0.2.2-linux-amd64 \
+  --asset linux-arm64=dist/visitortrace-0.2.2-linux-arm64 \
   --output manifest.unsigned.json
 
 go run ./tools/release-manifest sign \

@@ -49,7 +49,7 @@ The Pageview ingestion transaction stores the individual record, visitor-window 
 
 Accepted JavaScript ingestion derives a normalized `hostname` from the validated `Origin` header; the embedded tracker also reports `window.location.hostname`, and the server rejects a non-empty report that disagrees. The Image Widget instead derives and validates the Origin from `Referer`; an unavailable or disallowed Referer degrades to read-only rendering. It uses the explicit `path` query value or the Referer path and falls back to the HMAC of IP plus User-Agent because no browser Visitor ID exists. Bot, rate-limited, malformed-source, and collection-disabled image requests still render but do not write. Both paths use the same atomic Pageview/aggregate transaction.
 
-The hostname is stored on each Pageview Record and added to the durable aggregate dimensions. Visitor registrations are internally scoped by `(Site, hostname, window, dimension, visitor)`, so the same visitor digest is counted independently on different hostnames even when they share one configured Site. Migration 9 adds the Pageview hostname column and index; pre-migration detailed rows have an empty hostname and pre-migration aggregates cannot be reconstructed by hostname. Migration 10 adds `collection_method` (`js` or `image`) to detailed records and defaults historical records to `js`; the field is filterable and exported but intentionally does not create a durable aggregate dimension. Migration 11 adds the explicit Site-level `retention_unlimited` flag and defaults existing Sites to timed retention, leaving their saved day count unchanged.
+The hostname is stored on each Pageview Record and added to the durable aggregate dimensions. Visitor registrations are internally scoped by `(Site, hostname, window, dimension, visitor)`, so the same visitor digest is counted independently on different hostnames even when they share one configured Site. Migration 9 adds the Pageview hostname column and index; pre-migration detailed rows have an empty hostname and pre-migration aggregates cannot be reconstructed by hostname. Migration 10 adds `collection_method` (`js` or `image`) to detailed records and defaults historical records to `js`; the field is filterable and exported but intentionally does not create a durable aggregate dimension. Migration 11 adds the explicit Site-level `retention_unlimited` flag and defaults existing Sites to timed retention, leaving their saved day count unchanged. Migration 12 extends the Site public-language constraint with Japanese (`ja`) without changing existing Site data.
 
 `site_deduplication_rules` stores counting-rule history as Site-local dates. A window change upserts a rule for the next local date. Ingestion selects the latest rule effective on the Pageview's local date and calculates windows from that rule's effective-date anchor. Existing `visitor_registrations.window_end` values remain unchanged; they can only delay cleanup of temporary registrations and cannot affect counting under the new rule.
 
@@ -114,15 +114,15 @@ A production binary with self-update enabled can still be built locally:
 
 ```sh
 make build \
-  VERSION=0.2.1 \
+  VERSION=0.2.2 \
   UPDATE_PUBLIC_KEY="BASE64_RAW_ED25519_PUBLIC_KEY"
 ```
 
 Releases use semantic-version tags. Once CI on `main` is green, create and push a tag:
 
 ```sh
-git tag -a v0.2.1 -m "VisitorTrace v0.2.1"
-git push origin v0.2.1
+git tag -a v0.2.2 -m "VisitorTrace v0.2.2"
+git push origin v0.2.2
 ```
 
 `.github/workflows/release.yml` reruns the tests, builds `visitortrace-<version>-linux-amd64` and `visitortrace-<version>-linux-arm64` with `CGO_ENABLED=0`, and embeds the version, commit, build time, database schema, and public key. It derives SHA-256 digests, sizes, and the update manifest from the actual files, then verifies the result with the final public key. Each Release also carries the unmodified GPL text and a source archive generated from the same tagged commit; all files are covered by `checksums.txt`. Verified assets are uploaded to a draft Release and published only after every step succeeds. A rerun can refresh that draft but cannot overwrite an already published release. SemVer tags containing `-` become prereleases and do not replace the stable `releases/latest` target.
@@ -131,10 +131,10 @@ To generate a manifest locally:
 
 ```sh
 go run ./tools/release-manifest generate \
-  --version 0.2.1 \
+  --version 0.2.2 \
   --published-at 2026-08-28T00:00:00Z \
-  --asset linux-amd64=dist/visitortrace-0.2.1-linux-amd64 \
-  --asset linux-arm64=dist/visitortrace-0.2.1-linux-arm64 \
+  --asset linux-amd64=dist/visitortrace-0.2.2-linux-amd64 \
+  --asset linux-arm64=dist/visitortrace-0.2.2-linux-arm64 \
   --output manifest.unsigned.json
 
 go run ./tools/release-manifest sign \
