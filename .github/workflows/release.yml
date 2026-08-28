@@ -112,6 +112,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out tagged source for release verification
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
       - name: Download verified release assets
         uses: actions/download-artifact@v8
         with:
@@ -128,9 +133,9 @@ jobs:
           case "$version" in
             *-*) prerelease="--prerelease" ;;
           esac
-          if draft="$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null)"; then
+          if draft="$(gh release view "$GITHUB_REF_NAME" --repo "$GH_REPO" --json isDraft --jq .isDraft 2>/dev/null)"; then
             test "$draft" = "true" || { echo "Release already exists and is not a draft" >&2; exit 1; }
-            gh release upload "$GITHUB_REF_NAME" \
+            gh release upload "$GITHUB_REF_NAME" --repo "$GH_REPO" \
               dist/visitortrace-*-linux-amd64 \
               dist/visitortrace-*-linux-arm64 \
               dist/visitortrace-*-source.tar.gz \
@@ -139,7 +144,7 @@ jobs:
               dist/checksums.txt \
               --clobber
           else
-            gh release create "$GITHUB_REF_NAME" \
+            gh release create "$GITHUB_REF_NAME" --repo "$GH_REPO" \
               dist/visitortrace-*-linux-amd64 \
               dist/visitortrace-*-linux-arm64 \
               dist/visitortrace-*-source.tar.gz \
@@ -164,4 +169,4 @@ jobs:
             *-*) ;;
             *) latest="--latest" ;;
           esac
-          gh release edit "$GITHUB_REF_NAME" --draft=false $latest
+          gh release edit "$GITHUB_REF_NAME" --repo "$GH_REPO" --draft=false $latest

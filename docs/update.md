@@ -6,8 +6,14 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
+- No unreleased changes.
+
+## 0.2.1 - 2026-08-28
+
 - Added explicit **Timed** and **Unlimited** Pageview Record retention policies to Site creation and settings. Unlimited mode preserves the last 1–90 day value for an easy switch back, skips only detailed-record cleanup, and clearly warns about continuing disk growth.
-- This advances SQLite schema 10 to 11. Existing Sites migrate to timed retention with their current day count unchanged.
+- Added an interactive Map Preset URL-parameter reference. It opens on hover, click, keyboard focus, or touch, lists every supported override, and keeps its example query synchronized with unsaved form values.
+- Added an **Admin Console** shortcut to each Public Analytics page. It opens the current Site's management page and falls back to the existing Administrator login flow when needed.
+- This release advances SQLite schema 10 to 11. Existing Sites migrate to timed retention with their current day count unchanged.
 
 ## 0.2.0 - 2026-07-27
 
