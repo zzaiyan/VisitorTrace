@@ -16,6 +16,8 @@ coverage.out
 *.mmdb
 .env
 visitortrace.json
+.geoip-test.json
+.geoip-test.local.json
 
 # Editor and operating-system files
 .DS_Store

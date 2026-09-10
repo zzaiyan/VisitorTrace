@@ -7,6 +7,7 @@ This file records user-facing changes for each published VisitorTrace release.
 ## Unreleased
 
 - Added Administrator Console backup restoration from verified local `.vtbackup` archives. The workflow creates a pre-restore snapshot, schedules a safe database replacement during the next supervised restart, preserves the active configuration, and revokes Administrator sessions after a successful restore.
+- Advanced the default development/build version to `0.2.2-dev` and added an opt-in GeoIP integration test path using a Git-ignored local credential file. It validates existing provider databases and can exercise official downloads, unpacking, schema validation, activation, and lookup.
 
 ## 0.2.2 - 2026-08-29
 

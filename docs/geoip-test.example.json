@@ -1,0 +1,31 @@
+{
+  "providers": {
+    "dbip": {
+      "database_path": "/absolute/path/to/dbip-city-lite.mmdb",
+      "ip": "58.48.27.139",
+      "download": false,
+      "expected": {
+        "country_code": "CN"
+      }
+    },
+    "maxmind": {
+      "database_path": "/absolute/path/to/GeoLite2-City.mmdb",
+      "ip": "58.48.27.139",
+      "download": false,
+      "account_id": "",
+      "license_key": "",
+      "expected": {
+        "country_code": "CN"
+      }
+    },
+    "ip2location": {
+      "database_path": "/absolute/path/to/IP2LOCATION-LITE-DB11.MMDB",
+      "ip": "58.48.27.139",
+      "download": false,
+      "token": "",
+      "expected": {
+        "country_code": "CN"
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 GO ?= go
 NPM ?= npm
-VERSION ?= 0.2.1-dev
+VERSION ?= 0.2.2-dev
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || printf unknown)
 BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 UPDATE_PUBLIC_KEY ?=
@@ -10,7 +10,7 @@ LDFLAGS = -s -w \
 	-X github.com/zzaiyan/VisitorTrace/internal/buildinfo.BuildTime=$(BUILD_TIME) \
 	-X github.com/zzaiyan/VisitorTrace/internal/buildinfo.UpdatePublicKey=$(UPDATE_PUBLIC_KEY)
 
-.PHONY: build frontend test vet check clean
+.PHONY: build frontend test vet check geoip-integration clean
 
 build:
 	mkdir -p bin
@@ -27,6 +27,9 @@ vet:
 	$(GO) vet ./...
 
 check: test vet
+
+geoip-integration:
+	GO="$(GO)" ./scripts/test-geoip.sh
 
 clean:
 	$(GO) clean -testcache

@@ -33,6 +33,20 @@ go mod verify
 
 `make check` 执行常规测试和静态检查，`tools/preview-demo.sh` 提供带伪数据的本地人工预览环境。
 
+## GeoIP 集成验证
+
+常规测试不会下载 GeoIP 数据，也不需要后端凭证。如需验证真实数据库和官方更新链路，请将 `docs/geoip-test.example.json` 复制为 Git 忽略的本地文件 `.geoip-test.json`，填写数据库路径、测试 IP 和凭证：
+
+```sh
+cp docs/geoip-test.example.json .geoip-test.json
+# 编辑 .geoip-test.json
+make geoip-integration
+```
+
+`providers` 对象可以包含 `dbip`、`maxmind` 和 `ip2location`。每个条目必须提供 `ip`；`database_path` 会启用已有 MMDB 的 `ValidateWithProvider`、`OpenWithProvider` 和真实查询验证。设置 `download` 为 `true` 后，还会使用对应后端的官方地址，附加凭证，下载当前容器，执行校验和解包、后端结构验证，在临时目录原子激活，并查询激活后的数据库。仅测试下载链路时可以省略 `database_path`。可选的 `expected` 字段可以断言 `country_code`、`region_code` 和 `city`。
+
+该文件已加入 Git 忽略规则，集成测试使用内存日志，因此凭证不会提交或打印。MaxMind 条目使用 `account_id` 和 `license_key`，IP2Location 使用 `token`，DB-IP 不需要凭证。该测试会发起真实网络请求并可能下载较大的数据库，因此只手动执行，不纳入默认 `make check`。
+
 只有修改 Public Analytics 交互前端或底图时才需要 Node.js。`web/analytics-entry.js` 使用 ECharts 的按需模块，`web/assets/world.geo.json` 与 SVG 底图来自同一锁定版本的 Natural Earth 数据。执行：
 
 ```sh

@@ -33,6 +33,20 @@ go mod verify
 
 `make check` runs the regular tests and static analysis. `tools/preview-demo.sh` provides a local manual-preview environment with generated data.
 
+## GeoIP Integration Verification
+
+The regular test suite never downloads GeoIP data or requires provider credentials. To verify real databases and official update flows, copy `docs/geoip-test.example.json` to the ignored local file `.geoip-test.json` and fill in the database paths, test IPs, and credentials:
+
+```sh
+cp docs/geoip-test.example.json .geoip-test.json
+# edit .geoip-test.json
+make geoip-integration
+```
+
+The `providers` object may contain `dbip`, `maxmind`, and `ip2location`. Each entry requires an `ip`; `database_path` enables validation of an existing MMDB with `ValidateWithProvider`, `OpenWithProvider`, and a real lookup. Set `download` to `true` to additionally use the provider's official URL, attach credentials, download the current container, verify and unpack it, validate the provider schema, atomically activate it in a temporary directory, and query the activated database. `database_path` may be omitted when only the download path is being tested. Optional `expected` fields can assert `country_code`, `region_code`, and `city`.
+
+The file is ignored by Git and the integration test uses an in-memory logger, so credentials are not committed or printed. MaxMind entries use `account_id` and `license_key`; IP2Location entries use `token`; DB-IP requires no credential. The test performs live network requests and may download a large database, so run it manually rather than from the default `make check` target.
+
 Node.js is needed only when changing the Public Analytics interaction bundle or basemap. `web/analytics-entry.js` imports selected ECharts modules, while `web/assets/world.geo.json` and the SVG basemap come from the same pinned Natural Earth source. Run:
 
 ```sh
