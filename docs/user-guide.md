@@ -416,7 +416,7 @@ VisitorTrace is distributed under the [GNU General Public License, version 3](..
 
 ## Admin Backup Restore
 
-The Admin dashboard lists local `.vtbackup` archives and provides **Restore backup**. Select an archive, enter the current Administrator password, and confirm the destructive operation. VisitorTrace verifies both the sidecar and archive contents, creates a new safety snapshot under `backup_dir/pre-restore`, and schedules the replacement for the next supervised restart. The active configuration file is not overwritten. A successful restore revokes all Administrator sessions, so sign in again after the service becomes ready.
+**Administrator Settings > Backup restore** lists local `.vtbackup` archives and provides **Restore backup**. Select an archive, enter the current Administrator password, and confirm the destructive operation. VisitorTrace verifies both the sidecar and archive contents, creates a new safety snapshot under `backup_dir/pre-restore`, and schedules the replacement for the next supervised restart. The active configuration file is not overwritten. A successful restore revokes all Administrator sessions, so sign in again after the service becomes ready.
 
 ## Current Status
 

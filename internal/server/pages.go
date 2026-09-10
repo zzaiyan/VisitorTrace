@@ -72,7 +72,6 @@ type adminDashboardData struct {
 	pageLayout
 	SiteCount  int
 	Operations operations.Snapshot
-	Backups    []backupservice.Archive
 }
 
 type adminSitesData struct {
@@ -130,6 +129,7 @@ type adminSettingsData struct {
 	IP2LocationConfigured  bool
 	GeoIPFile              operations.FileStatus
 	GeoIPTask              *operations.TaskStatus
+	Backups                []backupservice.Archive
 }
 
 type publicAnalyticsData struct {
@@ -218,11 +218,6 @@ func (s *Server) adminDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	result := adminDashboardData{pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "dashboard"), "dashboard"), SiteCount: len(sites)}
 	result.Operations = operations.Collect(r.Context(), s.Config, s.Store, s.Started, time.Now())
-	result.Backups, err = backupservice.List(s.Config.BackupDir)
-	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法读取备份文件。")
-		return
-	}
 	result.Flash = adminFlash(r)
 	s.renderPage(w, r, "dashboard", result)
 }
@@ -266,6 +261,11 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 	maxMindProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderMaxMind))
 	ip2LocationProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderIP2Location))
 	operationSnapshot := operations.Collect(r.Context(), s.Config, s.Store, s.Started, time.Now())
+	backups, err := backupservice.List(s.Config.BackupDir)
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "无法读取备份文件。")
+		return
+	}
 	data := adminSettingsData{
 		pageLayout:     s.adminLayout(r, session, "管理员设置", "settings"),
 		CurrentVersion: manager.CurrentVersion, StableExecutable: manager.StableBinaryPath(),
@@ -278,7 +278,7 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		DBIPOfficialURL: dbipProfile.URL, MaxMindOfficialURL: maxMindProfile.URL, IP2LocationOfficialURL: ip2LocationProfile.URL,
 		MaxMindConfigured:     s.Config.MaxMindAccountID != "" && s.Config.MaxMindLicenseKey != "",
 		MaxMindHasCredentials: s.Config.MaxMindAccountID != "" || s.Config.MaxMindLicenseKey != "",
-		IP2LocationConfigured: s.Config.IP2LocationToken != "", GeoIPFile: operationSnapshot.GeoIP,
+		IP2LocationConfigured: s.Config.IP2LocationToken != "", GeoIPFile: operationSnapshot.GeoIP, Backups: backups,
 	}
 	for _, task := range operationSnapshot.Tasks {
 		if task.Operation == "geoip_update" {

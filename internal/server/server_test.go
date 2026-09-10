@@ -837,8 +837,16 @@ func TestAdminOperationalActions(t *testing.T) {
 	dashboard.AddCookie(cookie)
 	dashboardResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(dashboardResponse, dashboard)
-	if dashboardResponse.Code != http.StatusOK || !strings.Contains(dashboardResponse.Body.String(), "运行状态") || !strings.Contains(dashboardResponse.Body.String(), "visitortrace-") || !strings.Contains(dashboardResponse.Body.String(), `action="/admin/operations/restore"`) || !strings.Contains(dashboardResponse.Body.String(), "恢复备份") {
+	if dashboardResponse.Code != http.StatusOK || !strings.Contains(dashboardResponse.Body.String(), "运行状态") || !strings.Contains(dashboardResponse.Body.String(), "visitortrace-") || strings.Contains(dashboardResponse.Body.String(), `action="/admin/operations/restore"`) {
 		t.Fatalf("operations dashboard = status %d body %q", dashboardResponse.Code, dashboardResponse.Body.String())
+	}
+	settingsRequest := httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	settingsRequest.Host = "127.0.0.1:8790"
+	settingsRequest.AddCookie(cookie)
+	settingsResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(settingsResponse, settingsRequest)
+	if settingsResponse.Code != http.StatusOK || !strings.Contains(settingsResponse.Body.String(), `id="backup"`) || !strings.Contains(settingsResponse.Body.String(), `action="/admin/operations/restore"`) || !strings.Contains(settingsResponse.Body.String(), "恢复备份") {
+		t.Fatalf("settings backup restore section = status %d body %q", settingsResponse.Code, settingsResponse.Body.String())
 	}
 	restoreForm := url.Values{"csrf": {csrf}, "backup": {filepath.Base(archives[0])}, "password": {"correct horse"}}
 	restoreRequest := httptest.NewRequest(http.MethodPost, "/admin/operations/restore", strings.NewReader(restoreForm.Encode()))

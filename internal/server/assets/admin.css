@@ -75,6 +75,7 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .restore-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, .65fr) auto; align-items: end; gap: 12px; }
 .restore-form .field { min-width: 0; }
 .restore-form .button { min-height: 42px; }
+.restore-panel-single { display: block; }
 .status.success { background: #e2f0e9; color: var(--green-dark); }
 .status.failed { background: #f6dfdb; color: var(--danger); }
 .status.running { background: #f5ebcc; color: #765b10; }

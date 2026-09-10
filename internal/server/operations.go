@@ -23,7 +23,7 @@ func (s *Server) adminRunBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.ConfigPath == "" {
-		s.redirectWithError(w, r, "/admin", "服务配置路径不可用。")
+		s.redirectWithError(w, r, "/admin/settings#backup", "服务配置路径不可用。")
 		return
 	}
 	_, err := backupservice.CreateTracked(r.Context(), s.Store, s.ConfigPath, s.Config.BackupDir, 3, time.Now())
@@ -49,14 +49,14 @@ func (s *Server) adminRunRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
-		s.redirectWithError(w, r, "/admin", "管理员密码不正确。")
+		s.redirectWithError(w, r, "/admin/settings#backup", "管理员密码不正确。")
 		return
 	}
 
 	s.restoreMu.Lock()
 	if s.restoreActive {
 		s.restoreMu.Unlock()
-		s.redirectWithError(w, r, "/admin", "已有备份恢复任务正在等待服务重启。")
+		s.redirectWithError(w, r, "/admin/settings#backup", "已有备份恢复任务正在等待服务重启。")
 		return
 	}
 	s.restoreActive = true
@@ -73,27 +73,27 @@ func (s *Server) adminRunRestore(w http.ResponseWriter, r *http.Request) {
 	archiveName := strings.TrimSpace(r.FormValue("backup"))
 	archivePath, err := backupservice.Resolve(s.Config.BackupDir, archiveName)
 	if err != nil {
-		s.redirectWithError(w, r, "/admin", "备份文件不可用："+err.Error())
+		s.redirectWithError(w, r, "/admin/settings#backup", "备份文件不可用："+err.Error())
 		return
 	}
 	manifest, err := backupservice.ValidateArchive(r.Context(), archivePath)
 	if err != nil {
-		s.redirectWithError(w, r, "/admin", "备份校验失败："+err.Error())
+		s.redirectWithError(w, r, "/admin/settings#backup", "备份校验失败："+err.Error())
 		return
 	}
 	preRestoreDir := filepath.Join(s.Config.BackupDir, "pre-restore")
 	preRestore, err := backupservice.Create(r.Context(), s.Store, s.ConfigPath, preRestoreDir, 3, time.Now())
 	if err != nil {
-		s.redirectWithError(w, r, "/admin", "创建恢复前安全备份失败："+err.Error())
+		s.redirectWithError(w, r, "/admin/settings#backup", "创建恢复前安全备份失败："+err.Error())
 		return
 	}
 	if err := backupservice.ScheduleRestore(s.Config.DataDir, s.Config.BackupDir, archivePath, preRestore.Path, time.Now()); err != nil {
-		s.redirectWithError(w, r, "/admin", "安排恢复失败："+err.Error())
+		s.redirectWithError(w, r, "/admin/settings#backup", "安排恢复失败："+err.Error())
 		return
 	}
 	scheduled = true
 	s.renderPage(w, r, "restore-restarting", restoreRestartData{
-		pageLayout:  s.adminLayout(r, session, translate(adminLanguage(r), "restore_backup"), "dashboard"),
+		pageLayout:  s.adminLayout(r, session, translate(adminLanguage(r), "restore_backup"), "settings"),
 		ArchiveName: archiveName, Manifest: manifest,
 	})
 	go func() {

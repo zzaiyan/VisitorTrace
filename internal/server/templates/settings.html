@@ -5,6 +5,7 @@
 <nav class="settings-jump" aria-label="{{t "settings_navigation"}}">
   <a href="#configuration">{{t "service_configuration"}}</a>
   <a href="#geoip">{{t "geoip_operations"}}</a>
+  <a href="#backup">{{t "restore_backup"}}</a>
   <a href="#account">{{t "account_security"}}</a>
   <a href="#self-update">{{t "application_update"}}</a>
 </nav>
@@ -74,6 +75,20 @@
       <button class="button ghost" type="submit" name="force" value="0">{{t "check_now"}}</button>
       <button class="button primary" type="submit" name="force" value="1">{{t "force_download"}}</button>
     </form>
+  </div>
+</section>
+
+<section class="section-block" id="backup">
+  <div class="section-heading"><div><p class="eyebrow">DATA MAINTENANCE</p><h2>{{t "restore_backup"}}</h2><p class="subhead">{{t "restore_backup_help"}}</p></div></div>
+  <div class="restore-panel restore-panel-single">
+    {{if .Backups}}
+    <form class="restore-form" method="post" action="{{appPath "/admin/operations/restore"}}" data-confirm-message="{{t "restore_backup_confirm"}}">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label class="field"><span>{{t "choose_backup"}}</span><select name="backup" required>{{range .Backups}}<option value="{{.Name}}">{{.Name}} · {{formatBytes .Size}} · {{formatUTC .ModifiedAt}}{{if not .HasChecksum}} · {{t "checksum_missing"}}{{end}}</option>{{end}}</select></label>
+      <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="button danger" type="submit">{{t "restore_now"}}</button>
+    </form>
+    {{else}}<p class="muted">{{t "no_backups"}}</p>{{end}}
   </div>
 </section>
 
