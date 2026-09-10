@@ -161,6 +161,8 @@ go run ./tools/release-manifest verify \
 
 归档旁的 `.sha256` 校验整个容器。恢复在激活数据库前验证两层校验和、执行 SQLite 完整性检查、运行正向迁移并撤销全部管理员 Session。
 
+后台恢复路由只接受配置 `backup_dir` 目录下的普通归档文件。它会先完整校验归档，再在 `backup_dir/pre-restore` 创建新的安全快照，写入受保护的 `.restore-pending.json` 状态并请求进程优雅退出。下一次启动会在打开正常 Store 前消费该状态，激活恢复后的数据库并删除状态文件。待恢复失败时会将状态隔离为 `.restore-pending.json.failed-*`，保留当前数据库；恢复不会替换活动配置文件。
+
 ## 贡献许可
 
 VisitorTrace 采用 GPL-3.0。贡献内容必须能够按与该许可证兼容的条款提供；复制的代码或资产必须保留原始声明。所有打包进入项目的第三方组件和数据都应记录在[第三方声明](../THIRD_PARTY_NOTICES.zh-CN.md)中。依赖项位于公开仓库并不代表其许可证必然兼容。

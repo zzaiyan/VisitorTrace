@@ -6,7 +6,7 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
-- No unreleased changes.
+- Added Administrator Console backup restoration from verified local `.vtbackup` archives. The workflow creates a pre-restore snapshot, schedules a safe database replacement during the next supervised restart, preserves the active configuration, and revokes Administrator sessions after a successful restore.
 
 ## 0.2.2 - 2026-08-29
 

@@ -662,6 +662,9 @@ func TestAdminLoginAndDashboard(t *testing.T) {
 	if count := strings.Count(sitePageResponse.Body.String(), `class="copy-control copy-button"`); count != 4 {
 		t.Fatalf("admin Site page copy controls = %d, want 4", count)
 	}
+	if body := sitePageResponse.Body.String(); !strings.Contains(body, `data-reset-preset`) || !strings.Contains(body, "恢复默认") || !strings.Contains(body, `data-default-preset=`) || !strings.Contains(body, "function restoreDefaults()") {
+		t.Fatalf("admin Site page lacks unsaved Map Preset reset control: %q", body)
+	}
 	if count := strings.Count(sitePageResponse.Body.String(), `class="recent-page"`); count != 8 {
 		t.Fatalf("admin Site recent records = %d, want 8", count)
 	}
@@ -834,8 +837,26 @@ func TestAdminOperationalActions(t *testing.T) {
 	dashboard.AddCookie(cookie)
 	dashboardResponse := httptest.NewRecorder()
 	app.Handler().ServeHTTP(dashboardResponse, dashboard)
-	if dashboardResponse.Code != http.StatusOK || !strings.Contains(dashboardResponse.Body.String(), "运行状态") || !strings.Contains(dashboardResponse.Body.String(), "visitortrace-") {
+	if dashboardResponse.Code != http.StatusOK || !strings.Contains(dashboardResponse.Body.String(), "运行状态") || !strings.Contains(dashboardResponse.Body.String(), "visitortrace-") || !strings.Contains(dashboardResponse.Body.String(), `action="/admin/operations/restore"`) || !strings.Contains(dashboardResponse.Body.String(), "恢复备份") {
 		t.Fatalf("operations dashboard = status %d body %q", dashboardResponse.Code, dashboardResponse.Body.String())
+	}
+	restoreForm := url.Values{"csrf": {csrf}, "backup": {filepath.Base(archives[0])}, "password": {"correct horse"}}
+	restoreRequest := httptest.NewRequest(http.MethodPost, "/admin/operations/restore", strings.NewReader(restoreForm.Encode()))
+	restoreRequest.Host = "127.0.0.1:8790"
+	restoreRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	restoreRequest.AddCookie(cookie)
+	restoreResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(restoreResponse, restoreRequest)
+	if restoreResponse.Code != http.StatusOK || !strings.Contains(restoreResponse.Body.String(), "正在恢复备份") || !strings.Contains(restoreResponse.Body.String(), filepath.Base(archives[0])) {
+		t.Fatalf("restore action = status %d body %q", restoreResponse.Code, restoreResponse.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(app.Config.DataDir, ".restore-pending.json")); err != nil {
+		t.Fatalf("pending restore state: %v", err)
+	}
+	select {
+	case <-app.RestartRequested():
+	case <-time.After(2 * time.Second):
+		t.Fatal("restore action did not request a restart")
 	}
 }
 

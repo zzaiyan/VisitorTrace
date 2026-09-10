@@ -15,6 +15,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	backupservice "github.com/zzaiyan/VisitorTrace/internal/backup"
 	"github.com/zzaiyan/VisitorTrace/internal/buildinfo"
 	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
@@ -167,6 +168,14 @@ func runServe(args []string) int {
 	}
 	if *listen != "" {
 		cfg.Listen = *listen
+	}
+	restoreCtx, restoreCancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	manifest, restored, restoreErr := backupservice.ApplyPendingRestore(restoreCtx, cfg.DataDir, cfg.BackupDir, cfg.DatabasePath)
+	restoreCancel()
+	if restoreErr != nil {
+		fmt.Fprintf(os.Stderr, "serve: pending backup restore failed; current database retained: %v\n", restoreErr)
+	} else if restored {
+		fmt.Fprintf(os.Stdout, "serve: restored backup created at %s\n", manifest.CreatedAt.Format(time.RFC3339))
 	}
 	recoveryCtx, recoveryCancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	rolledBack, recoveryErr := selfupdate.RegisterStartup(recoveryCtx, cfg)

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	backupservice "github.com/zzaiyan/VisitorTrace/internal/backup"
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 	"github.com/zzaiyan/VisitorTrace/internal/maprender"
 	"github.com/zzaiyan/VisitorTrace/internal/operations"
@@ -71,6 +72,7 @@ type adminDashboardData struct {
 	pageLayout
 	SiteCount  int
 	Operations operations.Snapshot
+	Backups    []backupservice.Archive
 }
 
 type adminSitesData struct {
@@ -83,6 +85,7 @@ type adminSiteData struct {
 	Site             store.Site
 	Overview         store.SiteOverview
 	Preset           maprender.Options
+	DefaultPreset    maprender.Options
 	ChartJSON        template.JS
 	Recent           []store.PageviewRecord
 	OriginsText      string
@@ -169,7 +172,14 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string,
 		"operationLabel":   func(value string) string { return operationLabel(value, lang) },
 		"operationState":   func(value string) string { return operationState(value, lang) },
 		"geoAttribution":   func() geoip.Attribution { return geoip.AttributionForProvider(s.Config.GeoIPProvider) },
-		"geoLabel":         geoLabel,
+		"presetJSON": func(options maprender.Options) string {
+			value, err := maprender.PresetJSON(options)
+			if err != nil {
+				return "{}"
+			}
+			return value
+		},
+		"geoLabel": geoLabel,
 		"metricPercent": func(value, total int64) string {
 			if total <= 0 {
 				return "0%"
@@ -208,6 +218,11 @@ func (s *Server) adminDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	result := adminDashboardData{pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "dashboard"), "dashboard"), SiteCount: len(sites)}
 	result.Operations = operations.Collect(r.Context(), s.Config, s.Store, s.Started, time.Now())
+	result.Backups, err = backupservice.List(s.Config.BackupDir)
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, "无法读取备份文件。")
+		return
+	}
 	result.Flash = adminFlash(r)
 	s.renderPage(w, r, "dashboard", result)
 }
@@ -398,7 +413,7 @@ func (s *Server) adminSite(w http.ResponseWriter, r *http.Request) {
 	}
 	data := adminSiteData{
 		pageLayout: s.adminLayout(r, session, site.Name, "sites"), Site: site, Overview: overview,
-		Preset: preset, ChartJSON: chartJSON, Recent: recent, OriginsText: strings.Join(site.AllowedOrigins, "\n"),
+		Preset: preset, DefaultPreset: maprender.DefaultOptions(), ChartJSON: chartJSON, Recent: recent, OriginsText: strings.Join(site.AllowedOrigins, "\n"),
 		MapPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview.svg"), WidgetPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview"), MapAspect: maprender.MapAspect, BaseURL: s.externalBaseURL(r), Saved: adminFlash(r),
 		GeoIPAvailable: s.geoIPAvailable(),
 	}

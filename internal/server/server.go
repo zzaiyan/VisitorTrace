@@ -57,6 +57,8 @@ type Server struct {
 	mapCache      *mapCache
 	loginLimit    *ratelimit.Limiter
 	recordGeoIPMu sync.Mutex
+	restoreMu     sync.Mutex
+	restoreActive bool
 	basePath      string
 	restartOnce   sync.Once
 	restart       chan struct{}
@@ -102,6 +104,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/records.csv", s.adminRecordsCSV)
 	mux.HandleFunc("GET /admin/aggregates.csv", s.adminAggregatesCSV)
 	mux.HandleFunc("POST /admin/operations/backup", s.adminRunBackup)
+	mux.HandleFunc("POST /admin/operations/restore", s.adminRunRestore)
 	mux.HandleFunc("POST /admin/operations/cleanup", s.adminRunCleanup)
 	mux.HandleFunc("POST /admin/operations/geoip", s.adminRunGeoIPUpdate)
 	mux.HandleFunc("GET /admin/sites", s.adminSites)

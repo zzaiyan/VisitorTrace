@@ -143,7 +143,7 @@
       </div>
       {{with geoAttribution}}<a class="attribution" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}
     </div>
-    <form id="preset-form" method="post" action="{{appPath (printf "/admin/sites/%s/preset" .Site.ID)}}" class="preset-form" data-map-aspect="{{.MapAspect}}">
+    <form id="preset-form" method="post" action="{{appPath (printf "/admin/sites/%s/preset" .Site.ID)}}" class="preset-form" data-map-aspect="{{.MapAspect}}" data-default-preset="{{presetJSON .DefaultPreset}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div class="field-grid two">
         <div class="field"><label for="preset-width">{{t "width"}}</label><div class="input-unit"><input id="preset-width" type="number" name="w" min="160" max="1200" value="{{.Preset.Width}}" required><span>px</span><button class="input-auto" type="button" data-auto-dimension="width" title="{{t "auto_width"}}" aria-label="{{t "auto_width"}}">↔</button></div></div>
@@ -166,7 +166,7 @@
         <label class="color-field"><span>{{t "text"}}</span><input type="color" name="text" value="#{{.Preset.Text}}"></label>
         <label class="color-field"><span>{{t "marker"}}</span><input type="color" name="marker" value="#{{.Preset.Marker}}"></label>
       </div>
-      <div class="form-actions"><button class="button primary" type="submit">{{t "save_preset"}}</button></div>
+      <div class="form-actions"><button class="button ghost" type="button" data-reset-preset>{{t "restore_defaults"}}</button><button class="button primary" type="submit">{{t "save_preset"}}</button></div>
     </form>
   </div>
 </section>
@@ -251,6 +251,9 @@
   var overrideExample = document.querySelector(".url-override-example");
   var modeButtons = Array.prototype.slice.call(document.querySelectorAll("[data-preview-mode]"));
   if (!form || !previewSurface || !widgetPreview || !imagePreview || !modeButtons.length) return;
+  var resetButton = form.querySelector("[data-reset-preset]");
+  var defaultPreset = {};
+  try { defaultPreset = JSON.parse(form.dataset.defaultPreset || "{}"); } catch (_) {}
   var timer;
   var activeMode = "widget";
   var loadedURLs = { widget: widgetPreview.src, image: "" };
@@ -302,6 +305,20 @@
     var height = Number(form.elements.h.value);
     if (activeMode === "widget") sizeWidget(width, height);
     else sizeImage(width, height);
+  }
+  function restoreDefaults() {
+    ["w", "h", "title", "pv_label", "uv_label", "fs", "metric"].forEach(function (key) {
+      if (defaultPreset[key] !== undefined && form.elements[key]) form.elements[key].value = defaultPreset[key];
+    });
+    ["land", "border", "text", "marker"].forEach(function (key) {
+      if (defaultPreset[key] !== undefined && form.elements[key]) form.elements[key].value = "#" + defaultPreset[key];
+    });
+    if (form.elements.bg_color) form.elements.bg_color.value = "#" + (defaultPreset.bg === "transparent" ? "f2f3f3" : (defaultPreset.bg || "f2f3f3"));
+    if (form.elements.bg_transparent) form.elements.bg_transparent.checked = defaultPreset.bg === "transparent";
+    ["title", "pv", "uv"].forEach(function (key) {
+      if (form.elements["show_" + key]) form.elements["show_" + key].checked = Boolean(defaultPreset.show && defaultPreset.show[key]);
+    });
+    update();
   }
   function selectMode(mode) {
     activeMode = mode;
@@ -358,6 +375,7 @@
   form.querySelectorAll("[data-auto-dimension]").forEach(function (button) {
     button.addEventListener("click", function () { autoDimension(button.dataset.autoDimension); });
   });
+  if (resetButton) resetButton.addEventListener("click", restoreDefaults);
 }());
 </script>
 <script>

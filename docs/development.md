@@ -161,6 +161,8 @@ A `.vtbackup` file is a ZIP container with:
 
 The adjacent `.sha256` file verifies the complete container. Before activation, restore verifies both checksum layers, runs SQLite integrity checking, applies forward migrations, and revokes every Administrator session.
 
+The Admin restore route accepts only a regular archive directly inside the configured `backup_dir`. It verifies the archive before creating a new snapshot under `backup_dir/pre-restore`, then writes a protected `.restore-pending.json` state file and requests a graceful process exit. Startup consumes that state before opening the normal Store, activates the restored database, and removes the state file. A failed pending restore is quarantined as `.restore-pending.json.failed-*`, leaving the current database in place. The active configuration file is never replaced by a database restore.
+
 ## Licensing Contributions
 
 VisitorTrace is licensed under GPL-3.0. Contributions must be available under terms compatible with that license, and copied code or assets must retain their original notices. Record every bundled third-party component or dataset in the [Third-Party Notices](../THIRD_PARTY_NOTICES.md). Do not assume that a dependency's availability on a public repository makes it license-compatible.

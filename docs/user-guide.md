@@ -414,6 +414,10 @@ A mirror cannot replace the trust root. The manifest must verify against the pub
 
 VisitorTrace is distributed under the [GNU General Public License, version 3](../LICENSE). Third-party components and data remain under their respective terms as listed in the [Third-Party Notices](../THIRD_PARTY_NOTICES.md). The license text, rather than this guide, defines the applicable rights and obligations.
 
+## Admin Backup Restore
+
+The Admin dashboard lists local `.vtbackup` archives and provides **Restore backup**. Select an archive, enter the current Administrator password, and confirm the destructive operation. VisitorTrace verifies both the sidecar and archive contents, creates a new safety snapshot under `backup_dir/pre-restore`, and schedules the replacement for the next supervised restart. The active configuration file is not overwritten. A successful restore revokes all Administrator sessions, so sign in again after the service becomes ready.
+
 ## Current Status
 
 The current milestone implements the agreed first-version scope, including Pageview ingestion and aggregates, counting-rule history, automatic cleanup, automatic GeoIP updates, bounded SVG-map caching, bilingual interactive analytics, administrative data and health views, password and Site lifecycles, backup/restore, and signature-verified one-click self-update.

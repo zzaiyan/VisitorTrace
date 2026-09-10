@@ -14,6 +14,17 @@
     <div class="{{if or (not .Operations.GeoIP.Exists) .Operations.GeoIP.Stale}}operation-alert{{end}}"><dt>GeoIP</dt><dd>{{if .Operations.GeoIP.Exists}}{{formatBytes .Operations.GeoIP.Size}}{{else}}{{t "unavailable"}}{{end}}</dd><small>{{if .Operations.GeoIP.Exists}}{{formatUTC .Operations.GeoIP.ModifiedAt}}{{else}}{{t "awaiting_download"}}{{end}}</small></div>
     <div class="{{if or (not .Operations.Backup.Exists) .Operations.Backup.Stale}}operation-alert{{end}}"><dt>{{t "latest_backup"}}</dt><dd>{{if .Operations.Backup.Exists}}{{formatBytes .Operations.Backup.Size}}{{else}}{{t "no_backup"}}{{end}}</dd><small>{{if .Operations.Backup.Exists}}{{.Operations.Backup.Name}}{{else}}{{t "create_recommended"}}{{end}}</small></div>
   </dl>
+  <div class="restore-panel">
+    <div><h3>{{t "restore_backup"}}</h3><p>{{t "restore_backup_help"}}</p></div>
+    {{if .Backups}}
+    <form class="restore-form" method="post" action="{{appPath "/admin/operations/restore"}}" data-confirm-message="{{t "restore_backup_confirm"}}">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label class="field"><span>{{t "choose_backup"}}</span><select name="backup" required>{{range .Backups}}<option value="{{.Name}}">{{.Name}} · {{formatBytes .Size}} · {{formatUTC .ModifiedAt}}{{if not .HasChecksum}} · {{t "checksum_missing"}}{{end}}</option>{{end}}</select></label>
+      <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="button danger" type="submit">{{t "restore_now"}}</button>
+    </form>
+    {{else}}<p class="muted">{{t "no_backups"}}</p>{{end}}
+  </div>
   <div class="operation-table table-wrap"><table><thead><tr><th>{{t "task"}}</th><th>{{t "status"}}</th><th>{{t "completed_at"}}</th><th>{{t "summary"}}</th></tr></thead><tbody>{{range .Operations.Tasks}}<tr><td>{{operationLabel .Operation}}</td><td><span class="status {{.State}}">{{operationState .State}}</span></td><td>{{if .CompletedAt}}{{formatUTC .CompletedAt}}{{else}}{{t "running"}}{{end}}</td><td><code>{{.Summary}}</code></td></tr>{{else}}<tr><td colspan="4" class="empty-cell">{{t "no_task_runs"}}</td></tr>{{end}}</tbody></table></div>
 </section>
 {{end}}

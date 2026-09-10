@@ -20,11 +20,12 @@ import (
 )
 
 const (
-	formatVersion = 1
-	databaseName  = "visitortrace.sqlite3"
-	configName    = "config.json"
-	manifestName  = "manifest.json"
-	extension     = ".vtbackup"
+	formatVersion               = 1
+	databaseName                = "visitortrace.sqlite3"
+	configName                  = "config.json"
+	manifestName                = "manifest.json"
+	extension                   = ".vtbackup"
+	pendingRestoreFormatVersion = 1
 )
 
 type FileMetadata struct {
@@ -44,6 +45,223 @@ type Result struct {
 	Path     string
 	Checksum string
 	Manifest Manifest
+}
+
+type Archive struct {
+	Name        string
+	Path        string
+	Size        int64
+	ModifiedAt  time.Time
+	HasChecksum bool
+}
+
+type PendingRestore struct {
+	FormatVersion  int       `json:"format_version"`
+	ArchivePath    string    `json:"archive_path"`
+	PreRestorePath string    `json:"pre_restore_path"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func List(directory string) ([]Archive, error) {
+	entries, err := os.ReadDir(directory)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("list backup directory: %w", err)
+	}
+	archives := make([]Archive, 0)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), extension) {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		archives = append(archives, Archive{
+			Name: entry.Name(), Path: filepath.Join(directory, entry.Name()), Size: info.Size(), ModifiedAt: info.ModTime().UTC(),
+			HasChecksum: fileExists(filepath.Join(directory, entry.Name()+".sha256")),
+		})
+	}
+	sort.Slice(archives, func(i, j int) bool { return archives[i].ModifiedAt.After(archives[j].ModifiedAt) })
+	return archives, nil
+}
+
+func Resolve(directory, name string) (string, error) {
+	if name == "" || filepath.Base(name) != name || !strings.HasSuffix(name, extension) {
+		return "", fmt.Errorf("invalid backup archive name")
+	}
+	path := filepath.Join(directory, name)
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", fmt.Errorf("find backup archive: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("backup archive is not a regular file")
+	}
+	return path, nil
+}
+
+func ValidateArchive(ctx context.Context, archivePath string) (Manifest, error) {
+	if err := VerifyArchiveChecksum(archivePath); err != nil {
+		return Manifest{}, err
+	}
+	workDir, err := os.MkdirTemp("", ".visitortrace-restore-")
+	if err != nil {
+		return Manifest{}, fmt.Errorf("create restore verification workspace: %w", err)
+	}
+	defer os.RemoveAll(workDir)
+	manifest, err := extractAndVerify(archivePath, workDir)
+	if err != nil {
+		return Manifest{}, err
+	}
+	if err := store.IntegrityCheckFile(ctx, filepath.Join(workDir, databaseName)); err != nil {
+		return Manifest{}, err
+	}
+	return manifest, nil
+}
+
+func ScheduleRestore(dataDir, backupDir, archivePath, preRestorePath string, now time.Time) error {
+	archivePath, err := filepath.Abs(archivePath)
+	if err != nil {
+		return fmt.Errorf("resolve backup archive path: %w", err)
+	}
+	if err := validateArchivePath(backupDir, archivePath); err != nil {
+		return err
+	}
+	pendingPath := pendingRestorePath(dataDir)
+	if _, err := os.Stat(pendingPath); err == nil {
+		return fmt.Errorf("another backup restore is already pending")
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("check pending restore: %w", err)
+	}
+	pending := PendingRestore{FormatVersion: pendingRestoreFormatVersion, ArchivePath: archivePath, PreRestorePath: preRestorePath, CreatedAt: now.UTC()}
+	data, err := json.MarshalIndent(pending, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode pending restore: %w", err)
+	}
+	data = append(data, '\n')
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		return fmt.Errorf("create restore state directory: %w", err)
+	}
+	if err := os.Chmod(dataDir, 0o700); err != nil {
+		return fmt.Errorf("protect restore state directory: %w", err)
+	}
+	temporary, err := os.CreateTemp(dataDir, ".restore-pending-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create pending restore state: %w", err)
+	}
+	name := temporary.Name()
+	defer os.Remove(name)
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("write pending restore state: %w", err)
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("sync pending restore state: %w", err)
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("close pending restore state: %w", err)
+	}
+	if err := os.Rename(name, pendingPath); err != nil {
+		return fmt.Errorf("activate pending restore state: %w", err)
+	}
+	return nil
+}
+
+func ApplyPendingRestore(ctx context.Context, dataDir, backupDir, databasePath string) (Manifest, bool, error) {
+	pendingPath := pendingRestorePath(dataDir)
+	pending, err := readPendingRestore(pendingPath, backupDir)
+	if os.IsNotExist(err) {
+		return Manifest{}, false, nil
+	}
+	if err != nil {
+		quarantinePendingRestore(pendingPath)
+		return Manifest{}, true, err
+	}
+	manifest, err := Restore(ctx, pending.ArchivePath, databasePath)
+	if err != nil {
+		quarantinePendingRestore(pendingPath)
+		return Manifest{}, true, fmt.Errorf("apply pending restore: %w", err)
+	}
+	if err := os.Remove(pendingPath); err != nil && !os.IsNotExist(err) {
+		return Manifest{}, true, fmt.Errorf("clear pending restore state: %w", err)
+	}
+	return manifest, true, nil
+}
+
+func pendingRestorePath(dataDir string) string {
+	return filepath.Join(dataDir, ".restore-pending.json")
+}
+
+func readPendingRestore(path, backupDir string) (PendingRestore, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return PendingRestore{}, err
+	}
+	var pending PendingRestore
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&pending); err != nil {
+		return PendingRestore{}, fmt.Errorf("decode pending restore: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return PendingRestore{}, fmt.Errorf("decode pending restore: trailing content")
+	}
+	if pending.FormatVersion != pendingRestoreFormatVersion || pending.CreatedAt.IsZero() {
+		return PendingRestore{}, fmt.Errorf("pending restore state is invalid")
+	}
+	archivePath, err := filepath.Abs(pending.ArchivePath)
+	if err != nil {
+		return PendingRestore{}, fmt.Errorf("resolve pending restore archive: %w", err)
+	}
+	if err := validateArchivePath(backupDir, archivePath); err != nil {
+		return PendingRestore{}, err
+	}
+	info, err := os.Lstat(archivePath)
+	if err != nil {
+		return PendingRestore{}, fmt.Errorf("find pending restore archive: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return PendingRestore{}, fmt.Errorf("pending restore archive is not a regular file")
+	}
+	pending.ArchivePath = archivePath
+	return pending, nil
+}
+
+func validateArchivePath(backupDir, archivePath string) error {
+	root, err := filepath.Abs(backupDir)
+	if err != nil {
+		return fmt.Errorf("resolve backup directory: %w", err)
+	}
+	path, err := filepath.Abs(archivePath)
+	if err != nil {
+		return fmt.Errorf("resolve backup archive: %w", err)
+	}
+	relative, err := filepath.Rel(root, path)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) || relative == "" || strings.Contains(relative, string(filepath.Separator)) {
+		return fmt.Errorf("backup archive must be directly inside the backup directory")
+	}
+	if !strings.HasSuffix(path, extension) {
+		return fmt.Errorf("backup archive has an invalid extension")
+	}
+	return nil
+}
+
+func quarantinePendingRestore(path string) {
+	failed := path + ".failed-" + time.Now().UTC().Format("20060102T150405.000000000Z")
+	_ = os.Rename(path, failed)
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func CreateTracked(ctx context.Context, st *store.Store, configPath, outputDir string, keep int, now time.Time) (Result, error) {

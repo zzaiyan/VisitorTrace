@@ -75,6 +75,55 @@ func TestCreateAndRestore(t *testing.T) {
 	}
 }
 
+func TestPendingRestoreAppliesAfterRestart(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	cfg := config.Default(filepath.Join(dir, "data"))
+	configPath := filepath.Join(dir, "config.json")
+	if err := config.Save(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+	st, err := store.Initialize(ctx, cfg.DatabasePath, "test-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	site, err := st.CreateSite(ctx, store.CreateSiteParams{Name: "Before restore", AllowedOrigins: []string{"https://example.com"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := Create(ctx, st, configPath, cfg.BackupDir, 3, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.DB.ExecContext(ctx, `UPDATE sites SET name = 'After restore' WHERE id = ?`, site.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ScheduleRestore(cfg.DataDir, cfg.BackupDir, result.Path, filepath.Join(cfg.BackupDir, "pre-restore", "safety.vtbackup"), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := ApplyPendingRestore(ctx, cfg.DataDir, cfg.BackupDir, cfg.DatabasePath); err != nil || !ok {
+		t.Fatalf("ApplyPendingRestore() = applied %v, error %v", ok, err)
+	}
+	restored, err := store.OpenExisting(ctx, cfg.DatabasePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restored.Close()
+	got, err := restored.GetSite(ctx, site.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Name != "Before restore" {
+		t.Fatalf("pending restore site name = %q", got.Name)
+	}
+	if _, ok, err := ApplyPendingRestore(ctx, cfg.DataDir, cfg.BackupDir, cfg.DatabasePath); err != nil || ok {
+		t.Fatalf("second ApplyPendingRestore() = applied %v, error %v", ok, err)
+	}
+}
+
 func TestArchiveChecksumDetectsTampering(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
