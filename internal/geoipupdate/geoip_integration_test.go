@@ -68,12 +68,16 @@ func TestConfiguredGeoIPProviders(t *testing.T) {
 		}
 		t.Run(provider, func(t *testing.T) {
 			if fixture.DatabasePath != "" {
-				validateConfiguredDatabase(t, provider, fixture)
+				t.Run("existing_database", func(t *testing.T) {
+					validateConfiguredDatabase(t, provider, fixture)
+				})
 			} else if !fixture.Download {
 				t.Fatal("database_path is required when download is false")
 			}
 			if fixture.Download {
-				validateConfiguredDownload(t, provider, fixture)
+				t.Run("official_update", func(t *testing.T) {
+					validateConfiguredDownload(t, provider, fixture)
+				})
 			}
 		})
 	}
