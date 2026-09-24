@@ -213,7 +213,7 @@ func (s *Server) adminDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	sites, err := s.Store.ListSites(r.Context())
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法读取站点。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_sites"))
 		return
 	}
 	result := adminDashboardData{pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "dashboard"), "dashboard"), SiteCount: len(sites)}
@@ -229,19 +229,19 @@ func (s *Server) adminSites(w http.ResponseWriter, r *http.Request) {
 	}
 	sites, err := s.Store.ListSites(r.Context())
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法读取站点。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_sites"))
 		return
 	}
 	result := adminSitesData{pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "sites"), "sites")}
 	for _, site := range sites {
 		overview, err := s.Store.SiteOverview(r.Context(), site.ID)
 		if err != nil {
-			s.renderError(w, r, http.StatusInternalServerError, "无法读取站点统计。")
+			s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_site_stats"))
 			return
 		}
 		preset, err := maprender.ParsePresetJSON(site.MapPresetJSON)
 		if err != nil {
-			s.renderError(w, r, http.StatusInternalServerError, "无法读取 Map Preset。")
+			s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_preset"))
 			return
 		}
 		result.Sites = append(result.Sites, siteSummary{Site: site, Overview: overview, Preset: preset, MapPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview.svg")})
@@ -263,7 +263,7 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 	operationSnapshot := operations.Collect(r.Context(), s.Config, s.Store, s.Started, time.Now())
 	backups, err := backupservice.List(s.Config.BackupDir)
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法读取备份文件。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_backups"))
 		return
 	}
 	data := adminSettingsData{
@@ -306,15 +306,15 @@ func (s *Server) adminChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
 	if !s.validCSRF(r, session) {
-		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_csrf"))
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		s.redirectWithError(w, r, "/admin/settings", "密码表单无效。")
+		s.redirectWithError(w, r, "/admin/settings", translate(adminLanguage(r), "err_password_form"))
 		return
 	}
 	if !s.administratorPasswordMatches(r.Context(), r.FormValue("current_password")) {
-		s.redirectWithError(w, r, "/admin/settings", "当前密码不正确。")
+		s.redirectWithError(w, r, "/admin/settings", translate(adminLanguage(r), "err_current_password"))
 		return
 	}
 	newPassword, err := password.Validate(r.FormValue("new_password"))
@@ -324,16 +324,16 @@ func (s *Server) adminChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	confirmation := []byte(r.FormValue("confirm_password"))
 	if len(newPassword) != len(confirmation) || subtle.ConstantTimeCompare(newPassword, confirmation) != 1 {
-		s.redirectWithError(w, r, "/admin/settings", "两次输入的新密码不一致。")
+		s.redirectWithError(w, r, "/admin/settings", translate(adminLanguage(r), "err_password_mismatch"))
 		return
 	}
 	hash, err := password.Hash(newPassword)
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法生成密码凭据。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_credential"))
 		return
 	}
 	if err := s.Store.UpdateAdministratorPassword(r.Context(), hash); err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法更新管理员密码。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_update_password"))
 		return
 	}
 	s.clearAdminCookie(w, r)
@@ -355,11 +355,11 @@ func (s *Server) adminCreateSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.validCSRF(r, session) {
-		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_csrf"))
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		s.renderError(w, r, http.StatusBadRequest, "站点表单无效。")
+		s.renderError(w, r, http.StatusBadRequest, translate(adminLanguage(r), "err_site_form"))
 		return
 	}
 	data := newSiteData{pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "new_site"), "sites"), Name: r.FormValue("name"), Timezone: r.FormValue("timezone"), Origins: r.FormValue("origins"), DedupWindowDays: intFormValue(r, "dedup_window_days", 1), RetentionDays: intFormValue(r, "retention_days", 30), RetentionUnlimited: r.FormValue("retention_mode") == "unlimited"}
@@ -383,32 +383,32 @@ func (s *Server) adminSite(w http.ResponseWriter, r *http.Request) {
 	siteID := r.PathValue("siteID")
 	site, err := s.Store.GetSite(r.Context(), siteID)
 	if err != nil {
-		s.renderError(w, r, http.StatusNotFound, "Site 不存在。")
+		s.renderError(w, r, http.StatusNotFound, translate(adminLanguage(r), "err_site_not_found"))
 		return
 	}
 	overview, err := s.Store.SiteOverview(r.Context(), siteID)
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法读取站点统计。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_site_stats"))
 		return
 	}
 	mapData, err := s.Store.AdminMapData(r.Context(), siteID)
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法读取访客地图。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_map"))
 		return
 	}
 	chartJSON, err := analyticsMapChartJSON(mapData, adminLanguage(r))
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法编码访客地图。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_encode_map"))
 		return
 	}
 	preset, err := maprender.ParsePresetJSON(site.MapPresetJSON)
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法读取 Map Preset。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_preset"))
 		return
 	}
 	recent, err := s.Store.RecentPageviewRecords(r.Context(), siteID, 8)
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法读取 Pageview Record。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_records"))
 		return
 	}
 	data := adminSiteData{
@@ -430,11 +430,11 @@ func (s *Server) adminUpdateSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.validCSRF(r, session) {
-		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_csrf"))
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		s.renderError(w, r, http.StatusBadRequest, "站点表单无效。")
+		s.renderError(w, r, http.StatusBadRequest, translate(adminLanguage(r), "err_site_form"))
 		return
 	}
 	siteID := r.PathValue("siteID")
@@ -456,11 +456,11 @@ func (s *Server) adminUpdatePreset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.validCSRF(r, session) {
-		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_csrf"))
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		s.renderError(w, r, http.StatusBadRequest, "Map Preset 表单无效。")
+		s.renderError(w, r, http.StatusBadRequest, translate(adminLanguage(r), "err_preset_form"))
 		return
 	}
 	values := url.Values{}
@@ -508,16 +508,16 @@ func (s *Server) adminResetSite(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
 	if !s.validCSRF(r, session) {
-		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_csrf"))
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		s.redirectWithError(w, r, "/admin/sites/"+r.PathValue("siteID")+"#danger", "确认表单无效。")
+		s.redirectWithError(w, r, "/admin/sites/"+r.PathValue("siteID")+"#danger", translate(adminLanguage(r), "err_confirm_form"))
 		return
 	}
 	siteID := r.PathValue("siteID")
 	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", "管理员密码不正确。")
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", translate(adminLanguage(r), "err_admin_password"))
 		return
 	}
 	if err := s.Store.ResetSiteData(r.Context(), siteID); err != nil {
@@ -535,16 +535,16 @@ func (s *Server) adminDeleteSite(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
 	if !s.validCSRF(r, session) {
-		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_csrf"))
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		s.redirectWithError(w, r, "/admin/sites/"+r.PathValue("siteID")+"#danger", "确认表单无效。")
+		s.redirectWithError(w, r, "/admin/sites/"+r.PathValue("siteID")+"#danger", translate(adminLanguage(r), "err_confirm_form"))
 		return
 	}
 	siteID := r.PathValue("siteID")
 	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", "管理员密码不正确。")
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", translate(adminLanguage(r), "err_admin_password"))
 		return
 	}
 	if err := s.Store.DeleteSite(r.Context(), siteID); err != nil {
@@ -668,7 +668,7 @@ func (s *Server) adminSiteAnalytics(w http.ResponseWriter, r *http.Request) {
 	siteID := r.PathValue("siteID")
 	site, err := s.Store.GetSite(r.Context(), siteID)
 	if err != nil {
-		s.renderError(w, r, http.StatusNotFound, "Site 不存在。")
+		s.renderError(w, r, http.StatusNotFound, translate(adminLanguage(r), "err_site_not_found"))
 		return
 	}
 	start, end, rangeName, err := s.analyticsRange(r, site)
@@ -678,13 +678,13 @@ func (s *Server) adminSiteAnalytics(w http.ResponseWriter, r *http.Request) {
 	}
 	analytics, err := s.Store.AdminAnalytics(r.Context(), siteID, start, end)
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法读取聚合分析。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_analytics"))
 		return
 	}
 	lang := adminLanguage(r)
 	chartJSON, err := analyticsChartJSON(analytics, lang)
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法编码聚合分析。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_encode_analytics"))
 		return
 	}
 	s.renderPage(w, r, "admin-analytics", adminAnalyticsData{

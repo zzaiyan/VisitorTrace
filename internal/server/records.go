@@ -7,6 +7,7 @@ import (
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -62,16 +63,16 @@ func (s *Server) adminRecords(w http.ResponseWriter, r *http.Request) {
 	}
 	sites, err := s.Store.ListSites(r.Context())
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法读取 Site。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_sites"))
 		return
 	}
-	filters, values, err := parseRecordFilters(r.URL.Query())
+	filters, values, err := parseRecordFilters(r.URL.Query(), adminLanguage(r))
 	if err != nil {
-		s.renderError(w, r, http.StatusBadRequest, err.Error())
+		s.renderError(w, r, http.StatusBadRequest, translate(adminLanguage(r), err.Error()))
 		return
 	}
 	if values.SiteID != "" && !siteInList(sites, values.SiteID) {
-		s.renderError(w, r, http.StatusBadRequest, "Site 不存在。")
+		s.renderError(w, r, http.StatusBadRequest, translate(adminLanguage(r), "err_site_not_found"))
 		return
 	}
 	fingerprint := recordFilterFingerprint(filters, values.Limit)
@@ -81,19 +82,19 @@ func (s *Server) adminRecords(w http.ResponseWriter, r *http.Request) {
 		direction = "older"
 	}
 	if direction != "older" && direction != "newer" {
-		s.renderError(w, r, http.StatusBadRequest, "分页方向无效。")
+		s.renderError(w, r, http.StatusBadRequest, translate(adminLanguage(r), "err_pagination_direction"))
 		return
 	}
 	if token := r.URL.Query().Get("cursor"); token != "" {
 		cursor, err = decodeRecordCursor(token, fingerprint)
 		if err != nil {
-			s.renderError(w, r, http.StatusBadRequest, "分页游标无效或与当前筛选不匹配。")
+			s.renderError(w, r, http.StatusBadRequest, translate(adminLanguage(r), "err_pagination_cursor"))
 			return
 		}
 	}
 	page, err := s.Store.PageviewRecords(r.Context(), filters, cursor, direction, values.Limit)
 	if err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法读取 Pageview Record。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_read_records"))
 		return
 	}
 	csvQuery := recordFilterQuery(values, false).Encode()
@@ -133,9 +134,9 @@ func (s *Server) adminRecordsCSV(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return
 	}
-	filters, _, err := parseRecordFilters(r.URL.Query())
+	filters, _, err := parseRecordFilters(r.URL.Query(), adminLanguage(r))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, translate(adminLanguage(r), err.Error()), http.StatusBadRequest)
 		return
 	}
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
@@ -198,12 +199,12 @@ func (s *Server) adminAggregatesCSV(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func parseRecordFilters(query url.Values) (store.PageviewFilters, recordFilterValues, error) {
+func parseRecordFilters(query url.Values, lang string) (store.PageviewFilters, recordFilterValues, error) {
 	limit := 100
 	if value := query.Get("limit"); value != "" {
 		parsed, err := strconv.Atoi(value)
 		if err != nil || (parsed != 50 && parsed != 100 && parsed != 200) {
-			return store.PageviewFilters{}, recordFilterValues{}, fmt.Errorf("每页数量必须是 50、100 或 200")
+			return store.PageviewFilters{}, recordFilterValues{}, errors.New(translate(lang, "err_filter_limit"))
 		}
 		limit = parsed
 	}
@@ -219,29 +220,29 @@ func parseRecordFilters(query url.Values) (store.PageviewFilters, recordFilterVa
 		Browser: values.Browser, OperatingSystem: values.OS, CollectionMethod: values.Method,
 	}
 	if values.Method != "" && !store.ValidCollectionMethod(values.Method) {
-		return filters, values, fmt.Errorf("采集方式筛选无效")
+		return filters, values, errors.New(translate(lang, "err_filter_method"))
 	}
 	if values.From != "" {
 		parsed, err := parseUTCFilterTime(values.From)
 		if err != nil {
-			return filters, values, fmt.Errorf("起始时间无效")
+			return filters, values, errors.New(translate(lang, "err_filter_from"))
 		}
 		filters.OccurredFrom = &parsed
 	}
 	if values.To != "" {
 		parsed, err := parseUTCFilterTime(values.To)
 		if err != nil {
-			return filters, values, fmt.Errorf("结束时间无效")
+			return filters, values, errors.New(translate(lang, "err_filter_to"))
 		}
 		filters.OccurredTo = &parsed
 	}
 	if filters.OccurredFrom != nil && filters.OccurredTo != nil && filters.OccurredFrom.After(*filters.OccurredTo) {
-		return filters, values, fmt.Errorf("起始时间不能晚于结束时间")
+		return filters, values, errors.New(translate(lang, "err_filter_range"))
 	}
 	if values.Path != "" {
 		normalized, err := pageview.NormalizePath(values.Path)
 		if err != nil {
-			return filters, values, fmt.Errorf("路径筛选无效")
+			return filters, values, errors.New(translate(lang, "err_filter_path"))
 		}
 		filters.Path = normalized
 		values.Path = normalized
@@ -249,7 +250,7 @@ func parseRecordFilters(query url.Values) (store.PageviewFilters, recordFilterVa
 	if values.IP != "" {
 		address, err := netip.ParseAddr(values.IP)
 		if err != nil {
-			return filters, values, fmt.Errorf("IP 筛选无效")
+			return filters, values, errors.New(translate(lang, "err_filter_ip"))
 		}
 		filters.OriginalIP = address.String()
 		values.IP = address.String()
@@ -257,14 +258,14 @@ func parseRecordFilters(query url.Values) (store.PageviewFilters, recordFilterVa
 	if values.Digest != "" {
 		digest, err := hex.DecodeString(values.Digest)
 		if err != nil || len(digest) != sha256.Size {
-			return filters, values, fmt.Errorf("Visitor Digest 必须是 64 位十六进制值")
+			return filters, values, errors.New(translate(lang, "err_filter_digest"))
 		}
 		filters.VisitorDigest = digest
 		values.Digest = strings.ToLower(values.Digest)
 	}
-	for name, value := range map[string]string{"Site ID": values.SiteID, "访问域名": values.Hostname, "国家": values.Country, "地区": values.Region, "城市": values.City, "浏览器": values.Browser, "操作系统": values.OS} {
+	for key, value := range map[string]string{"err_filter_long_site_id": values.SiteID, "err_filter_long_hostname": values.Hostname, "err_filter_long_country": values.Country, "err_filter_long_region": values.Region, "err_filter_long_city": values.City, "err_filter_long_browser": values.Browser, "err_filter_long_os": values.OS} {
 		if len(value) > 200 {
-			return filters, values, fmt.Errorf("%s筛选过长", name)
+			return filters, values, errors.New(translate(lang, key))
 		}
 	}
 	return filters, values, nil

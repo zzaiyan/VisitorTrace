@@ -27,7 +27,7 @@ func (s *Server) adminRunSelfUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
 	if !s.validCSRF(r, session) {
-		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_csrf"))
 		return
 	}
 	manager, ok := s.authorizedSelfUpdateManager(w, r, session)
@@ -36,7 +36,7 @@ func (s *Server) adminRunSelfUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := manager.PrepareAndActivate(r.Context())
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#self-update", "更新失败："+err.Error())
+		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_update_failed")+err.Error())
 		return
 	}
 	s.finishSelfUpdate(w, r, session, result)
@@ -49,14 +49,14 @@ func (s *Server) adminRunLocalSelfUpdate(w http.ResponseWriter, r *http.Request)
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, localUpdateBodyLimit)
 	if err := r.ParseMultipartForm(localUpdateFormMemory); err != nil {
-		s.redirectWithError(w, r, "/admin/settings#self-update", "无法读取本地更新文件："+err.Error())
+		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_local_update_read")+err.Error())
 		return
 	}
 	if r.MultipartForm != nil {
 		defer r.MultipartForm.RemoveAll()
 	}
 	if !s.validCSRF(r, session) {
-		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_csrf"))
 		return
 	}
 	manager, ok := s.authorizedSelfUpdateManager(w, r, session)
@@ -65,32 +65,32 @@ func (s *Server) adminRunLocalSelfUpdate(w http.ResponseWriter, r *http.Request)
 	}
 	manifestFile, manifestHeader, err := r.FormFile("manifest")
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#self-update", "请选择签名发布清单。")
+		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_choose_manifest"))
 		return
 	}
 	defer manifestFile.Close()
 	if manifestHeader.Size < 1 || manifestHeader.Size > selfupdate.MaxManifestBytes {
-		s.redirectWithError(w, r, "/admin/settings#self-update", fmt.Sprintf("发布清单必须小于 %d 字节。", selfupdate.MaxManifestBytes))
+		s.redirectWithError(w, r, "/admin/settings#self-update", fmt.Sprintf(translate(adminLanguage(r), "err_manifest_max_bytes"), selfupdate.MaxManifestBytes))
 		return
 	}
 	manifestData, err := io.ReadAll(io.LimitReader(manifestFile, selfupdate.MaxManifestBytes+1))
 	if err != nil || int64(len(manifestData)) > selfupdate.MaxManifestBytes {
-		s.redirectWithError(w, r, "/admin/settings#self-update", "无法读取签名发布清单。")
+		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_manifest_read"))
 		return
 	}
 	binaryFile, binaryHeader, err := r.FormFile("binary")
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#self-update", "请选择当前平台的发布二进制。")
+		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_choose_binary"))
 		return
 	}
 	defer binaryFile.Close()
 	if binaryHeader.Size < 1 || binaryHeader.Size > selfupdate.MaxReleaseAssetBytes {
-		s.redirectWithError(w, r, "/admin/settings#self-update", "发布二进制大小超出允许范围。")
+		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_binary_too_large"))
 		return
 	}
 	result, err := manager.PrepareAndActivateLocal(r.Context(), manifestData, binaryFile)
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#self-update", "更新失败："+err.Error())
+		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_update_failed")+err.Error())
 		return
 	}
 	s.finishSelfUpdate(w, r, session, result)
@@ -98,25 +98,25 @@ func (s *Server) adminRunLocalSelfUpdate(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) authorizedSelfUpdateManager(w http.ResponseWriter, r *http.Request, session store.AdministratorSession) (*selfupdate.Manager, bool) {
 	if s.ConfigPath == "" {
-		s.redirectWithError(w, r, "/admin/settings#self-update", "服务配置路径不可用。")
+		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_config_path"))
 		return nil, false
 	}
 	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
-		s.redirectWithError(w, r, "/admin/settings#self-update", "管理员密码不正确。")
+		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_admin_password"))
 		return nil, false
 	}
 	verifiedAt := time.Now().UTC()
 	if err := s.Store.MarkAdministratorPasswordVerified(r.Context(), session.TokenDigest, verifiedAt); err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法记录密码验证状态。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_record_password_check"))
 		return nil, false
 	}
 	manager := selfupdate.New(s.Config, s.ConfigPath, s.Store)
 	if len(manager.PublicKey) == 0 {
-		s.redirectWithError(w, r, "/admin/settings#self-update", "当前构建未嵌入自更新签名公钥。")
+		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_no_update_key"))
 		return nil, false
 	}
 	if !manager.RunningFromStablePath() {
-		s.redirectWithError(w, r, "/admin/settings#self-update", "服务未从稳定更新路径启动，请先运行 update bootstrap 并调整进程管理器。")
+		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_not_stable_path"))
 		return nil, false
 	}
 	return manager, true

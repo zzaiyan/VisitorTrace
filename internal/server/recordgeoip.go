@@ -17,16 +17,16 @@ func (s *Server) adminRefreshSiteRecordGeoIP(w http.ResponseWriter, r *http.Requ
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
 	if !s.validCSRF(r, session) {
-		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_csrf"))
 		return
 	}
 	siteID := r.PathValue("siteID")
 	if _, err := s.Store.GetSite(r.Context(), siteID); err != nil {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", "Site 不存在。")
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", translate(adminLanguage(r), "err_site_not_found"))
 		return
 	}
 	if !s.recordGeoIPMu.TryLock() {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", "另一项 Pageview 地理信息刷新正在运行。")
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", translate(adminLanguage(r), "err_geoip_refresh_busy"))
 		return
 	}
 	defer s.recordGeoIPMu.Unlock()
@@ -34,7 +34,7 @@ func (s *Server) adminRefreshSiteRecordGeoIP(w http.ResponseWriter, r *http.Requ
 	s.geoMu.RLock()
 	defer s.geoMu.RUnlock()
 	if s.geoIP == nil {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", "GeoIP 数据库当前不可用。")
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", translate(adminLanguage(r), "err_geoip_unavailable"))
 		return
 	}
 	result, err := s.Store.RefreshPageviewGeoIP(r.Context(), siteID, func(address netip.Addr) store.PageviewGeography {
@@ -45,7 +45,7 @@ func (s *Server) adminRefreshSiteRecordGeoIP(w http.ResponseWriter, r *http.Requ
 		}
 	})
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", "无法刷新 Pageview 地理信息："+err.Error())
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", translate(adminLanguage(r), "err_geoip_refresh_failed")+err.Error())
 		return
 	}
 	s.mapCache.deleteSite(siteID)

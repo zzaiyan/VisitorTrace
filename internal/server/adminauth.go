@@ -34,46 +34,46 @@ func (s *Server) adminLogin(w http.ResponseWriter, r *http.Request) {
 	language := adminLanguage(r)
 	layout := pageLayout{Title: translate(language, "admin_login"), Lang: language}
 	if r.URL.Query().Get("changed") == "1" {
-		layout.Flash = "管理员密码已更新，请重新登录。"
+		layout.Flash = translate(language, "flash_password_changed")
 	}
 	s.renderPage(w, r, "login", loginPageData{pageLayout: layout, Next: safeNext(r.URL.Query().Get("next"), "/admin")})
 }
 
 func (s *Server) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	if !s.adminHTTPSAllowed(r) {
-		s.renderError(w, r, http.StatusForbidden, "管理员后台需要 HTTPS；本机回环地址可使用 HTTP 预览。")
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_admin_https"))
 		return
 	}
 	if !s.loginLimit.Allow(s.loginClientKey(r)) {
-		s.renderLoginError(w, r, "登录尝试过于频繁，请稍后再试。")
+		s.renderLoginError(w, r, translate(adminLanguage(r), "err_login_rate_limited"))
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4*1024)
 	if err := r.ParseForm(); err != nil {
-		s.renderLoginError(w, r, "登录请求无效。")
+		s.renderLoginError(w, r, translate(adminLanguage(r), "err_login_invalid"))
 		return
 	}
 	passwordValue := r.FormValue("password")
 	hash, err := s.Store.AdministratorPasswordHash(r.Context())
 	length := utf8.RuneCountInString(passwordValue)
 	if err != nil || !utf8.ValidString(passwordValue) || length < 8 || length > 128 || !password.Verify([]byte(passwordValue), hash) {
-		s.renderLoginError(w, r, "密码不正确。")
+		s.renderLoginError(w, r, translate(adminLanguage(r), "err_login_password"))
 		return
 	}
 	token := make([]byte, 32)
 	csrf := make([]byte, 32)
 	if _, err := rand.Read(token); err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法创建登录会话。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_create_session"))
 		return
 	}
 	if _, err := rand.Read(csrf); err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法创建安全令牌。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_create_csrf"))
 		return
 	}
 	now := time.Now().UTC()
 	_ = s.Store.DeleteExpiredAdministratorSessions(r.Context(), now)
 	if err := s.Store.CreateAdministratorSession(r.Context(), store.HashSessionToken(hex.EncodeToString(token)), csrf, now, now.Add(adminSessionAge)); err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, "无法保存登录会话。")
+		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_save_session"))
 		return
 	}
 	http.SetCookie(w, &http.Cookie{
@@ -95,7 +95,7 @@ func (s *Server) adminLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodPost || !s.validCSRF(r, session) {
-		s.renderError(w, r, http.StatusForbidden, "请求令牌无效。")
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_csrf"))
 		return
 	}
 	_ = s.Store.DeleteAdministratorSession(r.Context(), session.TokenDigest)
