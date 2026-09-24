@@ -70,7 +70,7 @@
   {{if .GeoIPTask}}<div class="task-summary" role="status"><span>{{t "summary"}}</span><code>{{.GeoIPTask.Summary}}</code></div>{{end}}
   <div class="geoip-manual">
     <div><h3>{{t "manual_update"}}</h3><p>{{t "manual_update_help"}}</p></div>
-    <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" class="inline-actions">
+    <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" class="inline-actions" data-vt-nav>
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <button class="button ghost" type="submit" name="force" value="0">{{t "check_now"}}</button>
       <button class="button primary" type="submit" name="force" value="1">{{t "force_download"}}</button>
@@ -96,10 +96,12 @@
   <div class="section-heading"><div><p class="eyebrow">Security</p><h2>{{t "change_password"}}</h2><p class="subhead">{{t "account_security_help"}}</p></div></div>
   <form method="post" action="{{appPath "/admin/settings/password"}}" class="password-settings-form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
-    <label class="field"><span>{{t "current_password"}}</span><input type="password" name="current_password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
-    <label class="field"><span>{{t "new_password"}}</span><input type="password" name="new_password" autocomplete="new-password" minlength="8" maxlength="128" required><small>{{t "password_hint"}}</small></label>
-    <label class="field"><span>{{t "confirm_new_password"}}</span><input type="password" name="confirm_password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
-    <small>{{t "password_change_notice"}}</small>
+    <div class="password-fields">
+      <label class="field"><span>{{t "current_password"}}</span><input type="password" name="current_password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
+      <label class="field"><span>{{t "new_password"}}</span><input type="password" name="new_password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
+      <label class="field"><span>{{t "confirm_new_password"}}</span><input type="password" name="confirm_password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
+    </div>
+    <small>{{t "password_hint"}} · {{t "password_change_notice"}}</small>
     <button class="button primary" type="submit">{{t "update_password"}}</button>
   </form>
 </section>

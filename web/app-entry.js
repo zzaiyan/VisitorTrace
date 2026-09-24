@@ -22,6 +22,7 @@
   var activeRequest = null;
   var scrollStampTimer = null;
   var lastTriggerHref = null;
+  var busyButton = null;
 
   function absoluteURL(value) {
     return new URL(value, window.location.href);
@@ -155,6 +156,53 @@
     if (anchor) anchor.scrollIntoView();
     else window.scrollTo(0, scroll);
     restoreFocus(previousActive, triggerHref);
+    surfaceNotices();
+  }
+
+  // The layout renders flash and error notices at the top of the page; after
+  // an in-place swap the user may be far below it, so lift them into
+  // auto-dismissing toasts instead. Full page loads keep the inline notices.
+  function surfaceNotices() {
+    var notices = document.querySelectorAll("main > .notice");
+    if (!notices.length) return;
+    var host = document.querySelector(".toast-host");
+    if (!host) {
+      host = document.createElement("div");
+      host.className = "toast-host";
+      document.documentElement.appendChild(host);
+    }
+    Array.prototype.forEach.call(notices, function (notice) {
+      var toast = document.createElement("div");
+      var danger = notice.classList.contains("danger");
+      toast.className = "toast " + (danger ? "danger" : "success");
+      toast.setAttribute("role", notice.getAttribute("role") || "status");
+      toast.textContent = notice.textContent.trim();
+      toast.addEventListener("click", dismissToast);
+      host.appendChild(toast);
+      window.requestAnimationFrame(function () { toast.classList.add("is-visible"); });
+      window.setTimeout(dismissToast, danger ? 8000 : 4000);
+      function dismissToast() {
+        if (!toast.parentNode) return;
+        toast.classList.remove("is-visible");
+        window.setTimeout(function () { toast.remove(); }, 300);
+      }
+      notice.remove();
+    });
+  }
+
+  // Every POST submission gets immediate busy feedback on its button, for
+  // AJAX swaps and full navigations alike; the indicator is pure CSS so it
+  // needs no translated labels.
+  function markBusy(button) {
+    if (!(button instanceof HTMLButtonElement)) button = null;
+    clearBusy();
+    busyButton = button;
+    if (busyButton) busyButton.setAttribute("aria-busy", "true");
+  }
+
+  function clearBusy() {
+    if (busyButton) busyButton.removeAttribute("aria-busy");
+    busyButton = null;
   }
 
   // Keep keyboard and screen-reader position across a swap: return to the
@@ -226,6 +274,7 @@
     var method = (form.getAttribute("method") || "get").toLowerCase();
     var action = absoluteURL(form.getAttribute("action") || window.location.href);
     if (!navigable(action)) return;
+    if (method !== "get") markBusy(event.submitter);
     if (method === "get") {
       var params = new URLSearchParams();
       new FormData(form).forEach(function (value, key) {
@@ -268,6 +317,7 @@
   // The dialog lives on <html> so body swaps never orphan it, and labels are
   // refreshed from the current body data attributes on every prompt.
   function promptStepUp(target, init, options) {
+    clearBusy();
     stepUpPending = { target: target, init: init, options: options };
     var dialog = document.documentElement.querySelector("dialog.stepup-dialog") || buildStepUpDialog();
     var labels = document.body.dataset;
