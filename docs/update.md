@@ -8,6 +8,13 @@ This file records user-facing changes for each published VisitorTrace release.
 
 - No unreleased changes.
 
+## 0.2.6 - 2026-09-24
+
+- Site settings, Map Preset, and new Site forms now submit through fetch and swap in place, following the post/redirect/get flow transparently. Rendered error pages replace the form in context, a POST landing back on the same URL replaces the history entry, and network failures reload instead of GET-navigating the POST-only route. Process-restarting, uploading, and destructive forms keep full-page behaviour.
+- Keyboard and screen-reader focus survives body swaps: focus returns to the previously focused element when it still exists by id, otherwise to the link that triggered the navigation.
+- Localized about a hundred admin-facing error and flash messages, including rendered error pages, redirect notices, record-filter validation, the login flow, and GeoIP credential checks, so the Japanese and English interfaces no longer fall back to Chinese text.
+- This release keeps SQLite Schema 12.
+
 ## 0.2.5 - 2026-09-24
 
 - Added fetch-based navigation for the Admin Console and Public Analytics. Same-origin link clicks and GET form submissions swap the page body in place, so switching the analytics range, language, or record filters preserves the scroll position, and back/forward restore each history entry's offset. POST submissions, downloads, and browsers without the required APIs keep the full-page behaviour.
