@@ -8,6 +8,10 @@
 
 - 暂无未发布变更。
 
+## 0.2.7 - 2026-09-24
+
+- 修复 0.2.6 的 opt-in 表单提交：fetch 导航器发送的 multipart 请求体未被 CSRF 校验解析，导致保存站点设置、Map Preset 或新增 Site 时返回 403。导航器现在像原生表单一样发送 url-encoded 请求体，CSRF 校验同时兼容 multipart 请求。本版本保持 SQLite Schema 12。
+
 ## 0.2.6 - 2026-09-24
 
 - 站点设置、Map Preset 和新增 Site 表单改为 fetch 提交并原地交换，透明跟随 PRG 重定向；服务端渲染的错误页原地替换当前内容，落回同一 URL 的响应用 replace 更新历史，网络失败时刷新而非以 GET 访问 POST-only 路由。重启流程、上传和危险操作表单保持整页行为。

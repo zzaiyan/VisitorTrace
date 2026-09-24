@@ -8,6 +8,10 @@ This file records user-facing changes for each published VisitorTrace release.
 
 - No unreleased changes.
 
+## 0.2.7 - 2026-09-24
+
+- Fixed the 0.2.6 opt-in form submissions: the fetch navigator sent multipart bodies that CSRF validation did not parse, so saving Site settings, Map Preset, or creating a Site failed with 403. The navigator now sends url-encoded bodies exactly like native form posts, and CSRF validation accepts multipart requests as well. This release keeps SQLite Schema 12.
+
 ## 0.2.6 - 2026-09-24
 
 - Site settings, Map Preset, and new Site forms now submit through fetch and swap in place, following the post/redirect/get flow transparently. Rendered error pages replace the form in context, a POST landing back on the same URL replaces the history entry, and network failures reload instead of GET-navigating the POST-only route. Process-restarting, uploading, and destructive forms keep full-page behaviour.
