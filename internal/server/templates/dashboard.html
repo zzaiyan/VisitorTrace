@@ -1,11 +1,11 @@
 {{define "content"}}
 <header class="page-header">
-  <div><p class="eyebrow">ADMIN CONSOLE</p><h1>{{t "dashboard"}}</h1><p class="subhead">{{.SiteCount}} {{t "site_count"}}</p></div>
+  <div><p class="eyebrow">Console</p><h1>{{t "dashboard"}}</h1><p class="subhead">{{.SiteCount}} {{t "site_count"}}</p></div>
   <a class="button ghost" href="{{appPath "/admin/sites"}}">{{t "manage_sites"}}</a>
 </header>
 {{if .Operations.Warnings}}<div class="notice danger" role="alert">{{t "operations_attention"}}: {{range $index, $warning := .Operations.Warnings}}{{if $index}} · {{end}}{{operationWarning $warning}}{{end}}</div>{{end}}
 <section class="operations-band" aria-label="{{t "operations"}}">
-  <div class="operations-head"><div><p class="eyebrow">OPERATIONS</p><h2>{{t "operations"}}</h2></div><div class="operation-actions"><form method="post" action="{{appPath "/admin/operations/backup"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">{{t "backup_now"}}</button></form><form method="post" action="{{appPath "/admin/operations/cleanup"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">{{t "cleanup_now"}}</button></form><form method="post" action="{{appPath "/admin/operations/geoip"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">{{t "check_geoip"}}</button></form></div></div>
+  <div class="operations-head"><div><p class="eyebrow">Operations</p><h2>{{t "operations"}}</h2></div><div class="operation-actions"><form method="post" action="{{appPath "/admin/operations/backup"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">{{t "backup_now"}}</button></form><form method="post" action="{{appPath "/admin/operations/cleanup"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">{{t "cleanup_now"}}</button></form><form method="post" action="{{appPath "/admin/operations/geoip"}}"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="button ghost" type="submit">{{t "check_geoip"}}</button></form></div></div>
   <dl class="operations-grid">
     <div><dt>{{t "version"}}</dt><dd>{{.Operations.Version}}</dd><small>{{.Operations.Commit}}</small></div>
     <div><dt>{{t "uptime"}}</dt><dd>{{formatDuration .Operations.Uptime}}</dd><small>{{t "started_at"}} {{formatUTC .Operations.StartedAt}}</small></div>

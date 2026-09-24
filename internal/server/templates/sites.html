@@ -1,6 +1,6 @@
 {{define "content"}}
 <header class="page-header">
-  <div><p class="eyebrow">{{t "sites"}}</p><h1>{{t "sites"}}</h1><p class="subhead">{{t "site_management_help"}}</p></div>
+  <div><p class="eyebrow">Sites</p><h1>{{t "sites"}}</h1><p class="subhead">{{t "site_management_help"}}</p></div>
   <a class="button primary" href="{{appPath "/admin/sites/new"}}">{{t "add_site"}}</a>
 </header>
 {{if .Sites}}
@@ -29,6 +29,6 @@
   {{end}}
 </section>
 {{else}}
-<section class="empty-state"><p class="eyebrow">{{t "no_sites"}}</p><h2>{{t "no_sites"}}</h2><a class="button primary" href="{{appPath "/admin/sites/new"}}">{{t "create_first_site"}}</a></section>
+<section class="empty-state"><p class="eyebrow">Sites</p><h2>{{t "no_sites"}}</h2><a class="button primary" href="{{appPath "/admin/sites/new"}}">{{t "create_first_site"}}</a></section>
 {{end}}
 {{end}}

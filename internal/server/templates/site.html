@@ -15,7 +15,7 @@
 </section>
 
 <section class="section-block" id="visitor-map">
-  <div class="section-heading"><div><p class="eyebrow">{{t "geographic_distribution"}}</p><h2>{{t "visitor_map"}}</h2></div><span class="muted">{{t "all_history"}}</span></div>
+  <div class="section-heading"><div><p class="eyebrow">Geography</p><h2>{{t "visitor_map"}}</h2></div><span class="muted">{{t "all_history"}}</span></div>
   <div class="analytics-map site-analytics-map">
     <div class="interactive-map-shell"><div id="geo-chart" class="interactive-chart geo-chart" role="img" aria-label="{{.Site.Name}} {{t "visitor_map"}}"></div><div class="map-controls" data-map-controls data-reset-label="{{t "reset_map_view"}}" role="toolbar" aria-label="{{t "map_controls"}}"></div></div>
     <a class="chart-fallback" href="{{.MapPreviewURL}}" target="_blank" rel="noopener"><img src="{{.MapPreviewURL}}" alt="{{.Site.Name}} {{t "visitor_map"}}"></a>
@@ -24,7 +24,7 @@
 </section>
 
 <section class="section-block" id="integration">
-  <div class="section-heading"><div><p class="eyebrow">INTEGRATION</p><h2>{{t "integration_code"}}</h2></div></div>
+  <div class="section-heading"><div><p class="eyebrow">Integration</p><h2>{{t "integration_code"}}</h2></div></div>
   <div class="integration-method">
     <div class="integration-method-heading"><span>01</span><h3>{{t "combined_widget"}}</h3></div>
     <div class="integration-resource-grid">
@@ -68,7 +68,7 @@
 </section>
 
 <section class="section-block" id="settings">
-  <div class="section-heading"><div><p class="eyebrow">SETTINGS</p><h2>{{t "site_settings"}}</h2></div></div>
+  <div class="section-heading"><div><p class="eyebrow">Settings</p><h2>{{t "site_settings"}}</h2></div></div>
   <form method="post" action="{{appPath (printf "/admin/sites/%s/settings" .Site.ID)}}" class="site-settings-form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
     <div class="site-settings-group">
@@ -112,7 +112,7 @@
 </section>
 
 <section class="section-block" id="preset">
-  <div class="section-heading"><div><p class="eyebrow">MAP PRESET</p><h2>{{t "map_preset"}}</h2></div>
+  <div class="section-heading"><div><p class="eyebrow">Map preset</p><h2>{{t "map_preset"}}</h2></div>
     <div class="url-override-help" data-url-override-help>
       <button class="url-override-trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="url-override-panel"><span>{{t "url_overrides"}}</span><span class="help-mark" aria-hidden="true">?</span></button>
       <div id="url-override-panel" class="url-override-panel" role="dialog" aria-label="{{t "url_override_title"}}" hidden>
@@ -173,7 +173,7 @@
 
 <section class="section-block" id="records">
   <div class="section-heading records-section-heading">
-    <div><p class="eyebrow">PAGEVIEW RECORDS</p><h2>{{t "recent_records"}}</h2></div>
+    <div><p class="eyebrow">Records</p><h2>{{t "recent_records"}}</h2></div>
     <div class="records-heading-actions">
       <a class="button ghost" href="{{appPath (printf "/admin/records?site_id=%s" .Site.ID)}}">{{t "view_site_records"}}</a>
       <form method="post" action="{{appPath (printf "/admin/sites/%s/records/geoip" .Site.ID)}}" data-confirm-message="{{t "refresh_record_geoip_confirm"}}">
@@ -190,7 +190,7 @@
 </section>
 
 <section class="section-block danger-zone" id="danger">
-  <div class="section-heading"><div><p class="eyebrow">DANGER ZONE</p><h2>{{t "danger_zone"}}</h2></div><span class="muted">{{t "irreversible_backup_first"}}</span></div>
+  <div class="section-heading"><div><p class="eyebrow">Danger zone</p><h2>{{t "danger_zone"}}</h2></div><span class="muted">{{t "irreversible_backup_first"}}</span></div>
   <div class="danger-grid">
     <form method="post" action="{{appPath (printf "/admin/sites/%s/reset" .Site.ID)}}" class="danger-form">
       <input type="hidden" name="csrf" value="{{.CSRF}}">

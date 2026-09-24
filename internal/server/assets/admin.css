@@ -22,7 +22,7 @@ a { color: inherit; }
 button, input, textarea, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 .muted, small { color: var(--muted); }
-.eyebrow { margin: 0 0 8px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: 0; }
+.eyebrow { margin: 0 0 8px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: 0; text-transform: uppercase; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: 8px; font-size: 42px; line-height: 1.04; letter-spacing: 0; }
 h2 { margin-bottom: 0; font-size: 20px; line-height: 1.2; }

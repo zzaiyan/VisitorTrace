@@ -1,7 +1,7 @@
 {{define "content"}}
 <main class="login-shell">
   <section class="login-panel error-panel">
-    <p class="eyebrow">ERROR {{.Status}}</p>
+    <p class="eyebrow">Error {{.Status}}</p>
     <h1>{{t "request_incomplete"}}</h1>
     <p class="muted">{{.Message}}</p>
     <a class="button primary" href="{{appPath "/admin"}}">{{t "return_admin"}}</a>

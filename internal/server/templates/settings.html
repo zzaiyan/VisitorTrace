@@ -1,6 +1,6 @@
 {{define "content"}}
 <header class="page-header">
-  <div><p class="eyebrow">ADMINISTRATOR</p><h1>{{t "settings"}}</h1><p class="subhead">{{t "settings_page_help"}}</p></div>
+  <div><p class="eyebrow">Administrator</p><h1>{{t "settings"}}</h1><p class="subhead">{{t "settings_page_help"}}</p></div>
 </header>
 <nav class="settings-jump" aria-label="{{t "settings_navigation"}}">
   <a href="#configuration">{{t "service_configuration"}}</a>
@@ -11,19 +11,19 @@
 </nav>
 
 <section class="section-block settings-configuration" id="configuration" data-geoip-settings>
-  <div class="section-heading"><div><p class="eyebrow">SERVICE CONFIGURATION</p><h2>{{t "service_configuration"}}</h2><p class="subhead">{{t "service_configuration_help"}}</p></div><span class="status paused">{{t "managed_restart"}}</span></div>
+  <div class="section-heading"><div><p class="eyebrow">Configuration</p><h2>{{t "service_configuration"}}</h2><p class="subhead">{{t "service_configuration_help"}}</p></div><span class="status paused">{{t "managed_restart"}}</span></div>
   <form method="post" action="{{appPath "/admin/settings/configuration"}}" class="configuration-form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
 
     <div class="configuration-group">
-      <div class="configuration-group-heading"><p class="eyebrow">PUBLIC ACCESS</p><h3>{{t "public_access"}}</h3><p>{{t "base_url_help"}}</p></div>
+      <div class="configuration-group-heading"><p class="eyebrow">Public access</p><h3>{{t "public_access"}}</h3><p>{{t "base_url_help"}}</p></div>
       <div class="configuration-fields">
         <label class="field"><span>{{t "base_url"}}</span><input type="url" name="base_url" value="{{.BaseURL}}" placeholder="https://stats.example.com/visitortrace" autocomplete="url"><small>{{t "base_url_effective"}} <code>{{.EffectiveBaseURL}}</code></small></label>
       </div>
     </div>
 
     <div class="configuration-group">
-      <div class="configuration-group-heading"><p class="eyebrow">GEOIP RESOLUTION</p><h3>{{t "geoip_resolution"}}</h3><p>{{t "geoip_settings_help"}}</p></div>
+      <div class="configuration-group-heading"><p class="eyebrow">Geolocation</p><h3>{{t "geoip_resolution"}}</h3><p>{{t "geoip_settings_help"}}</p></div>
       <div class="configuration-fields">
         <div class="field-grid two">
           <label class="field"><span>{{t "geoip_provider"}}</span><select name="geoip_provider" data-provider-select><option value="dbip" data-source-url="{{.DBIPOfficialURL}}" {{if eq .GeoIPProvider "dbip"}}selected{{end}}>DB-IP City Lite</option><option value="maxmind" data-source-url="{{.MaxMindOfficialURL}}" {{if eq .GeoIPProvider "maxmind"}}selected{{end}}>MaxMind GeoLite2 City</option><option value="ip2location" data-source-url="{{.IP2LocationOfficialURL}}" {{if eq .GeoIPProvider "ip2location"}}selected{{end}}>IP2Location LITE DB11</option></select></label>
@@ -37,7 +37,7 @@
     </div>
 
     <div class="configuration-group">
-      <div class="configuration-group-heading"><p class="eyebrow">PROVIDER CREDENTIALS</p><h3>{{t "provider_credentials"}}</h3><p>{{t "provider_credentials_help"}}</p></div>
+      <div class="configuration-group-heading"><p class="eyebrow">Credentials</p><h3>{{t "provider_credentials"}}</h3><p>{{t "provider_credentials_help"}}</p></div>
       <div class="configuration-fields credential-grid">
         <div class="credential-panel">
           <div class="credential-heading"><div><h3>MaxMind</h3><p>{{t "credential_blank_keeps"}}</p></div><span class="status {{if .MaxMindConfigured}}live{{else}}paused{{end}}">{{if .MaxMindConfigured}}{{t "configured"}}{{else if .MaxMindHasCredentials}}{{t "incomplete"}}{{else}}{{t "not_configured"}}{{end}}</span></div>
@@ -61,7 +61,7 @@
 </section>
 
 <section class="section-block" id="geoip">
-  <div class="section-heading"><div><p class="eyebrow">GEOIP OPERATIONS</p><h2>{{t "geoip_database_status"}}</h2><p class="subhead">{{t "geoip_status_help"}}</p></div><span class="status live">{{.GeoIPProvider}}</span></div>
+  <div class="section-heading"><div><p class="eyebrow">GeoIP</p><h2>{{t "geoip_database_status"}}</h2><p class="subhead">{{t "geoip_status_help"}}</p></div><span class="status live">{{.GeoIPProvider}}</span></div>
   <div class="update-status geoip-status">
     <div><span>{{t "database_file"}}</span><strong>{{if .GeoIPFile.Exists}}{{formatBytes .GeoIPFile.Size}}{{else}}{{t "unavailable"}}{{end}}</strong><small>{{if .GeoIPFile.Exists}}{{t "last_modified"}} {{formatUTC .GeoIPFile.ModifiedAt}}{{else}}{{t "awaiting_download"}}{{end}}</small></div>
     <div><span>{{t "update_mode"}}</span><strong>{{if eq .GeoIPUpdate "automatic"}}{{t "automatic_updates"}}{{else}}{{t "manual_only"}}{{end}}</strong><small>{{.GeoIPProvider}}</small></div>
@@ -79,7 +79,7 @@
 </section>
 
 <section class="section-block" id="backup">
-  <div class="section-heading"><div><p class="eyebrow">DATA MAINTENANCE</p><h2>{{t "restore_backup"}}</h2><p class="subhead">{{t "restore_backup_help"}}</p></div></div>
+  <div class="section-heading"><div><p class="eyebrow">Maintenance</p><h2>{{t "restore_backup"}}</h2><p class="subhead">{{t "restore_backup_help"}}</p></div></div>
   <div class="restore-panel restore-panel-single">
     {{if .Backups}}
     <form class="restore-form" method="post" action="{{appPath "/admin/operations/restore"}}" data-confirm-message="{{t "restore_backup_confirm"}}">
@@ -93,7 +93,7 @@
 </section>
 
 <section class="section-block" id="account">
-  <div class="section-heading"><div><p class="eyebrow">ACCOUNT SECURITY</p><h2>{{t "change_password"}}</h2><p class="subhead">{{t "account_security_help"}}</p></div></div>
+  <div class="section-heading"><div><p class="eyebrow">Security</p><h2>{{t "change_password"}}</h2><p class="subhead">{{t "account_security_help"}}</p></div></div>
   <form method="post" action="{{appPath "/admin/settings/password"}}" class="password-settings-form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
     <label class="field"><span>{{t "current_password"}}</span><input type="password" name="current_password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
@@ -104,7 +104,7 @@
 </section>
 
 <section class="section-block" id="self-update">
-  <div class="section-heading"><div><p class="eyebrow">SELF UPDATE</p><h2>{{t "version_update"}}</h2></div><span class="muted">{{t "current"}} {{.CurrentVersion}}</span></div>
+  <div class="section-heading"><div><p class="eyebrow">Update</p><h2>{{t "version_update"}}</h2></div><span class="muted">{{t "current"}} {{.CurrentVersion}}</span></div>
   <div class="update-status">
     <div><span>{{t "stable_path"}}</span><code>{{.StableExecutable}}</code></div>
     <div><span>{{t "signature_verification"}}</span><strong>{{if .UpdateKeyReady}}{{t "configured"}}{{else}}{{t "not_configured"}}{{end}}</strong></div>

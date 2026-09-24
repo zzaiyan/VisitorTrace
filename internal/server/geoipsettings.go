@@ -93,7 +93,7 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 		reconnectURL = strings.TrimSuffix(baseURL, "/") + "/admin/settings#configuration"
 	}
 	s.renderPage(w, r, "settings-restarting", settingsRestartData{
-		pageLayout: layout, ReconnectURL: reconnectURL, Eyebrow: "CONFIGURATION",
+		pageLayout: layout, ReconnectURL: reconnectURL, Eyebrow: "Configuration",
 		Message: translate(layout.Lang, "configuration_saved"),
 	})
 	go func() {
