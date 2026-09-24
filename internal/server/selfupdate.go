@@ -128,7 +128,7 @@ func (s *Server) finishSelfUpdate(w http.ResponseWriter, r *http.Request, sessio
 		return
 	}
 	s.renderPage(w, r, "update-restarting", updateRestartData{
-		pageLayout: s.adminLayout(r, session, "正在重启", "settings"), Version: result.Version,
+		pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "service_restarting"), "settings"), Version: result.Version,
 	})
 	go func() {
 		time.Sleep(300 * time.Millisecond)

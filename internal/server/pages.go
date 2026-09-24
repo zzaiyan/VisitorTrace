@@ -267,7 +267,7 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := adminSettingsData{
-		pageLayout:     s.adminLayout(r, session, "管理员设置", "settings"),
+		pageLayout:     s.adminLayout(r, session, translate(adminLanguage(r), "settings"), "settings"),
 		CurrentVersion: manager.CurrentVersion, StableExecutable: manager.StableBinaryPath(),
 		UpdateKeyReady: len(manager.PublicKey) > 0, RunningFromStablePath: manager.RunningFromStablePath(),
 		UpdatePlatform: manager.Platform,
@@ -345,7 +345,7 @@ func (s *Server) adminNewSite(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	data := newSiteData{pageLayout: s.adminLayout(r, session, "新增 Site", "sites"), Timezone: "Asia/Shanghai", DedupWindowDays: 1, RetentionDays: 30}
+	data := newSiteData{pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "new_site"), "sites"), Timezone: "Asia/Shanghai", DedupWindowDays: 1, RetentionDays: 30}
 	s.renderPage(w, r, "new-site", data)
 }
 
@@ -362,7 +362,7 @@ func (s *Server) adminCreateSite(w http.ResponseWriter, r *http.Request) {
 		s.renderError(w, r, http.StatusBadRequest, "站点表单无效。")
 		return
 	}
-	data := newSiteData{pageLayout: s.adminLayout(r, session, "新增 Site", "sites"), Name: r.FormValue("name"), Timezone: r.FormValue("timezone"), Origins: r.FormValue("origins"), DedupWindowDays: intFormValue(r, "dedup_window_days", 1), RetentionDays: intFormValue(r, "retention_days", 30), RetentionUnlimited: r.FormValue("retention_mode") == "unlimited"}
+	data := newSiteData{pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "new_site"), "sites"), Name: r.FormValue("name"), Timezone: r.FormValue("timezone"), Origins: r.FormValue("origins"), DedupWindowDays: intFormValue(r, "dedup_window_days", 1), RetentionDays: intFormValue(r, "retention_days", 30), RetentionUnlimited: r.FormValue("retention_mode") == "unlimited"}
 	created, err := s.Store.CreateSite(r.Context(), store.CreateSiteParams{
 		Name: data.Name, Timezone: data.Timezone, AllowedOrigins: splitLines(data.Origins),
 		DedupWindowDays: data.DedupWindowDays, RetentionDays: data.RetentionDays, RetentionUnlimited: data.RetentionUnlimited,
@@ -688,7 +688,7 @@ func (s *Server) adminSiteAnalytics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.renderPage(w, r, "admin-analytics", adminAnalyticsData{
-		pageLayout: s.adminLayout(r, session, site.Name+" · Analytics", "sites"),
+		pageLayout: s.adminLayout(r, session, site.Name+" · "+translate(adminLanguage(r), "aggregate_analytics"), "sites"),
 		Site:       site, Analytics: analytics, Range: rangeName, ChartJSON: chartJSON,
 	})
 }

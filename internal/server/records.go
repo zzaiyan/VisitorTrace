@@ -103,7 +103,7 @@ func (s *Server) adminRecords(w http.ResponseWriter, r *http.Request) {
 	}
 	recordCSVURL = s.appPath(recordCSVURL)
 	data := recordsPageData{
-		pageLayout: s.adminLayout(r, session, "Pageview Records", "records"),
+		pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "records"), "records"),
 		Sites:      sites, Records: page.Records, Filters: values,
 		RecordCSVURL: recordCSVURL,
 	}

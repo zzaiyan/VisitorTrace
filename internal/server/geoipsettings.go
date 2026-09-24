@@ -87,7 +87,7 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	layout := s.adminLayout(r, session, "正在重启", "settings")
+	layout := s.adminLayout(r, session, translate(adminLanguage(r), "service_restarting"), "settings")
 	reconnectURL := s.requestOrigin(r) + "/admin/settings#configuration"
 	if baseURL != "" {
 		reconnectURL = strings.TrimSuffix(baseURL, "/") + "/admin/settings#configuration"
