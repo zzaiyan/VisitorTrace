@@ -8,6 +8,12 @@ This file records user-facing changes for each published VisitorTrace release.
 
 - No unreleased changes.
 
+## 0.2.5 - 2026-09-24
+
+- Added fetch-based navigation for the Admin Console and Public Analytics. Same-origin link clicks and GET form submissions swap the page body in place, so switching the analytics range, language, or record filters preserves the scroll position, and back/forward restore each history entry's offset. POST submissions, downloads, and browsers without the required APIs keep the full-page behaviour.
+- Interactive map zoom and pan now survive range and language switches. Switching Sites, full reloads, and the Reset control still start from the default view.
+- This release keeps SQLite Schema 12.
+
 ## 0.2.4 - 2026-09-24
 
 - Standardized all section eyebrows into fixed short English echoes of their headings, displayed in uppercase through CSS instead of following the interface language. This removes the previous mix of translated eyebrows and hardcoded all-caps labels that made multilingual pages inconsistent.
