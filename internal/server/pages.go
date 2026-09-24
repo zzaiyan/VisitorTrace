@@ -38,14 +38,15 @@ var pageAssetRevision = func() string {
 }()
 
 type pageLayout struct {
-	Title       string
-	Admin       bool
-	CSRF        string
-	Flash       string
-	Error       string
-	Active      string
-	CurrentPath string
-	Lang        string
+	Title         string
+	Admin         bool
+	CSRF          string
+	Flash         string
+	Error         string
+	Active        string
+	CurrentPath   string
+	Lang          string
+	StepUpActive  bool
 }
 
 func (p pageLayout) PageLanguage() string { return p.Lang }
@@ -202,7 +203,7 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string,
 func (s *Server) adminLayout(r *http.Request, session store.AdministratorSession, title, active string) pageLayout {
 	return pageLayout{
 		Title: title, Admin: true, CSRF: hex.EncodeToString(session.CSRFToken),
-		Active: active, CurrentPath: r.URL.Path, Lang: adminLanguage(r),
+		Active: active, CurrentPath: r.URL.Path, Lang: adminLanguage(r), StepUpActive: stepUpActive(session),
 	}
 }
 
@@ -516,8 +517,7 @@ func (s *Server) adminResetSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	siteID := r.PathValue("siteID")
-	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", translate(adminLanguage(r), "err_admin_password"))
+	if !s.authorizeStepUp(w, r, session) {
 		return
 	}
 	if err := s.Store.ResetSiteData(r.Context(), siteID); err != nil {
@@ -543,8 +543,11 @@ func (s *Server) adminDeleteSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	siteID := r.PathValue("siteID")
-	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", translate(adminLanguage(r), "err_admin_password"))
+	if !s.authorizeStepUp(w, r, session) {
+		return
+	}
+	if r.FormValue("confirm_site_id") != siteID {
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", translate(adminLanguage(r), "err_site_id_mismatch"))
 		return
 	}
 	if err := s.Store.DeleteSite(r.Context(), siteID); err != nil {

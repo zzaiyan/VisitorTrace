@@ -101,13 +101,7 @@ func (s *Server) authorizedSelfUpdateManager(w http.ResponseWriter, r *http.Requ
 		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_config_path"))
 		return nil, false
 	}
-	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
-		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_admin_password"))
-		return nil, false
-	}
-	verifiedAt := time.Now().UTC()
-	if err := s.Store.MarkAdministratorPasswordVerified(r.Context(), session.TokenDigest, verifiedAt); err != nil {
-		s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_record_password_check"))
+	if !s.authorizeStepUp(w, r, session) {
 		return nil, false
 	}
 	manager := selfupdate.New(s.Config, s.ConfigPath, s.Store)

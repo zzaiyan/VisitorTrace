@@ -23,6 +23,12 @@ button, input, textarea, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 .muted, small { color: var(--muted); }
 .eyebrow { margin: 0 0 8px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: 0; text-transform: uppercase; }
+.stepup-dialog { border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 22px; width: min(360px, calc(100vw - 40px)); background: var(--panel); color: var(--ink); }
+.stepup-dialog::backdrop { background: rgba(24, 35, 41, .35); }
+.stepup-dialog form { display: grid; gap: 14px; }
+.stepup-dialog h3 { margin: 0; }
+.stepup-dialog .field { display: grid; gap: 6px; }
+.stepup-actions { display: flex; justify-content: flex-end; gap: 10px; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: 8px; font-size: 42px; line-height: 1.04; letter-spacing: 0; }
 h2 { margin-bottom: 0; font-size: 20px; line-height: 1.2; }

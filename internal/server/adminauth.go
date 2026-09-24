@@ -215,6 +215,36 @@ func (s *Server) administratorPasswordMatches(ctx context.Context, value string)
 	return err == nil && password.Verify([]byte(value), hash)
 }
 
+// adminStepUpWindow is how long a password verification unlocks sensitive
+// operations for the session before another step-up is required.
+const adminStepUpWindow = 5 * time.Minute
+
+func stepUpActive(session store.AdministratorSession) bool {
+	return time.Since(session.PasswordVerifiedAt) < adminStepUpWindow
+}
+
+// authorizeStepUp gates a sensitive action: it passes when the session
+// verified the administrator password recently, or when the request carries
+// the correct password (which then starts a fresh window). AJAX callers get
+// a 403 with Vt-Auth: step-up so they can prompt once and replay the form;
+// forms rendered without JavaScript always include the password field.
+func (s *Server) authorizeStepUp(w http.ResponseWriter, r *http.Request, session store.AdministratorSession) bool {
+	if stepUpActive(session) {
+		return true
+	}
+	if s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
+		verifiedAt := time.Now().UTC()
+		if err := s.Store.MarkAdministratorPasswordVerified(r.Context(), session.TokenDigest, verifiedAt); err != nil {
+			s.renderError(w, r, http.StatusInternalServerError, translate(adminLanguage(r), "err_record_password_check"))
+			return false
+		}
+		return true
+	}
+	w.Header().Set("Vt-Auth", "step-up")
+	s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_step_up"))
+	return false
+}
+
 func (s *Server) clearAdminCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: adminSessionCookie, Value: "", Path: s.cookiePath(), MaxAge: -1, HttpOnly: true, Secure: s.secureAdminCookie(r), SameSite: http.SameSiteStrictMode})
 }

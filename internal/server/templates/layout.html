@@ -71,7 +71,7 @@
   <title>{{if .Title}}{{.Title}} · {{end}}VisitorTrace · 访迹</title>
   <link rel="stylesheet" href="{{assetPath "/admin/assets/style.css"}}">
 </head>
-<body class="{{if .Admin}}admin-shell{{else}}public-shell{{end}}">
+<body class="{{if .Admin}}admin-shell{{else}}public-shell{{end}}"{{if .Admin}} data-stepup-title="{{t "stepup_dialog_title"}}" data-stepup-body="{{t "stepup_dialog_body"}}" data-stepup-submit="{{t "stepup_submit"}}" data-stepup-cancel="{{t "cancel"}}" data-stepup-password="{{t "administrator_password"}}"{{end}}>
   {{if .Admin}}
   <aside class="sidebar">
     <a class="brand" href="{{appPath "/admin"}}"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>

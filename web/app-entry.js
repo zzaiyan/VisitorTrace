@@ -78,6 +78,12 @@
     window.fetch(target, init)
       .then(function (response) {
         if (request.signal.aborted) return;
+        // A sensitive POST was rejected until the Administrator password is
+        // re-verified: prompt once and replay the original submission.
+        if (init.method === "POST" && response.headers.get("Vt-Auth") === "step-up") {
+          promptStepUp(target, init, options);
+          return;
+        }
         // Rendered error pages (403 CSRF, 400 form, 404, ...) are valid HTML:
         // swap them in place so the failure is diagnosed instead of masked.
         var contentType = response.headers.get("Content-Type") || "";
@@ -256,4 +262,77 @@
     var scroll = event.state && typeof event.state.vtScroll === "number" ? event.state.vtScroll : 0;
     goTo(target, { history: "replace", scroll: scroll });
   });
+
+  var stepUpPending = null;
+
+  // The dialog lives on <html> so body swaps never orphan it, and labels are
+  // refreshed from the current body data attributes on every prompt.
+  function promptStepUp(target, init, options) {
+    stepUpPending = { target: target, init: init, options: options };
+    var dialog = document.documentElement.querySelector("dialog.stepup-dialog") || buildStepUpDialog();
+    var labels = document.body.dataset;
+    dialog.querySelector("h3").textContent = labels.stepupTitle || "Verify";
+    dialog.querySelector("p").textContent = labels.stepupBody || "";
+    dialog.querySelector('[data-stepup-label]').textContent = labels.stepupPassword || "Password";
+    dialog.querySelector('[data-stepup-submit]').textContent = labels.stepupSubmit || "Verify";
+    dialog.querySelector('[data-stepup-cancel]').textContent = labels.stepupCancel || "Cancel";
+    var input = dialog.querySelector("input");
+    input.value = "";
+    dialog.showModal();
+    input.focus();
+  }
+
+  function buildStepUpDialog() {
+    var dialog = document.createElement("dialog");
+    dialog.className = "stepup-dialog";
+    var form = document.createElement("form");
+    var heading = document.createElement("h3");
+    var message = document.createElement("p");
+    message.className = "muted";
+    var field = document.createElement("label");
+    field.className = "field";
+    var labelSpan = document.createElement("span");
+    labelSpan.dataset.stepupLabel = "password";
+    var input = document.createElement("input");
+    input.type = "password";
+    input.name = "password";
+    input.autocomplete = "current-password";
+    input.minLength = 8;
+    input.maxLength = 128;
+    input.required = true;
+    field.appendChild(labelSpan);
+    field.appendChild(input);
+    var actions = document.createElement("div");
+    actions.className = "stepup-actions";
+    var cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "button ghost";
+    cancel.dataset.stepupCancel = "";
+    var submit = document.createElement("button");
+    submit.type = "submit";
+    submit.className = "button primary";
+    submit.dataset.stepupSubmit = "";
+    actions.appendChild(cancel);
+    actions.appendChild(submit);
+    form.appendChild(heading);
+    form.appendChild(message);
+    form.appendChild(field);
+    form.appendChild(actions);
+    dialog.appendChild(form);
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var pending = stepUpPending;
+      stepUpPending = null;
+      dialog.close();
+      if (!pending) return;
+      pending.init.body.append("password", input.value);
+      requestDocument(pending.target, pending.init, pending.options);
+    });
+    cancel.addEventListener("click", function () {
+      stepUpPending = null;
+      dialog.close();
+    });
+    document.documentElement.appendChild(dialog);
+    return dialog;
+  }
 }());

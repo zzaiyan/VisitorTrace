@@ -192,16 +192,17 @@
 <section class="section-block danger-zone" id="danger">
   <div class="section-heading"><div><p class="eyebrow">Danger zone</p><h2>{{t "danger_zone"}}</h2></div><span class="muted">{{t "irreversible_backup_first"}}</span></div>
   <div class="danger-grid">
-    <form method="post" action="{{appPath (printf "/admin/sites/%s/reset" .Site.ID)}}" class="danger-form">
+    <form method="post" action="{{appPath (printf "/admin/sites/%s/reset" .Site.ID)}}" class="danger-form" data-confirm-message="{{t "reset_site_confirm"}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div><h3>{{t "reset_site_data"}}</h3><p>{{t "reset_site_help"}}</p></div>
-      <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>
+      {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>{{end}}
       <button class="button danger" type="submit">{{t "reset_data"}}</button>
     </form>
-    <form method="post" action="{{appPath (printf "/admin/sites/%s/delete" .Site.ID)}}" class="danger-form">
+    <form method="post" action="{{appPath (printf "/admin/sites/%s/delete" .Site.ID)}}" class="danger-form" data-confirm-message="{{t "delete_site_confirm"}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div><h3>{{t "delete_site"}}</h3><p>{{t "delete_site_help"}}</p></div>
-      <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>
+      <label class="field"><span>{{t "confirm_site_id"}}</span><input type="text" name="confirm_site_id" autocomplete="off" spellcheck="false" required aria-describedby="confirm-site-id-help"><small id="confirm-site-id-help">{{t "confirm_site_id_help"}} <code>{{.Site.ID}}</code></small></label>
+      {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>{{end}}
       <button class="button danger" type="submit">{{t "delete_permanently"}}</button>
     </form>
   </div>

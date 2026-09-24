@@ -54,7 +54,7 @@
 
     <div class="configuration-actions">
       <div class="configuration-action-copy"><strong>{{t "apply_configuration"}}</strong><span>{{t "apply_configuration_help"}}</span></div>
-      <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
+      {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>{{end}}
       <button class="button primary" type="submit">{{t "save_configuration"}}</button>
     </div>
   </form>
@@ -85,7 +85,7 @@
     <form class="restore-form" method="post" action="{{appPath "/admin/operations/restore"}}" data-confirm-message="{{t "restore_backup_confirm"}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <label class="field"><span>{{t "choose_backup"}}</span><select name="backup" required>{{range .Backups}}<option value="{{.Name}}">{{.Name}} · {{formatBytes .Size}} · {{formatUTC .ModifiedAt}}{{if not .HasChecksum}} · {{t "checksum_missing"}}{{end}}</option>{{end}}</select></label>
-      <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>
+      {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>{{end}}
       <button class="button danger" type="submit">{{t "restore_now"}}</button>
     </form>
     {{else}}<p class="muted">{{t "no_backups"}}</p>{{end}}
@@ -99,6 +99,7 @@
     <label class="field"><span>{{t "current_password"}}</span><input type="password" name="current_password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
     <label class="field"><span>{{t "new_password"}}</span><input type="password" name="new_password" autocomplete="new-password" minlength="8" maxlength="128" required><small>{{t "password_hint"}}</small></label>
     <label class="field"><span>{{t "confirm_new_password"}}</span><input type="password" name="confirm_password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
+    <small>{{t "password_change_notice"}}</small>
     <button class="button primary" type="submit">{{t "update_password"}}</button>
   </form>
 </section>
@@ -115,7 +116,7 @@
       <div class="update-method-heading"><h3>{{t "online_update"}}</h3><p>{{t "online_update_help"}}</p></div>
       <form method="post" action="{{appPath "/admin/settings/update"}}" class="update-form">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
+        {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>{{end}}
         <button class="button primary" type="submit" {{if or (not .UpdateKeyReady) (not .RunningFromStablePath)}}disabled{{end}}>{{t "check_and_update"}}</button>
       </form>
     </div>
@@ -128,7 +129,7 @@
           <label class="field"><span>{{t "release_binary"}} <code>{{.UpdatePlatform}}</code></span><input type="file" name="binary" required></label>
         </div>
         <div class="update-submit-row">
-          <label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>
+          {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>{{end}}
           <button class="button primary" type="submit" {{if or (not .UpdateKeyReady) (not .RunningFromStablePath)}}disabled{{end}}>{{t "install_local_update"}}</button>
         </div>
       </form>

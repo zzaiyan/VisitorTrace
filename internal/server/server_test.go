@@ -722,9 +722,12 @@ func TestAdminSiteResetAndDelete(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	post := func(path string) *httptest.ResponseRecorder {
+	post := func(path string, extra url.Values) *httptest.ResponseRecorder {
 		t.Helper()
 		form := url.Values{"csrf": {csrf}, "password": {"correct horse"}}
+		for key, values := range extra {
+			form[key] = values
+		}
 		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
 		request.Host = "127.0.0.1:8790"
 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -733,7 +736,7 @@ func TestAdminSiteResetAndDelete(t *testing.T) {
 		app.Handler().ServeHTTP(response, request)
 		return response
 	}
-	reset := post("/admin/sites/" + site.ID + "/reset")
+	reset := post("/admin/sites/"+site.ID+"/reset", nil)
 	if reset.Code != http.StatusSeeOther || reset.Header().Get("Location") != "/admin/sites/"+site.ID+"?saved=reset#danger" {
 		t.Fatalf("reset = status %d location %q", reset.Code, reset.Header().Get("Location"))
 	}
@@ -741,7 +744,7 @@ func TestAdminSiteResetAndDelete(t *testing.T) {
 	if err != nil || resetSite.AcceptPageviews || resetSite.PublishPublic {
 		t.Fatalf("reset Site = %#v, %v", resetSite, err)
 	}
-	deleted := post("/admin/sites/" + site.ID + "/delete")
+	deleted := post("/admin/sites/"+site.ID+"/delete", url.Values{"confirm_site_id": {site.ID}})
 	if deleted.Code != http.StatusSeeOther || deleted.Header().Get("Location") != "/admin/sites?saved=deleted" {
 		t.Fatalf("delete = status %d location %q", deleted.Code, deleted.Header().Get("Location"))
 	}
@@ -1057,6 +1060,12 @@ func TestAdminSavesCombinedConfigurationAndRequestsOneRestart(t *testing.T) {
 func TestAdminConfigurationRejectsWrongPassword(t *testing.T) {
 	app, _, _ := testAdminServer(t)
 	cookie, csrf := loginAdmin(t, app)
+	// Expire the login-time verification so the password gate is active.
+	digest := store.HashSessionToken(cookie.Value)
+	expired := time.Now().UTC().Add(-10 * time.Minute)
+	if err := app.Store.MarkAdministratorPasswordVerified(context.Background(), digest, expired); err != nil {
+		t.Fatalf("expire step-up window: %v", err)
+	}
 	form := url.Values{
 		"csrf": {csrf}, "password": {"wrong password"}, "base_url": {"https://stats.example.com"},
 		"geoip_provider": {"ip2location"}, "geoip_update": {"disabled"}, "geoip_source": {"official"},
@@ -1067,8 +1076,8 @@ func TestAdminConfigurationRejectsWrongPassword(t *testing.T) {
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
-	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") || !strings.HasSuffix(response.Header().Get("Location"), "#configuration") {
-		t.Fatalf("wrong password = status %d location %q", response.Code, response.Header().Get("Location"))
+	if response.Code != http.StatusForbidden || response.Header().Get("Vt-Auth") != "step-up" {
+		t.Fatalf("wrong password = status %d step-up %q", response.Code, response.Header().Get("Vt-Auth"))
 	}
 	loaded, err := config.Load(app.ConfigPath)
 	if err != nil || loaded.GeoIPProvider != "dbip" {
@@ -1265,6 +1274,52 @@ func TestSiteSettingsAcceptsMultipartForm(t *testing.T) {
 	updated, err := st.GetSite(context.Background(), site.ID)
 	if err != nil || !updated.PublishPublic || updated.RetentionUnlimited {
 		t.Fatalf("multipart settings were not applied: %#v, %v", updated, err)
+	}
+}
+
+func TestStepUpWindowAndSiteDeletionConfirmation(t *testing.T) {
+	app, st, site := testAdminServer(t)
+	cookie, csrf := loginAdmin(t, app)
+	post := func(path string, form url.Values) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
+		request.Host = "127.0.0.1:8790"
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.AddCookie(cookie)
+		response := httptest.NewRecorder()
+		app.Handler().ServeHTTP(response, request)
+		return response
+	}
+	// Login itself verifies the password, so a fresh session starts inside
+	// the step-up window: reset proceeds without a password field.
+	if response := post("/admin/sites/"+site.ID+"/reset", url.Values{"csrf": {csrf}}); response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "saved=reset") {
+		t.Fatalf("reset inside window = status %d location %q", response.Code, response.Header().Get("Location"))
+	}
+	// Once the window expires, a password-less action is challenged with
+	// 403 + Vt-Auth: step-up instead of executed.
+	digest := store.HashSessionToken(cookie.Value)
+	expired := time.Now().UTC().Add(-10 * time.Minute)
+	if err := st.MarkAdministratorPasswordVerified(context.Background(), digest, expired); err != nil {
+		t.Fatalf("expire step-up window: %v", err)
+	}
+	if response := post("/admin/sites/"+site.ID+"/reset", url.Values{"csrf": {csrf}}); response.Code != http.StatusForbidden || response.Header().Get("Vt-Auth") != "step-up" {
+		t.Fatalf("reset outside window = status %d step-up %q", response.Code, response.Header().Get("Vt-Auth"))
+	}
+	// A correct password authorizes the action and re-opens the window.
+	if response := post("/admin/sites/"+site.ID+"/reset", url.Values{"csrf": {csrf}, "password": {"correct horse"}}); response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "saved=reset") {
+		t.Fatalf("reset with password = status %d location %q", response.Code, response.Header().Get("Location"))
+	}
+	// Within the window the password is no longer required, but deleting the
+	// Site additionally demands the Site ID itself.
+	deleteURL := "/admin/sites/" + site.ID + "/delete"
+	if response := post(deleteURL, url.Values{"csrf": {csrf}, "confirm_site_id": {"wrong-id"}}); response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") {
+		t.Fatalf("delete with wrong Site ID = status %d location %q", response.Code, response.Header().Get("Location"))
+	}
+	response := post(deleteURL, url.Values{"csrf": {csrf}, "confirm_site_id": {site.ID}})
+	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "saved=deleted") {
+		t.Fatalf("delete with matching Site ID = status %d location %q", response.Code, response.Header().Get("Location"))
+	}
+	if _, err := st.GetSite(context.Background(), site.ID); err == nil {
+		t.Fatalf("site still exists after deletion")
 	}
 }
 

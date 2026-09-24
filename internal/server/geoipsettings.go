@@ -28,8 +28,7 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 		s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_config_path"))
 		return
 	}
-	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
-		s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_admin_password"))
+	if !s.authorizeStepUp(w, r, session) {
 		return
 	}
 	baseURL, err := config.NormalizeBaseURL(r.FormValue("base_url"))
