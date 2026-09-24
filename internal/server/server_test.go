@@ -1234,6 +1234,40 @@ func TestPublicAnalyticsMapHonorsDateRange(t *testing.T) {
 	}
 }
 
+func TestSiteSettingsAcceptsMultipartForm(t *testing.T) {
+	app, st, site := testAdminServer(t)
+	cookie, csrf := loginAdmin(t, app)
+	// Fetch-built FormData submits multipart; CSRF validation and the handler
+	// must both accept that encoding (regression: it returned 403).
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for _, field := range [][2]string{
+		{"csrf", csrf}, {"name", site.Name}, {"timezone", site.Timezone},
+		{"origins", "https://example.com"}, {"dedup_window_days", "1"},
+		{"retention_days", "30"}, {"retention_mode", "limited"}, {"publish_public", "on"},
+	} {
+		if err := writer.WriteField(field[0], field[1]); err != nil {
+			t.Fatalf("write multipart field: %v", err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+	settingsRequest := httptest.NewRequest(http.MethodPost, "/admin/sites/"+site.ID+"/settings", &body)
+	settingsRequest.Host = "127.0.0.1:8790"
+	settingsRequest.Header.Set("Content-Type", writer.FormDataContentType())
+	settingsRequest.AddCookie(cookie)
+	settingsResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(settingsResponse, settingsRequest)
+	if settingsResponse.Code != http.StatusSeeOther || settingsResponse.Header().Get("Location") != "/admin/sites/"+site.ID+"?saved=settings#settings" {
+		t.Fatalf("multipart settings update = status %d body = %q", settingsResponse.Code, settingsResponse.Body.String())
+	}
+	updated, err := st.GetSite(context.Background(), site.ID)
+	if err != nil || !updated.PublishPublic || updated.RetentionUnlimited {
+		t.Fatalf("multipart settings were not applied: %#v, %v", updated, err)
+	}
+}
+
 func TestAnalyticsAssetServesPrecompressedBundle(t *testing.T) {
 	app, _, _ := testServer(t)
 	request := httptest.NewRequest(http.MethodGet, "/assets/analytics.js", nil)

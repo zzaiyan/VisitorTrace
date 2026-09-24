@@ -137,7 +137,14 @@ func (s *Server) validCSRF(r *http.Request, session store.AdministratorSession) 
 	if r.Method != http.MethodPost {
 		return false
 	}
-	if err := r.ParseForm(); err != nil {
+	// ParseForm does not decode multipart bodies; accept both encodings so
+	// fetch submissions built from FormData validate like native form posts
+	// and the parsed fields remain available to the handlers afterwards.
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if err := r.ParseMultipartForm(2 << 20); err != nil {
+			return false
+		}
+	} else if err := r.ParseForm(); err != nil {
 		return false
 	}
 	value, err := hex.DecodeString(r.FormValue("csrf"))

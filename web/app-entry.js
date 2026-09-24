@@ -233,9 +233,15 @@
     } else if (form.hasAttribute("data-vt-nav")) {
       // Opt-in POST submissions follow the PRG redirect and swap in place;
       // forms that restart the process or upload files stay full-page.
+      // Send url-encoded like a native form; a URLSearchParams body makes
+      // fetch set that Content-Type automatically.
       event.preventDefault();
       flushScrollStamp();
-      requestDocument(action.href, { method: "POST", body: new FormData(form) }, { history: "push", scroll: window.scrollY });
+      var body = new URLSearchParams();
+      new FormData(form).forEach(function (value, key) {
+        if (typeof value === "string") body.append(key, value);
+      });
+      requestDocument(action.href, { method: "POST", body: body }, { history: "push", scroll: window.scrollY });
     }
   });
 
