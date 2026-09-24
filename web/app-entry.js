@@ -78,7 +78,8 @@
     window.fetch(target, init)
       .then(function (response) {
         if (request.signal.aborted) return;
-        if (!response.ok) throw new Error("HTTP " + response.status);
+        // Rendered error pages (403 CSRF, 400 form, 404, ...) are valid HTML:
+        // swap them in place so the failure is diagnosed instead of masked.
         var contentType = response.headers.get("Content-Type") || "";
         if (contentType.indexOf("text/html") === -1) throw new Error("non-HTML response");
         var finalURL = absoluteURL(response.url || target);
@@ -90,18 +91,26 @@
         }
         return response.text().then(function (html) {
           if (request.signal.aborted) return;
-          // A POST landing back on the same URL (validation failure rendered
-          // in place) replaces the entry instead of piling up duplicates.
           var merged = options;
-          if (init.method === "POST" && options.history === "push" && finalURL.href === window.location.href) {
-            merged = Object.assign({}, options, { history: "replace" });
+          if (init.method === "POST") {
+            if (!response.redirected) {
+              // A direct POST response (rendered error page) must not put the
+              // POST-only URL into the address bar; keep the current entry.
+              merged = Object.assign({}, options, { history: "replace", url: window.location.href });
+            } else if (options.history === "push" && finalURL.href === window.location.href) {
+              // A POST landing back on the same URL replaces the entry
+              // instead of piling up duplicates.
+              merged = Object.assign({}, options, { history: "replace" });
+            }
           }
           applyDocument(html, finalURL, merged);
         });
       })
       .catch(function () {
         if (request.signal.aborted || request !== activeRequest) return;
-        window.location.href = target;
+        // A POST target cannot be replayed over GET; reload the current page.
+        if (init.method === "POST") window.location.reload();
+        else window.location.href = target;
       });
   }
 
@@ -131,9 +140,10 @@
     rerunScripts(body);
 
     var scroll = typeof options.scroll === "number" ? options.scroll : 0;
-    if (options.history === "push") window.history.pushState({ vtScroll: scroll }, "", finalURL.href);
-    else window.history.replaceState({ vtScroll: scroll }, "", finalURL.href);
-    currentURL = finalURL.href;
+    var historyURL = options.url || finalURL.href;
+    if (options.history === "push") window.history.pushState({ vtScroll: scroll }, "", historyURL);
+    else window.history.replaceState({ vtScroll: scroll }, "", historyURL);
+    currentURL = historyURL;
 
     var anchor = finalURL.hash ? document.getElementById(finalURL.hash.slice(1)) : null;
     if (anchor) anchor.scrollIntoView();
