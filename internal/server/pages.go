@@ -23,12 +23,12 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
-//go:embed templates/*.html assets/admin.css assets/analytics.js assets/analytics.js.gz assets/analytics.js.br
+//go:embed templates/*.html assets/admin.css assets/analytics.js assets/analytics.js.gz assets/analytics.js.br assets/app.js assets/app.js.gz assets/app.js.br
 var pageAssets embed.FS
 
 var pageAssetRevision = func() string {
 	hash := sha256.New()
-	for _, name := range []string{"assets/admin.css", "assets/analytics.js"} {
+	for _, name := range []string{"assets/admin.css", "assets/analytics.js", "assets/app.js"} {
 		data, err := pageAssets.ReadFile(name)
 		if err == nil {
 			_, _ = hash.Write(data)
@@ -837,17 +837,23 @@ func (s *Server) adminAssets(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(data)
 }
 
-func (s *Server) analyticsAssets(w http.ResponseWriter, r *http.Request) {
-	asset := "assets/analytics.js"
-	encoding := ""
-	accepted := r.Header.Get("Accept-Encoding")
-	if strings.Contains(accepted, "br") {
-		asset += ".br"
-		encoding = "br"
-	} else if strings.Contains(accepted, "gzip") {
-		asset += ".gz"
-		encoding = "gzip"
+func (s *Server) scriptAsset(name string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		asset := "assets/" + name
+		encoding := ""
+		accepted := r.Header.Get("Accept-Encoding")
+		if strings.Contains(accepted, "br") {
+			asset += ".br"
+			encoding = "br"
+		} else if strings.Contains(accepted, "gzip") {
+			asset += ".gz"
+			encoding = "gzip"
+		}
+		serveScriptAsset(w, r, asset, encoding)
 	}
+}
+
+func serveScriptAsset(w http.ResponseWriter, r *http.Request, asset, encoding string) {
 	data, err := pageAssets.ReadFile(asset)
 	if err != nil {
 		http.Error(w, "asset unavailable", http.StatusInternalServerError)

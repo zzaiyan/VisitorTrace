@@ -60,4 +60,4 @@ jobs:
       - name: Rebuild committed assets
         run: npm run build:analytics
       - name: Verify generated assets are current
-        run: git diff --exit-code -- internal/server/assets/analytics.js internal/server/assets/analytics.js.br internal/server/assets/analytics.js.gz
+        run: git diff --exit-code -- internal/server/assets/analytics.js internal/server/assets/analytics.js.br internal/server/assets/analytics.js.gz internal/server/assets/app.js internal/server/assets/app.js.br internal/server/assets/app.js.gz

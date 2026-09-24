@@ -90,12 +90,20 @@ if (dataElement && (trendElement || mapElement)) {
     const resize = () => {
       charts.forEach((chart) => chart.resize());
     };
+    let observer = null;
     if ("ResizeObserver" in window) {
-      const observer = new ResizeObserver(resize);
+      observer = new ResizeObserver(resize);
       observedElements.forEach((element) => observer.observe(element));
     } else {
       window.addEventListener("resize", resize, { passive: true });
     }
+    // AJAX navigation swaps the body and re-runs this script; release the
+    // previous run's charts and observers so nothing accumulates.
+    document.addEventListener("vt:before-swap", () => {
+      charts.forEach((chart) => chart.dispose());
+      if (observer) observer.disconnect();
+      else window.removeEventListener("resize", resize);
+    }, { once: true });
   } catch (error) {
     document.body.classList.remove("analytics-enhancing");
     console.warn("VisitorTrace analytics enhancement unavailable", error);

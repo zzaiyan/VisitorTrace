@@ -2,21 +2,32 @@ import { build } from "esbuild";
 import { readFile, writeFile } from "node:fs/promises";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 
-await build({
-  entryPoints: ["web/analytics-entry.js"],
-  outfile: "internal/server/assets/analytics.js",
-  bundle: true,
-  minify: true,
-  legalComments: "none",
-  target: ["es2020"],
-  platform: "browser",
-  banner: { js: "/*! Apache ECharts 6.1.0 | Apache-2.0 | https://echarts.apache.org/ */" },
-});
+const bundles = [
+  {
+    entryPoints: ["web/analytics-entry.js"],
+    outfile: "internal/server/assets/analytics.js",
+    banner: { js: "/*! Apache ECharts 6.1.0 | Apache-2.0 | https://echarts.apache.org/ */" },
+  },
+  {
+    entryPoints: ["web/app-entry.js"],
+    outfile: "internal/server/assets/app.js",
+  },
+];
 
-const bundle = await readFile("internal/server/assets/analytics.js");
-await Promise.all([
-  writeFile("internal/server/assets/analytics.js.gz", gzipSync(bundle, { level: 9 })),
-  writeFile("internal/server/assets/analytics.js.br", brotliCompressSync(bundle, {
-    params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
-  })),
-]);
+for (const bundle of bundles) {
+  await build({
+    ...bundle,
+    bundle: true,
+    minify: true,
+    legalComments: "none",
+    target: ["es2020"],
+    platform: "browser",
+  });
+  const artifact = await readFile(bundle.outfile);
+  await Promise.all([
+    writeFile(`${bundle.outfile}.gz`, gzipSync(artifact, { level: 9 })),
+    writeFile(`${bundle.outfile}.br`, brotliCompressSync(artifact, {
+      params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
+    })),
+  ]);
+}

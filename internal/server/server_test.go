@@ -1248,6 +1248,20 @@ func TestAnalyticsAssetServesPrecompressedBundle(t *testing.T) {
 	}
 }
 
+func TestAppAssetServesPrecompressedBundle(t *testing.T) {
+	app, _, _ := testServer(t)
+	request := httptest.NewRequest(http.MethodGet, "/assets/app.js", nil)
+	request.Header.Set("Accept-Encoding", "gzip")
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK || response.Header().Get("Content-Encoding") != "gzip" || response.Header().Get("Vary") != "Accept-Encoding" {
+		t.Fatalf("app asset headers = status %d encoding %q vary %q", response.Code, response.Header().Get("Content-Encoding"), response.Header().Get("Vary"))
+	}
+	if response.Body.Len() > 16*1024 {
+		t.Fatalf("Gzip app asset = %d bytes, want <= 16 KiB", response.Body.Len())
+	}
+}
+
 func TestMapPresetDefaultsAndOverrides(t *testing.T) {
 	app, st, site := testServer(t)
 	options := maprender.DefaultOptions()

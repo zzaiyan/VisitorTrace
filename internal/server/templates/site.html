@@ -241,7 +241,9 @@
     trigger.addEventListener("click", function () { setOpen(panel.hidden); });
     trigger.addEventListener("blur", hideSoon);
     close.addEventListener("click", function () { suppressTriggerFocus = true; setOpen(false); trigger.focus(); });
-    document.addEventListener("pointerdown", function (event) { if (!help.contains(event.target)) setOpen(false); });
+    var dismissOnPointerDown = function (event) { if (!help.contains(event.target)) setOpen(false); };
+    document.addEventListener("pointerdown", dismissOnPointerDown);
+    document.addEventListener("vt:before-swap", function () { document.removeEventListener("pointerdown", dismissOnPointerDown); }, { once: true });
     help.addEventListener("keydown", function (event) { if (event.key === "Escape") { event.preventDefault(); setOpen(false); trigger.focus(); } });
   }
   var form = document.getElementById("preset-form");
@@ -346,11 +348,13 @@
       modeButtons[next].focus();
     });
   });
-  window.addEventListener("message", function (event) {
+  var onPreviewResizeMessage = function (event) {
     var data = event.data;
     if (event.source !== widgetPreview.contentWindow || !data || data.type !== "visitortrace:resize") return;
     sizeWidget(Number(data.width), Number(data.height));
-  });
+  };
+  window.addEventListener("message", onPreviewResizeMessage);
+  document.addEventListener("vt:before-swap", function () { window.removeEventListener("message", onPreviewResizeMessage); }, { once: true });
   updateOverrideExample(previewQuery());
   sizeWidget(Number(form.elements.w.value), Number(form.elements.h.value));
   sizeImage(Number(form.elements.w.value), Number(form.elements.h.value));
