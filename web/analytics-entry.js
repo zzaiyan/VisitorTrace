@@ -63,6 +63,7 @@ if (dataElement && (trendElement || mapElement)) {
     const labels = payload.labels || {};
     const charts = [];
     const observedElements = [];
+    let mapChart = null;
 
     if (trendElement) {
       const trend = echarts.init(trendElement, null, { renderer: "svg" });
@@ -73,11 +74,19 @@ if (dataElement && (trendElement || mapElement)) {
     if (mapElement) {
       const map = echarts.init(mapElement, null, { renderer: "svg" });
       const options = mapOptions(payload.points || [], labels);
+      const defaultCenter = options.geo.center;
+      const defaultZoom = options.geo.zoom;
+      const saved = savedMapState();
+      if (saved) {
+        options.geo.center = saved.center;
+        options.geo.zoom = saved.zoom;
+      }
       map.setOption(options);
       installMapControls(mapElement, map, () => {
         map.dispatchAction({ type: "hideTip" });
-        map.setOption({ geo: { center: options.geo.center.slice(), zoom: options.geo.zoom } }, { lazyUpdate: false });
+        map.setOption({ geo: { center: defaultCenter.slice(), zoom: defaultZoom } }, { lazyUpdate: false });
       });
+      mapChart = map;
       charts.push(map);
       observedElements.push(mapElement);
     }
@@ -98,8 +107,16 @@ if (dataElement && (trendElement || mapElement)) {
       window.addEventListener("resize", resize, { passive: true });
     }
     // AJAX navigation swaps the body and re-runs this script; release the
-    // previous run's charts and observers so nothing accumulates.
+    // previous run's charts and observers so nothing accumulates. The map's
+    // current view survives via a window key because the module scope does
+    // not outlive a re-run.
     document.addEventListener("vt:before-swap", () => {
+      if (mapChart) {
+        const geo = (mapChart.getOption()?.geo || [])[0];
+        if (geo && Array.isArray(geo.center) && typeof geo.zoom === "number") {
+          window.__vtMapState = { path: window.location.pathname, center: geo.center.slice(), zoom: geo.zoom };
+        }
+      }
       charts.forEach((chart) => chart.dispose());
       if (observer) observer.disconnect();
       else window.removeEventListener("resize", resize);
@@ -108,6 +125,17 @@ if (dataElement && (trendElement || mapElement)) {
     document.body.classList.remove("analytics-enhancing");
     console.warn("VisitorTrace analytics enhancement unavailable", error);
   }
+}
+
+// Returns and clears the map view saved by the previous run's teardown, but
+// only when it belongs to the same page, so switching Sites or reloads start
+// from the default view while range or language swaps keep it.
+function savedMapState() {
+  const saved = window.__vtMapState;
+  window.__vtMapState = null;
+  if (!saved || saved.path !== window.location.pathname) return null;
+  if (!Array.isArray(saved.center) || saved.center.length !== 2 || typeof saved.zoom !== "number") return null;
+  return saved;
 }
 
 function installMapControls(element, chart, reset) {
