@@ -8,6 +8,12 @@ This file records user-facing changes for each published VisitorTrace release.
 
 - No unreleased changes.
 
+## 0.2.4 - 2026-09-24
+
+- Standardized all section eyebrows into fixed short English echoes of their headings, displayed in uppercase through CSS instead of following the interface language. This removes the previous mix of translated eyebrows and hardcoded all-caps labels that made multilingual pages inconsistent.
+- Localized previously hardcoded Admin Console page titles, including Pageview Records, Administrator Settings, new Site creation, and the restart interstitials, so browser tab titles now follow the selected interface language.
+- This release keeps SQLite Schema 12.
+
 ## 0.2.3 - 2026-09-11
 
 - Added Administrator Settings backup restoration from verified local `.vtbackup` archives. The workflow creates a pre-restore snapshot, schedules a safe database replacement during the next supervised restart, preserves the active configuration, and revokes Administrator sessions after a successful restore.
