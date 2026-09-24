@@ -21,6 +21,7 @@
   var currentURL = window.location.href;
   var activeRequest = null;
   var scrollStampTimer = null;
+  var lastTriggerHref = null;
 
   function absoluteURL(value) {
     return new URL(value, window.location.href);
@@ -67,12 +68,14 @@
 
   window.addEventListener("scroll", stampScroll, { passive: true });
 
-  function goTo(url, options) {
+  function requestDocument(target, init, options) {
     if (activeRequest) activeRequest.abort();
     var request = new AbortController();
     activeRequest = request;
-    var target = url.href;
-    window.fetch(target, { signal: request.signal, credentials: "same-origin", headers: { Accept: "text/html" } })
+    init.signal = request.signal;
+    init.credentials = "same-origin";
+    init.headers = { Accept: "text/html" };
+    window.fetch(target, init)
       .then(function (response) {
         if (request.signal.aborted) return;
         if (!response.ok) throw new Error("HTTP " + response.status);
@@ -87,13 +90,23 @@
         }
         return response.text().then(function (html) {
           if (request.signal.aborted) return;
-          applyDocument(html, finalURL, options);
+          // A POST landing back on the same URL (validation failure rendered
+          // in place) replaces the entry instead of piling up duplicates.
+          var merged = options;
+          if (init.method === "POST" && options.history === "push" && finalURL.href === window.location.href) {
+            merged = Object.assign({}, options, { history: "replace" });
+          }
+          applyDocument(html, finalURL, merged);
         });
       })
       .catch(function () {
         if (request.signal.aborted || request !== activeRequest) return;
         window.location.href = target;
       });
+  }
+
+  function goTo(url, options) {
+    requestDocument(url.href, {}, options);
   }
 
   function applyDocument(html, finalURL, options) {
@@ -107,6 +120,9 @@
     // Adopt the rendered body and re-create <script> elements: imported
     // scripts never execute on their own, so page bootstrapping re-runs.
     var body = document.body;
+    var previousActive = document.activeElement;
+    var triggerHref = lastTriggerHref;
+    lastTriggerHref = null;
     body.className = incoming.body.className;
     body.replaceChildren();
     Array.prototype.forEach.call(incoming.body.childNodes, function (node) {
@@ -122,6 +138,25 @@
     var anchor = finalURL.hash ? document.getElementById(finalURL.hash.slice(1)) : null;
     if (anchor) anchor.scrollIntoView();
     else window.scrollTo(0, scroll);
+    restoreFocus(previousActive, triggerHref);
+  }
+
+  // Keep keyboard and screen-reader position across a swap: return to the
+  // previously focused element when the new document has one with the same
+  // id, otherwise to the link that triggered the navigation.
+  function restoreFocus(previousActive, triggerHref) {
+    var target = null;
+    if (previousActive && previousActive.id) target = document.getElementById(previousActive.id);
+    if (!target && triggerHref) {
+      var anchors = document.getElementsByTagName("a");
+      for (var index = 0; index < anchors.length; index += 1) {
+        if (anchors[index].href === triggerHref) {
+          target = anchors[index];
+          break;
+        }
+      }
+    }
+    if (target) target.focus({ preventScroll: true });
   }
 
   function rerunScripts(root) {
@@ -162,26 +197,36 @@
     if (!url.hash && window.location.hash && url.pathname === window.location.pathname) url.hash = window.location.hash;
     event.preventDefault();
     flushScrollStamp();
+    lastTriggerHref = url.href;
     var samePath = url.pathname === window.location.pathname;
     goTo(url, { history: "push", scroll: samePath ? window.scrollY : 0 });
   });
 
   document.addEventListener("submit", function (event) {
+    // Page scripts may cancel a submission (confirmation dialogs); respect it.
+    if (event.defaultPrevented) return;
     var form = event.target;
     if (!(form instanceof HTMLFormElement) || optedOut(form)) return;
     var method = (form.getAttribute("method") || "get").toLowerCase();
-    if (method !== "get") return;
     var action = absoluteURL(form.getAttribute("action") || window.location.href);
     if (!navigable(action)) return;
-    var params = new URLSearchParams();
-    new FormData(form).forEach(function (value, key) {
-      if (typeof value === "string" && value !== "") params.append(key, value);
-    });
-    action.hash = "";
-    action.search = params.toString();
-    event.preventDefault();
-    flushScrollStamp();
-    goTo(action, { history: "push", scroll: window.scrollY });
+    if (method === "get") {
+      var params = new URLSearchParams();
+      new FormData(form).forEach(function (value, key) {
+        if (typeof value === "string" && value !== "") params.append(key, value);
+      });
+      action.hash = "";
+      action.search = params.toString();
+      event.preventDefault();
+      flushScrollStamp();
+      goTo(action, { history: "push", scroll: window.scrollY });
+    } else if (form.hasAttribute("data-vt-nav")) {
+      // Opt-in POST submissions follow the PRG redirect and swap in place;
+      // forms that restart the process or upload files stay full-page.
+      event.preventDefault();
+      flushScrollStamp();
+      requestDocument(action.href, { method: "POST", body: new FormData(form) }, { history: "push", scroll: window.scrollY });
+    }
   });
 
   window.addEventListener("popstate", function (event) {
