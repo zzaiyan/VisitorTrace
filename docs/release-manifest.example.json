@@ -1,16 +1,16 @@
 {
   "format_version": 1,
-  "version": "0.2.7",
+  "version": "0.3.0",
   "published_at": "2026-09-24T00:00:00Z",
   "schema_version": 12,
   "assets": {
     "linux-amd64": {
-      "url": "visitortrace-0.2.7-linux-amd64",
+      "url": "visitortrace-0.3.0-linux-amd64",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size": 1
     },
     "linux-arm64": {
-      "url": "visitortrace-0.2.7-linux-arm64",
+      "url": "visitortrace-0.3.0-linux-arm64",
       "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "size": 1
     }

@@ -8,6 +8,14 @@ This file records user-facing changes for each published VisitorTrace release.
 
 - No unreleased changes.
 
+## 0.3.0 - 2026-09-24
+
+- Replaced the per-action administrator password prompts with step-up verification. A password check opens a five-minute window on the session, and login itself starts one, so sensitive actions normally proceed without a password; once the window lapses, the request is challenged and the AJAX navigator answers with one shared verification dialog and replays the submission, while forms rendered without JavaScript still include the password field.
+- Tiered destructive-action protection: resetting Site data gains a confirmation dialog, permanently deleting a Site additionally requires typing the Site ID, and changing the password now warns that every session is signed out.
+- Added operation feedback: every POST form shows a busy indicator on its button while the request is pending, backup, cleanup, and GeoIP updates join the in-place AJAX form set, and results surface as auto-dismissing toasts near the action instead of a flash strip at the top of the page.
+- Rebalanced the password change form into even columns with a single merged hint line, and restored natural button sizing on the configuration actions row and the danger zone after the step-up layout changes.
+- This release keeps SQLite Schema 12.
+
 ## 0.2.7 - 2026-09-24
 
 - Fixed the 0.2.6 opt-in form submissions: the fetch navigator sent multipart bodies that CSRF validation did not parse, so saving Site settings, Map Preset, or creating a Site failed with 403. The navigator now sends url-encoded bodies exactly like native form posts, and CSRF validation accepts multipart requests as well. This release keeps SQLite Schema 12.
