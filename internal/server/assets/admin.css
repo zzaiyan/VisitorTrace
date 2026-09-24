@@ -187,7 +187,10 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .configuration-group-heading h3 { margin: 3px 0 7px; font-size: 15px; }
 .configuration-group-heading > p:last-child { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .configuration-fields { display: grid; min-width: 0; gap: 18px; }
-.configuration-actions { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(260px, 420px) auto; align-items: end; gap: 18px; margin-top: 4px; padding: 18px 20px; border-top: 1px solid #c9d6d3; border-bottom: 1px solid #c9d6d3; background: #f2f6f4; }
+.configuration-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 18px; margin-top: 4px; padding: 18px 20px; border-top: 1px solid #c9d6d3; border-bottom: 1px solid #c9d6d3; background: #f2f6f4; }
+.configuration-action-copy { flex: 1 1 220px; }
+.configuration-actions .field { flex: 0 1 320px; min-width: 240px; }
+.configuration-actions .button { flex: 0 0 auto; }
 .configuration-action-copy { align-self: center; }
 .configuration-action-copy strong, .configuration-action-copy span { display: block; }
 .configuration-action-copy strong { font-size: 13px; }
@@ -296,7 +299,7 @@ tbody tr:hover { background: #f6f9f7; }
 .danger-zone { border-top-color: #d9b6af; }
 .danger-zone .eyebrow { color: var(--danger); }
 .danger-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-.danger-form { display: grid; gap: 16px; padding: 20px; border: 1px solid #dfc3bd; background: #fffafa; }
+.danger-form { display: grid; align-content: start; gap: 16px; padding: 20px; border: 1px solid #dfc3bd; background: #fffafa; }
 .danger-form h3 { margin-bottom: 7px; color: var(--danger); }
 .danger-form p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .danger-form .button { justify-self: start; }
@@ -444,7 +447,8 @@ tbody tr:hover { background: #f6f9f7; }
 	.integration-method, .site-settings-group { grid-template-columns: 1fr; gap: 14px; padding: 21px 0; }
 	.site-settings-actions .button { width: 100%; }
 	.configuration-group { grid-template-columns: 1fr; gap: 14px; padding: 21px 0; }
-	.configuration-actions { grid-template-columns: 1fr; padding: 17px 16px; }
+	.configuration-actions { padding: 17px 16px; }
+	.configuration-actions .field, .configuration-actions .button { flex-basis: 100%; }
 	.credential-grid { grid-template-columns: 1fr; gap: 20px; }
 	.credential-panel { padding-right: 0; }
 	.credential-panel + .credential-panel { padding-top: 20px; padding-left: 0; border-top: 1px solid var(--line); border-left: 0; }
