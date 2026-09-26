@@ -55,7 +55,7 @@ type Server struct {
 	logger        *slog.Logger
 	geoMu         sync.RWMutex
 	geoIP         *geoip.Resolver
-	onlineGeoIP   *geoiponline.Client
+	geoChain      *geoip.Chain
 	mapCache      *mapCache
 	loginLimit    *ratelimit.Limiter
 	recordGeoIPMu sync.Mutex
@@ -85,41 +85,41 @@ func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
 		basePath:   config.BasePath(cfg.BaseURL),
 		restart:    make(chan struct{}),
 	}
-	if cfg.OnlineGeoIPEnabled {
-		if client, err := geoiponline.New(cfg.OnlineGeoIPProvider, cfg.OnlineGeoIPKey, 3*time.Second); err == nil {
-			server.onlineGeoIP = client
-		} else {
-			server.logger.Warn("online GeoIP disabled", "error", err)
+	// Build the chain for recommended/precise presets; the offline
+	// resolvers attach later once databases are opened.
+	if cfg.GeoIPPreset == "recommended" || cfg.GeoIPPreset == "precise" {
+		backends := []*geoip.ChainBackend{}
+		if cfg.GeoIPPreset == "precise" && strings.TrimSpace(cfg.OnlineGeoIPKey) != "" {
+			if client, err := geoiponline.New(cfg.OnlineGeoIPProvider, cfg.OnlineGeoIPKey, 3*time.Second); err == nil {
+				dom, fo := geoip.DefaultChainWeights(cfg.OnlineGeoIPProvider)
+				backends = append(backends, &geoip.ChainBackend{Name: cfg.OnlineGeoIPProvider, Online: client, DomesticWeight: dom, ForeignWeight: fo})
+			} else {
+				server.logger.Warn("online GeoIP disabled", "error", err)
+			}
 		}
+		server.geoChain = geoip.NewChain(backends, "ip2region", "ip2location", true)
 	}
 	return server
 }
 
-// locate resolves visitor geography through the local database first and
-// falls back to the opt-in online provider when the local result is empty.
-// The online call carries a short deadline so collection never blocks for
-// long and skips addresses that cannot be geolocated anyway.
+// locate resolves visitor geography: the chain handles routing,
+// cross-validation, voting, and post-processing when configured; otherwise
+// the plain resolver answers directly with post-processing.
 func (s *Server) locate(ctx context.Context, address netip.Addr) geoip.Location {
+	if !address.IsValid() || address.IsPrivate() || address.IsLoopback() || address.IsUnspecified() {
+		return geoip.Location{}
+	}
 	s.geoMu.RLock()
+	chain := s.geoChain
 	resolver := s.geoIP
-	online := s.onlineGeoIP
 	s.geoMu.RUnlock()
-	var location geoip.Location
+	if chain != nil {
+		return chain.Lookup(ctx, address)
+	}
 	if resolver != nil {
-		location = resolver.Lookup(address)
+		return geoip.PostprocessLocation(resolver.Lookup(address))
 	}
-	if online == nil || !address.IsValid() || address.IsPrivate() || address.IsLoopback() || address.IsUnspecified() {
-		return location
-	}
-	if location.CountryCode != "" || location.City != "" {
-		return location
-	}
-	lookupCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-	if fallback, err := online.Lookup(lookupCtx, address); err == nil {
-		location = fallback
-	}
-	return location
+	return geoip.Location{}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -222,8 +222,21 @@ func (s *Server) SetGeoIP(resolver *geoip.Resolver) {
 	defer s.geoMu.Unlock()
 	previous := s.geoIP
 	s.geoIP = resolver
+	if s.geoChain != nil {
+		s.geoChain.SetDomestic(resolver)
+	}
 	if previous != nil && previous != resolver {
 		_ = previous.Close()
+	}
+}
+
+// SetGeoIPForeign attaches the foreign-branch resolver for the recommended
+// and precise presets.
+func (s *Server) SetGeoIPForeign(resolver *geoip.Resolver) {
+	s.geoMu.Lock()
+	defer s.geoMu.Unlock()
+	if s.geoChain != nil {
+		s.geoChain.SetForeign(resolver)
 	}
 }
 

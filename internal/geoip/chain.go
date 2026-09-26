@@ -85,6 +85,24 @@ func NewChain(backends []*ChainBackend, domestic, foreign string, greaterChinaDo
 	return &Chain{backends: backends, domesticID: domestic, foreignID: foreign, greaterChinaDomestic: greaterChinaDomestic}
 }
 
+// SetDomestic attaches or replaces the domestic-branch offline resolver.
+func (c *Chain) SetDomestic(resolver *Resolver) {
+	if backend := c.backend(c.domesticID); backend != nil {
+		backend.Offline = resolver
+		return
+	}
+	c.backends = append(c.backends, &ChainBackend{Name: c.domesticID, Offline: resolver, DomesticWeight: 1.1, ForeignWeight: 0.3})
+}
+
+// SetForeign attaches or replaces the foreign-branch offline resolver.
+func (c *Chain) SetForeign(resolver *Resolver) {
+	if backend := c.backend(c.foreignID); backend != nil {
+		backend.Offline = resolver
+		return
+	}
+	c.backends = append(c.backends, &ChainBackend{Name: c.foreignID, Offline: resolver})
+}
+
 func (c *Chain) backend(name string) *ChainBackend {
 	for _, backend := range c.backends {
 		if backend.Name == name {

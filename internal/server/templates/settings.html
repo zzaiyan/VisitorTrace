@@ -23,44 +23,14 @@
     </div>
 
     <div class="configuration-group">
-      <div class="configuration-group-heading"><p class="eyebrow">Geolocation</p><h3>{{t "geoip_resolution"}}</h3><p>{{t "geoip_settings_help"}}</p></div>
+      <div class="configuration-group-heading"><p class="eyebrow">Geolocation</p><h3>{{t "geoip_preset"}}</h3><p>{{t "provider_credentials_help"}}</p></div>
       <div class="configuration-fields">
-        <div class="field-grid two">
-          <label class="field"><span>{{t "geoip_provider"}}</span><select name="geoip_provider" data-provider-select><option value="dbip" data-source-url="{{.DBIPOfficialURL}}" {{if eq .GeoIPProvider "dbip"}}selected{{end}}>DB-IP City Lite</option><option value="maxmind" data-source-url="{{.MaxMindOfficialURL}}" {{if eq .GeoIPProvider "maxmind"}}selected{{end}}>MaxMind GeoLite2 City</option><option value="ip2location" data-source-url="{{.IP2LocationOfficialURL}}" {{if eq .GeoIPProvider "ip2location"}}selected{{end}}>IP2Location LITE DB11</option><option value="ip2region" data-source-url="{{.IP2RegionOfficialURL}}" {{if eq .GeoIPProvider "ip2region"}}selected{{end}}>ip2region (IPv4)</option></select></label>
-          <label class="field"><span>{{t "update_mode"}}</span><select name="geoip_update"><option value="automatic" {{if eq .GeoIPUpdate "automatic"}}selected{{end}}>{{t "automatic_updates"}}</option><option value="disabled" {{if eq .GeoIPUpdate "disabled"}}selected{{end}}>{{t "manual_only"}}</option></select></label>
+        <div class="preset-options" role="radiogroup" aria-label="{{t "geoip_preset"}}">
+          <label class="setting-toggle"><span><strong>{{t "preset_basic"}}</strong><small>{{t "preset_basic_help"}}</small></span><span class="switch-control"><input type="radio" name="geoip_preset" value="basic" {{if eq .GeoIPPreset "basic"}}checked{{end}}><span aria-hidden="true"></span></span></label>
+          <label class="setting-toggle"><span><strong>{{t "preset_recommended"}}</strong><small>{{t "preset_recommended_help"}}</small></span><span class="switch-control"><input type="radio" name="geoip_preset" value="recommended" {{if or (eq .GeoIPPreset "recommended") (eq .GeoIPPreset "")}}checked{{end}}><span aria-hidden="true"></span></span></label>
+          <label class="setting-toggle"><span><strong>{{t "preset_precise"}}</strong><small>{{t "preset_precise_help"}}</small></span><span class="switch-control"><input type="radio" name="geoip_preset" value="precise" {{if eq .GeoIPPreset "precise"}}checked{{end}}><span aria-hidden="true"></span></span></label>
         </div>
-        <fieldset class="check-group geoip-source-options"><legend>{{t "download_source"}}</legend><label><input type="radio" name="geoip_source" value="official" {{if .GeoIPOfficialSource}}checked{{end}}> {{t "official_source"}}</label><label><input type="radio" name="geoip_source" value="custom" {{if not .GeoIPOfficialSource}}checked{{end}}> {{t "custom_mirror"}}</label></fieldset>
-        <div class="official-source-row" data-official-source><span>{{t "official_source_url"}}</span><code data-official-url-display>{{.GeoIPOfficialURL}}</code></div>
-        <label class="field" data-custom-source {{if .GeoIPOfficialSource}}hidden{{end}}><span>{{t "custom_download_url"}}</span><input type="url" name="geoip_update_url" value="{{if not .GeoIPOfficialSource}}{{.GeoIPUpdateURL}}{{end}}" placeholder="https://mirror.example.com/city.mmdb.gz" maxlength="4096"></label>
-        <label class="field"><span>{{t "checksum_url"}}</span><input type="url" name="geoip_checksum_url" value="{{.GeoIPChecksumURL}}" placeholder="https://mirror.example.com/city.mmdb.gz.sha256" maxlength="4096"><small>{{t "checksum_url_help"}}</small></label>
-      </div>
-    </div>
-
-    <div class="configuration-group">
-      <div class="configuration-group-heading"><p class="eyebrow">Online lookup</p><h3>{{t "online_geoip"}}</h3><p>{{t "online_geoip_help"}}</p></div>
-      <div class="configuration-fields">
-        <label class="setting-toggle"><span><strong>{{t "online_geoip"}}</strong><small>{{t "online_privacy_warning"}}</small></span><span class="switch-control"><input type="checkbox" name="online_geoip_enabled" role="switch" {{if .OnlineGeoIPEnabled}}checked{{end}}><span aria-hidden="true"></span></span></label>
-        <div class="field-grid two">
-          <label class="field"><span>{{t "online_provider"}}</span><select name="online_geoip_provider"><option value="tencent" {{if eq .OnlineGeoIPProvider "tencent"}}selected{{end}}>腾讯位置服务</option><option value="amap" {{if eq .OnlineGeoIPProvider "amap"}}selected{{end}}>高德</option><option value="ipinfo" {{if eq .OnlineGeoIPProvider "ipinfo"}}selected{{end}}>IPinfo</option><option value="bigdatacloud" {{if eq .OnlineGeoIPProvider "bigdatacloud"}}selected{{end}}>BigDataCloud</option></select></label>
-          <label class="field"><span>{{t "online_api_key"}}</span><input type="password" name="online_geoip_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineGeoIPConfigured}}{{t "saved_credential"}}{{else}}API Key{{end}}"><small>{{t "online_api_key_hint"}}</small></label>
-        </div>
-        {{if .OnlineGeoIPConfigured}}<label class="toggle-field credential-clear"><span><strong>{{t "clear_online_key"}}</strong></span><input type="checkbox" name="clear_online_geoip_key" value="1"></label>{{end}}
-      </div>
-    </div>
-
-    <div class="configuration-group">
-      <div class="configuration-group-heading"><p class="eyebrow">Credentials</p><h3>{{t "provider_credentials"}}</h3><p>{{t "provider_credentials_help"}}</p></div>
-      <div class="configuration-fields credential-grid">
-        <div class="credential-panel">
-          <div class="credential-heading"><div><h3>MaxMind</h3><p>{{t "credential_blank_keeps"}}</p></div><span class="status {{if .MaxMindConfigured}}live{{else}}paused{{end}}">{{if .MaxMindConfigured}}{{t "configured"}}{{else if .MaxMindHasCredentials}}{{t "incomplete"}}{{else}}{{t "not_configured"}}{{end}}</span></div>
-          <div class="field-grid two"><label class="field"><span>{{t "maxmind_account_id"}}</span><input type="text" name="maxmind_account_id" autocomplete="off" maxlength="512" placeholder="{{if .MaxMindConfigured}}{{t "saved_credential"}}{{else}}Account ID{{end}}"></label><label class="field"><span>{{t "maxmind_license_key"}}</span><input type="password" name="maxmind_license_key" autocomplete="new-password" maxlength="512" placeholder="{{if .MaxMindConfigured}}{{t "saved_credential"}}{{else}}License Key{{end}}"></label></div>
-          {{if .MaxMindHasCredentials}}<label class="toggle-field credential-clear"><span><strong>{{t "clear_maxmind_credentials"}}</strong></span><input type="checkbox" name="clear_maxmind_credentials" value="1"></label>{{end}}
-        </div>
-        <div class="credential-panel">
-          <div class="credential-heading"><div><h3>IP2Location</h3><p>{{t "credential_blank_keeps"}}</p></div><span class="status {{if .IP2LocationConfigured}}live{{else}}paused{{end}}">{{if .IP2LocationConfigured}}{{t "configured"}}{{else}}{{t "not_configured"}}{{end}}</span></div>
-          <label class="field"><span>{{t "ip2location_token"}}</span><input type="password" name="ip2location_token" autocomplete="new-password" maxlength="512" placeholder="{{if .IP2LocationConfigured}}{{t "saved_credential"}}{{else}}Download Token{{end}}"></label>
-          {{if .IP2LocationConfigured}}<label class="toggle-field credential-clear"><span><strong>{{t "clear_ip2location_token"}}</strong></span><input type="checkbox" name="clear_ip2location_token" value="1"></label>{{end}}
-        </div>
+        <label class="field"><span>{{t "online_api_key"}}</span><input type="password" name="online_geoip_key" autocomplete="new-password" maxlength="512" placeholder="API Key"><small>{{t "online_api_key_hint"}}</small></label>
       </div>
     </div>
 

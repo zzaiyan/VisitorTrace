@@ -122,9 +122,7 @@ type adminSettingsData struct {
 	GeoIPChecksumURL       string
 	GeoIPOfficialSource    bool
 	GeoIPOfficialURL       string
-	OnlineGeoIPEnabled     bool
-	OnlineGeoIPProvider    string
-	OnlineGeoIPConfigured  bool
+	GeoIPPreset            string
 	IP2RegionOfficialURL   string
 	DBIPOfficialURL        string
 	MaxMindOfficialURL     string
@@ -281,8 +279,7 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		GeoIPProvider: s.Config.GeoIPProvider, GeoIPUpdate: s.Config.GeoIPUpdate,
 		GeoIPUpdateURL: s.Config.GeoIPUpdateURL, GeoIPChecksumURL: s.Config.GeoIPChecksumURL,
 		GeoIPOfficialSource: s.Config.GeoIPUpdateURL == profile.URL, GeoIPOfficialURL: profile.URL,
-		OnlineGeoIPEnabled: s.Config.OnlineGeoIPEnabled, OnlineGeoIPProvider: s.Config.OnlineGeoIPProvider,
-		OnlineGeoIPConfigured: strings.TrimSpace(s.Config.OnlineGeoIPKey) != "",
+		GeoIPPreset: s.Config.GeoIPPreset,
 		DBIPOfficialURL: dbipProfile.URL, MaxMindOfficialURL: maxMindProfile.URL, IP2LocationOfficialURL: ip2LocationProfile.URL,
 		IP2RegionOfficialURL: ip2RegionProfile.URL,
 		MaxMindConfigured:     s.Config.MaxMindAccountID != "" && s.Config.MaxMindLicenseKey != "",

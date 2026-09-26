@@ -20,11 +20,23 @@ import (
 
 const CurrentVersion = 1
 
+// GeoIPPresetFromProvider derives the preset name from a legacy provider
+// configuration so existing installs migrate transparently.
+func GeoIPPresetFromProvider(provider string) string {
+	switch provider {
+	case string(geoip.ProviderIP2Region):
+		return "recommended"
+	default:
+		return "basic"
+	}
+}
+
 type Config struct {
 	Version           int      `json:"version"`
 	DataDir           string   `json:"data_dir"`
 	DatabasePath      string   `json:"database_path"`
 	GeoIPPath         string   `json:"geoip_path"`
+	GeoIPPreset       string   `json:"geoip_preset,omitempty"`
 	GeoIPProvider     string   `json:"geoip_provider,omitempty"`
 	GeoIPUpdate       string   `json:"geoip_update,omitempty"`
 	GeoIPUpdateURL    string   `json:"geoip_update_url,omitempty"`
@@ -32,9 +44,9 @@ type Config struct {
 	MaxMindAccountID  string   `json:"maxmind_account_id,omitempty"`
 	MaxMindLicenseKey string   `json:"maxmind_license_key,omitempty"`
 	IP2LocationToken  string   `json:"ip2location_download_token,omitempty"`
-	OnlineGeoIPEnabled  bool   `json:"online_geoip_enabled,omitempty"`
+	OnlineGeoIPKey    string   `json:"online_geoip_key,omitempty"`
 	OnlineGeoIPProvider string `json:"online_geoip_provider,omitempty"`
-	OnlineGeoIPKey      string `json:"online_geoip_key,omitempty"`
+	GeoIPForeignPath  string   `json:"geoip_foreign_path,omitempty"`
 	BackupDir         string   `json:"backup_dir,omitempty"`
 	UpdateManifestURL string   `json:"update_manifest_url,omitempty"`
 	Listen            string   `json:"listen"`
@@ -213,15 +225,26 @@ func (c Config) Validate() error {
 			}
 		}
 	}
-	if c.OnlineGeoIPEnabled {
-		provider, err := geoiponline.NormalizeProvider(c.OnlineGeoIPProvider)
-		if err != nil {
+	if c.GeoIPPreset == "" {
+		c.GeoIPPreset = GeoIPPresetFromProvider(c.GeoIPProvider)
+	}
+	switch c.GeoIPPreset {
+	case "basic", "recommended", "precise":
+	case "":
+		c.GeoIPPreset = "basic"
+	default:
+		return fmt.Errorf("geoip_preset must be basic, recommended, or precise (got %q)", c.GeoIPPreset)
+	}
+	if c.GeoIPPreset == "precise" {
+		if strings.TrimSpace(c.OnlineGeoIPKey) == "" {
+			return errors.New("online_geoip_key is required when the GeoIP preset is precise")
+		}
+		if c.OnlineGeoIPProvider == "" {
+			c.OnlineGeoIPProvider = "ipinfo"
+		}
+		if _, err := geoiponline.NormalizeProvider(c.OnlineGeoIPProvider); err != nil {
 			return err
 		}
-		if strings.TrimSpace(c.OnlineGeoIPKey) == "" {
-			return errors.New("online_geoip_key is required when online GeoIP lookups are enabled")
-		}
-		c.OnlineGeoIPProvider = provider
 	}
 	for name, value := range map[string]string{"maxmind_account_id": c.MaxMindAccountID, "maxmind_license_key": c.MaxMindLicenseKey, "ip2location_download_token": c.IP2LocationToken, "online_geoip_key": c.OnlineGeoIPKey} {
 		if strings.ContainsAny(value, "\r\n") {
