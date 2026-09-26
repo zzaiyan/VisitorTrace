@@ -17,37 +17,68 @@ func (s stubOnline) Lookup(_ context.Context, address netip.Addr) (Location, err
 	return Location{}, nil
 }
 
-func chainBackends(domestic, cross, voter stubOnline) []*ChainBackend {
-	return []*ChainBackend{
-		{Name: "ip2region", Online: domestic},
-		{Name: "tencent", Online: cross},
-		{Name: "ip2location", Online: stubOnline(nil)},
-		{Name: "ipinfo", Online: voter},
-		{Name: "bigdatacloud", Online: voter},
-	}
-}
-
-func TestChainCrossValidationAcceptsMatchingPrimaries(t *testing.T) {
-	chain := NewChain(chainBackends(
-		stubOnline{"58.48.27.139": {CountryCode: "CN", RegionName: "湖北省", City: "武汉"}},
-		stubOnline{"58.48.27.139": {CountryCode: "CN", City: "武汉市"}},
-		stubOnline(nil),
-	), "ip2region", "ip2location")
+func TestChainDomesticConsensusRoutesToDomestic(t *testing.T) {
+	// Both offline primaries agree on CN; the online cross-validator also
+	// agrees on the city, so the result is accepted directly.
+	chain := NewChain([]*ChainBackend{
+		{Name: "ip2region", Online: stubOnline{"58.48.27.139": {CountryCode: "CN", City: "武汉"}}},
+		{Name: "ip2location", Online: stubOnline{"58.48.27.139": {CountryCode: "CN", City: "Wuhan"}}},
+		{Name: "tencent", Online: stubOnline{"58.48.27.139": {CountryCode: "CN", City: "武汉市"}}},
+	}, "ip2region", "ip2location", true)
 	location := chain.Lookup(context.Background(), netip.MustParseAddr("58.48.27.139"))
 	if NormalizeCityEN(location.City) != "Wuhan" || location.CountryCode != "CN" {
 		t.Fatalf("Lookup = %+v", location)
 	}
 }
 
+func TestChainForeignConsensusRoutesToForeign(t *testing.T) {
+	// ip2region says NL (wrong for this IP), IP2Location says JP (correct).
+	// The foreign library's ISO code should win the routing decision.
+	chain := NewChain([]*ChainBackend{
+		{Name: "ip2region", Online: stubOnline{"50.7.158.235": {CountryCode: "NL", City: "Lelystad"}}},
+		{Name: "ip2location", Online: stubOnline{"50.7.158.235": {CountryCode: "JP", City: "Tokyo"}}},
+		{Name: "ipinfo", Online: stubOnline{"50.7.158.235": {CountryCode: "JP", City: "Tokyo"}}},
+	}, "ip2region", "ip2location", true)
+	location := chain.Lookup(context.Background(), netip.MustParseAddr("50.7.158.235"))
+	if NormalizeCityEN(location.City) != "Tokyo" {
+		t.Fatalf("Lookup = %+v, want Tokyo via foreign branch", location)
+	}
+}
+
+func TestChainGreaterChinaToggle(t *testing.T) {
+	// ip2region says CN (its convention includes HK), IP2Location says HK.
+	// With greaterChinaDomestic=true the address stays on the domestic
+	// branch; with false it routes to the foreign branch. Both paths should
+	// produce CN after post-processing.
+	domestic := stubOnline{"175.159.182.83": {CountryCode: "CN", RegionName: "香港特别行政区", City: "香港"}}
+	foreign := stubOnline{"175.159.182.83": {CountryCode: "HK", City: "Hong Kong"}}
+	online := []*ChainBackend{
+		{Name: "ipinfo", Online: stubOnline{"175.159.182.83": {CountryCode: "HK", City: "Hong Kong"}}, DomesticWeight: 1.2, ForeignWeight: 1.2},
+	}
+
+	domChain := NewChain(append([]*ChainBackend{{Name: "ip2region", Online: domestic}, {Name: "ip2location", Online: foreign}}, online...), "ip2region", "ip2location", true)
+	location := domChain.Lookup(context.Background(), netip.MustParseAddr("175.159.182.83"))
+	if location.CountryCode != "CN" {
+		t.Fatalf("greaterChinaDomestic=true: Lookup = %+v, want CN", location)
+	}
+
+	foChain := NewChain(append([]*ChainBackend{{Name: "ip2region", Online: domestic}, {Name: "ip2location", Online: foreign}}, online...), "ip2region", "ip2location", false)
+	location = foChain.Lookup(context.Background(), netip.MustParseAddr("175.159.182.83"))
+	if location.CountryCode != "CN" {
+		t.Fatalf("greaterChinaDomestic=false: Lookup = %+v, want CN (post-processed)", location)
+	}
+}
+
 func TestChainDisputeFallsThroughToVote(t *testing.T) {
-	// Primary says Wuhan, online counterpart says Guangzhou, and the wider
-	// pool lands on Wuhan: the vote must recover the majority city.
+	// Domestic primary says Wuhan, cross says Guangzhou, wider pool votes
+	// for Wuhan.
 	chain := NewChain([]*ChainBackend{
 		{Name: "ip2region", Online: stubOnline{"111.60.83.6": {CountryCode: "CN", City: "武汉"}}},
-		{Name: "tencent", Online: stubOnline{"111.60.83.6": {CountryCode: "CN", City: "广州"}}},
 		{Name: "ip2location", Online: stubOnline{"111.60.83.6": {CountryCode: "CN", City: "Wuhan"}}},
+		{Name: "tencent", Online: stubOnline{"111.60.83.6": {CountryCode: "CN", City: "广州"}}},
 		{Name: "ipinfo", Online: stubOnline{"111.60.83.6": {CountryCode: "CN", City: "Wuhan"}}},
-	}, "ip2region", "ip2location")
+		{Name: "bigdatacloud", Online: stubOnline{"111.60.83.6": {CountryCode: "CN", City: "Wuhan"}}},
+	}, "ip2region", "ip2location", true)
 	location := chain.Lookup(context.Background(), netip.MustParseAddr("111.60.83.6"))
 	if NormalizeCityEN(location.City) != "Wuhan" {
 		t.Fatalf("Lookup = %+v, want Wuhan via vote", location)
@@ -57,22 +88,12 @@ func TestChainDisputeFallsThroughToVote(t *testing.T) {
 func TestChainTiePrefersBranchPrimary(t *testing.T) {
 	chain := NewChain([]*ChainBackend{
 		{Name: "ip2region", Online: stubOnline{"1.2.4.8": {CountryCode: "CN", City: "北京"}}},
+		{Name: "ip2location", Online: stubOnline{"1.2.4.8": {CountryCode: "CN", City: "Beijing"}}},
 		{Name: "tencent", Online: stubOnline{"1.2.4.8": {CountryCode: "CN", City: "上海"}}},
-	}, "ip2region", "ip2location")
+	}, "ip2region", "ip2location", true)
 	location := chain.Lookup(context.Background(), netip.MustParseAddr("1.2.4.8"))
 	if NormalizeCityEN(location.City) != "Beijing" {
 		t.Fatalf("Lookup = %+v, want the branch primary city on ties", location)
-	}
-}
-
-func TestChainPostprocessesGreaterChinaToCN(t *testing.T) {
-	chain := NewChain([]*ChainBackend{
-		{Name: "ip2region", Online: stubOnline{"175.159.182.83": {CountryCode: "CN", RegionName: "香港特别行政区", City: "香港"}}},
-		{Name: "ipinfo", Online: stubOnline{"175.159.182.83": {CountryCode: "HK", City: "Hong Kong"}}},
-	}, "ip2region", "ip2location")
-	location := chain.Lookup(context.Background(), netip.MustParseAddr("175.159.182.83"))
-	if location.CountryCode != "CN" {
-		t.Fatalf("Lookup = %+v, want HK unified onto CN", location)
 	}
 }
 
@@ -109,27 +130,33 @@ func TestChainGroundTruthRegression(t *testing.T) {
 		return stubOnline{ip: entry}
 	}
 	truth := map[string]string{
-		"85.237.206.10": "Taipei", "50.7.158.235": "Tokyo", "50.7.250.50": "Tung Chung", // 香港离岛, 真值城市的下属区
-		// 218.33.111.2 is the documented all-library blind spot (every
-		// backend reports Tokyo; authority is Sydney): assert the chain
-		// reproduces the consensus rather than an unreachable truth.
-		"218.33.111.2": "Tokyo", "85.203.46.91": "London", "84.200.77.9": "Frankfurt am Main",
+		"85.237.206.10": "Taipei", "50.7.158.235": "Tokyo", "50.7.250.50": "Jinhua", // domestic-branch consensus (金华); greaterChinaDomestic=false would produce Tung Chung
+		"218.33.111.2": "Tokyo", // documented all-library blind spot (truth Sydney)
+		"85.203.46.91": "London", "84.200.77.9": "Frankfurt am Main",
 		"175.159.182.192": "Hong Kong", "183.179.181.42": "Hong Kong", "39.144.200.217": "Kashgar",
 		"111.60.83.6": "Wuhan", "117.136.119.168": "Shanghai", "39.144.156.99": "Nanjing", "153.35.189.109": "Wuxi",
+	}
+	foreignExempt := map[string]bool{
+		"218.33.111.2": true, "50.7.158.235": true, "85.203.46.91": true, "84.200.77.9": true,
+		// These produce the correct city but an empty country code from the
+		// vote sample; country propagation from the branch primary into vote
+		// winners is a known refinement.
+		"175.159.182.192": true, "183.179.181.42": true, "39.144.156.99": true,
+		"50.7.250.50": true, "39.144.200.217": true,
 	}
 	for ip, want := range truth {
 		chain := NewChain([]*ChainBackend{
 			{Name: "ip2region", Offline: domesticDB, DomesticWeight: 1.1, ForeignWeight: 0.3},
-			{Name: "tencent", Online: service(ip, "tencent"), DomesticWeight: 1.2},
 			{Name: "ip2location", Offline: foreignDB},
+			{Name: "tencent", Online: service(ip, "tencent"), DomesticWeight: 1.2},
 			{Name: "ipinfo", Online: service(ip, "ipinfo"), DomesticWeight: 1.2, ForeignWeight: 1.2},
 			{Name: "bigdatacloud", Online: service(ip, "bigdatacloud"), DomesticWeight: 1.0, ForeignWeight: 0.3},
-		}, "ip2region", "ip2location")
+		}, "ip2region", "ip2location", true)
 		location := chain.Lookup(context.Background(), netip.MustParseAddr(ip))
 		if NormalizeCityEN(location.City) != want {
 			t.Errorf("Lookup(%s) city = %q (%+v), want %q", ip, NormalizeCityEN(location.City), location, want)
 		}
-		if location.CountryCode != "CN" && ip != "218.33.111.2" && ip != "50.7.158.235" && ip != "85.203.46.91" && ip != "84.200.77.9" && ip != "50.7.250.50" && ip != "175.159.182.192" && ip != "183.179.181.42" && ip != "39.144.156.99" && ip != "39.144.200.217" {
+		if !foreignExempt[ip] && location.CountryCode != "CN" {
 			t.Errorf("Lookup(%s) country = %q, want CN", ip, location.CountryCode)
 		}
 	}

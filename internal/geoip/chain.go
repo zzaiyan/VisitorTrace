@@ -63,21 +63,26 @@ func DefaultChainWeights(name string) (domestic, foreign float64) {
 	}
 }
 
-// Chain resolves an address through the domestic/foreign split: the branch's
-// offline and online primaries cross-validate their city-level answers, and
-// disagreements fall through to a weighted vote across every configured
-// backend. Hong Kong, Macau, and Taiwan codes are post-processed to CN.
+// Chain resolves an address through a dual-library consensus route: the
+// domestic and foreign offline primaries are queried together, their
+// country codes decide the branch, and the branch's online counterpart
+// cross-validates the city. Disagreements fall through to a weighted vote
+// across every configured backend. Numeric ISO codes and the HK/TW/MO codes
+// are post-processed at the chain output.
 type Chain struct {
-	router     *Router
-	backends   []*ChainBackend
-	domesticID string
-	foreignID  string
+	backends             []*ChainBackend
+	domesticID           string
+	foreignID            string
+	greaterChinaDomestic bool
 }
 
 // NewChain builds the resolution chain. domestic and foreign name the
-// primary backends for each branch (their entries must exist in backends).
-func NewChain(backends []*ChainBackend, domestic, foreign string) *Chain {
-	return &Chain{router: NewRouter(), backends: backends, domesticID: domestic, foreignID: foreign}
+// primary backends for each branch. When greaterChinaDomestic is true,
+// addresses that the domestic library labels CN and the foreign library
+// labels HK/TW/MO stay on the domestic branch; otherwise they route to
+// the foreign branch for ISO-accurate handling.
+func NewChain(backends []*ChainBackend, domestic, foreign string, greaterChinaDomestic bool) *Chain {
+	return &Chain{backends: backends, domesticID: domestic, foreignID: foreign, greaterChinaDomestic: greaterChinaDomestic}
 }
 
 func (c *Chain) backend(name string) *ChainBackend {
@@ -89,22 +94,57 @@ func (c *Chain) backend(name string) *ChainBackend {
 	return nil
 }
 
-// Lookup resolves one address through the full chain.
+// routeDomestic decides the branch from the two offline primaries: when
+// both indicate China (or the foreign library has no data), the address
+// goes to the domestic branch. When the domestic library labels an address
+// CN but the foreign library labels it HK/TW/MO, the greaterChinaDomestic
+// flag decides. Any other disagreement trusts the foreign library's ISO
+// code, which our cross-validation showed is more reliable for non-CN
+// routing than the domestic library's country field.
+func (c *Chain) routeDomestic(domestic, foreign Location) bool {
+	domesticCN := NormalizeCountryCode(domestic.CountryCode) == "CN"
+	foreignCC := NormalizeCountryCode(foreign.CountryCode)
+	switch {
+	case domesticCN && foreignCC == "":
+		return true
+	case domesticCN && foreignCC == "CN":
+		return true
+	case domesticCN && (foreignCC == "HK" || foreignCC == "TW" || foreignCC == "MO"):
+		return c.greaterChinaDomestic
+	case domesticCN:
+		return false
+	case foreignCC == "CN":
+		return true
+	default:
+		return false
+	}
+}
+
+// Lookup resolves one address through the full chain: query both offline
+// primaries, decide the branch from their consensus, cross-validate with
+// the branch's online counterpart, and vote on disagreements.
 func (c *Chain) Lookup(ctx context.Context, address netip.Addr) Location {
-	domestic := c.router.IsDomestic(address)
-	branch := c.foreignID
+	// Always query both offline primaries; their results drive routing and
+	// are reused as the branch primary answer.
+	domesticResult := Location{}
+	if backend := c.backend(c.domesticID); backend != nil {
+		domesticResult = backend.lookup(ctx, address)
+	}
+	foreignResult := Location{}
+	if backend := c.backend(c.foreignID); backend != nil {
+		foreignResult = backend.lookup(ctx, address)
+	}
+	domestic := c.routeDomestic(domesticResult, foreignResult)
+
+	primary := foreignResult
 	if domestic {
-		branch = c.domesticID
+		primary = domesticResult
 	}
-	primary := Location{}
-	if backend := c.backend(branch); backend != nil {
-		primary = backend.lookup(ctx, address)
-	}
-	// Cross-validate against the branch's online counterpart: pick the
-	// highest-weighted online backend that serves this branch.
+
+	// Cross-validate against the branch's online counterpart.
 	cross := Location{}
 	for _, backend := range c.backends {
-		if backend.Online == nil || backend.Name == branch {
+		if backend.Online == nil || backend.Name == c.branchName(domestic) {
 			continue
 		}
 		if domestic && backend.DomesticWeight <= 0 {
