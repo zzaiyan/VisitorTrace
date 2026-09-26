@@ -83,12 +83,35 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 	}
 	// GeoIP preset selection replaces the old per-provider configuration.
 	updated.GeoIPPreset = r.FormValue("geoip_preset")
-	updated.OnlineGeoIPKey, err = updatedSecret(r.FormValue("online_geoip_key"), r.FormValue("clear_online_geoip_key") == "1", updated.OnlineGeoIPKey, "Online GeoIP Key", adminLanguage(r))
-	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
-		return
+	// Parse multiple online services: each has an enable checkbox, key,
+	// and optional SK. Only entries with a non-empty key are kept.
+	updated.OnlineServices = make(map[string]config.OnlineServiceConfig)
+	for _, service := range []string{"ipinfo", "tencent", "amap", "bigdatacloud"} {
+		if r.FormValue("online_"+service+"_enabled") != "on" {
+			continue
+		}
+		key := strings.TrimSpace(r.FormValue("online_" + service + "_key"))
+		if key == "" {
+			// Preserve previously saved keys when the field is left blank.
+			if existing, ok := s.Config.OnlineServices[service]; ok && existing.Key != "" {
+				key = existing.Key
+			} else {
+				continue
+			}
+		}
+		sk := strings.TrimSpace(r.FormValue("online_" + service + "_sk"))
+		if sk == "" {
+			if existing, ok := s.Config.OnlineServices[service]; ok {
+				sk = existing.SK
+			}
+		}
+		entry := config.OnlineServiceConfig{Key: key}
+		if sk != "" {
+			entry.SK = sk
+		}
+		updated.OnlineServices[service] = entry
 	}
-	if updated.GeoIPPreset == "precise" && strings.TrimSpace(updated.OnlineGeoIPKey) == "" {
+	if updated.GeoIPPreset == "precise" && len(updated.OnlineServices) == 0 {
 		s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_online_key"))
 		return
 	}

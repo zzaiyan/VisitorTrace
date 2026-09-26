@@ -20,6 +20,12 @@ import (
 
 const CurrentVersion = 1
 
+// OnlineServiceConfig holds the credentials for one online lookup service.
+type OnlineServiceConfig struct {
+	Key string `json:"key"`
+	SK  string `json:"sk,omitempty"`
+}
+
 // GeoIPPresetFromProvider derives the preset name from a legacy provider
 // configuration so existing installs migrate transparently.
 func GeoIPPresetFromProvider(provider string) string {
@@ -44,8 +50,7 @@ type Config struct {
 	MaxMindAccountID  string   `json:"maxmind_account_id,omitempty"`
 	MaxMindLicenseKey string   `json:"maxmind_license_key,omitempty"`
 	IP2LocationToken  string   `json:"ip2location_download_token,omitempty"`
-	OnlineGeoIPKey    string   `json:"online_geoip_key,omitempty"`
-	OnlineGeoIPProvider string `json:"online_geoip_provider,omitempty"`
+	OnlineServices  map[string]OnlineServiceConfig `json:"online_services,omitempty"`
 	GeoIPForeignPath  string   `json:"geoip_foreign_path,omitempty"`
 	BackupDir         string   `json:"backup_dir,omitempty"`
 	UpdateManifestURL string   `json:"update_manifest_url,omitempty"`
@@ -236,17 +241,21 @@ func (c Config) Validate() error {
 		return fmt.Errorf("geoip_preset must be basic, recommended, or precise (got %q)", c.GeoIPPreset)
 	}
 	if c.GeoIPPreset == "precise" {
-		if strings.TrimSpace(c.OnlineGeoIPKey) == "" {
-			return errors.New("online_geoip_key is required when the GeoIP preset is precise")
+		if len(c.OnlineServices) == 0 {
+			return errors.New("at least one online service key is required when the GeoIP preset is precise")
 		}
-		if c.OnlineGeoIPProvider == "" {
-			c.OnlineGeoIPProvider = "ipinfo"
-		}
-		if _, err := geoiponline.NormalizeProvider(c.OnlineGeoIPProvider); err != nil {
-			return err
+		for name := range c.OnlineServices {
+			if _, err := geoiponline.NormalizeProvider(name); err != nil {
+				return err
+			}
 		}
 	}
-	for name, value := range map[string]string{"maxmind_account_id": c.MaxMindAccountID, "maxmind_license_key": c.MaxMindLicenseKey, "ip2location_download_token": c.IP2LocationToken, "online_geoip_key": c.OnlineGeoIPKey} {
+	for name, svc := range c.OnlineServices {
+		if strings.ContainsAny(svc.Key, "\r\n") || strings.ContainsAny(svc.SK, "\r\n") {
+			return fmt.Errorf("online_services[%s] must not contain line breaks", name)
+		}
+	}
+	for name, value := range map[string]string{"maxmind_account_id": c.MaxMindAccountID, "maxmind_license_key": c.MaxMindLicenseKey, "ip2location_download_token": c.IP2LocationToken} {
 		if strings.ContainsAny(value, "\r\n") {
 			return fmt.Errorf("%s must not contain line breaks", name)
 		}

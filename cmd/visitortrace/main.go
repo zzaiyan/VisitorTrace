@@ -205,7 +205,12 @@ func runServe(args []string) int {
 		return 1
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	geoResolver, geoErr := geoip.OpenWithProvider(cfg.GeoIPProvider, cfg.GeoIPPath)
+	// Open the domestic (primary) database.
+	domesticProvider := cfg.GeoIPProvider
+	if cfg.GeoIPPreset == "recommended" || cfg.GeoIPPreset == "precise" {
+		domesticProvider = string(geoip.ProviderIP2Region)
+	}
+	geoResolver, geoErr := geoip.OpenWithProvider(domesticProvider, cfg.GeoIPPath)
 	if geoErr != nil {
 		logger.Warn("GeoIP database is unavailable", "path", cfg.GeoIPPath, "error", geoErr)
 	}
@@ -213,13 +218,26 @@ func runServe(args []string) int {
 	app.ConfigPath = *configPath
 	app.SetGeoIP(geoResolver)
 	defer app.CloseGeoIP()
+	// Open the foreign database for the recommended and precise presets.
+	if cfg.GeoIPPreset == "recommended" || cfg.GeoIPPreset == "precise" {
+		foreignPath := cfg.GeoIPForeignPath
+		if foreignPath == "" {
+			foreignPath = filepath.Join(cfg.DataDir, "geoip-foreign.mmdb")
+		}
+		if foreignResolver, err := geoip.OpenWithProvider(string(geoip.ProviderIP2Location), foreignPath); err == nil {
+			app.SetGeoIPForeign(foreignResolver)
+			defer foreignResolver.Close()
+		} else {
+			logger.Warn("foreign GeoIP database is unavailable", "path", foreignPath, "error", err)
+		}
+	}
 	httpServer := app.HTTPServer()
 	stopCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	maintenanceDone := maintenance.New(st, logger).Start(stopCtx)
 	geoUpdater := geoipupdate.New(cfg, st, logger)
 	geoUpdater.Activate = func(path string) error {
-		resolver, err := geoip.OpenWithProvider(cfg.GeoIPProvider, path)
+		resolver, err := geoip.OpenWithProvider(domesticProvider, path)
 		if err != nil {
 			return err
 		}

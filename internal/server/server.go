@@ -89,12 +89,16 @@ func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
 	// resolvers attach later once databases are opened.
 	if cfg.GeoIPPreset == "recommended" || cfg.GeoIPPreset == "precise" {
 		backends := []*geoip.ChainBackend{}
-		if cfg.GeoIPPreset == "precise" && strings.TrimSpace(cfg.OnlineGeoIPKey) != "" {
-			if client, err := geoiponline.New(cfg.OnlineGeoIPProvider, cfg.OnlineGeoIPKey, 3*time.Second); err == nil {
-				dom, fo := geoip.DefaultChainWeights(cfg.OnlineGeoIPProvider)
-				backends = append(backends, &geoip.ChainBackend{Name: cfg.OnlineGeoIPProvider, Online: client, DomesticWeight: dom, ForeignWeight: fo})
+		for name, svc := range cfg.OnlineServices {
+			credential := svc.Key
+			if svc.SK != "" {
+				credential = svc.Key + ":" + svc.SK
+			}
+			if client, err := geoiponline.New(name, credential, 3*time.Second); err == nil {
+				dom, fo := geoip.DefaultChainWeights(name)
+				backends = append(backends, &geoip.ChainBackend{Name: name, Online: client, DomesticWeight: dom, ForeignWeight: fo})
 			} else {
-				server.logger.Warn("online GeoIP disabled", "error", err)
+				server.logger.Warn("online GeoIP service unavailable", "service", name, "error", err)
 			}
 		}
 		server.geoChain = geoip.NewChain(backends, "ip2region", "ip2location", true)
