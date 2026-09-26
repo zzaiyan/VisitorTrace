@@ -2,9 +2,12 @@ package geoiponline
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -93,7 +96,7 @@ func TestLookupIPinfoParsesCoordinates(t *testing.T) {
 func TestLookupBigDataCloudParsesFields(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"countryCode":"DE","countryName":"Germany","principalSubdivision":"Hesse","city":"Frankfurt","location":{"latitude":"50.11","longitude":"8.68"}}`))
+		_, _ = w.Write([]byte(`{"country":{"isoAlpha2":"DE","name":"Germany"},"location":{"principalSubdivision":"Hesse","isoPrincipalSubdivisionCode":"DE-HE","city":"Frankfurt","latitude":50.11,"longitude":8.68}}`))
 	}))
 	defer server.Close()
 	client, _ := New("bigdatacloud", "test-key", time.Second)
@@ -102,7 +105,7 @@ func TestLookupBigDataCloudParsesFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Lookup error: %v", err)
 	}
-	if location.CountryCode != "DE" || location.RegionName != "Hesse" || location.City != "Frankfurt" || location.Longitude == nil || *location.Longitude != 8.68 {
+	if location.CountryCode != "DE" || location.RegionCode != "HE" || location.RegionName != "Hesse" || location.City != "Frankfurt" || location.Longitude == nil || *location.Longitude != 8.68 {
 		t.Fatalf("Lookup = %+v", location)
 	}
 }
@@ -116,5 +119,69 @@ func TestLookupSurfacesProviderErrors(t *testing.T) {
 	client.setBaseURL(server.URL)
 	if _, err := client.Lookup(context.Background(), netip.MustParseAddr("8.8.8.8")); err == nil {
 		t.Fatal("Lookup should surface the HTTP error")
+	}
+}
+
+func TestTencentSignatureIsAppended(t *testing.T) {
+	var gotQuery url.Values
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":0,"result":{"ad_info":{"nation":"中国","nation_code":"CN","province":"北京市","city":"北京市"}}}`))
+	}))
+	defer server.Close()
+	// Key with an SK: the credential carries "KEY:SK".
+	client, err := New("tencent", "ABCD-KEY:my-secret-sk", time.Second)
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+	client.setBaseURL(server.URL)
+	if _, err := client.Lookup(context.Background(), netip.MustParseAddr("114.114.114.114")); err != nil {
+		t.Fatalf("Lookup error: %v", err)
+	}
+	// Independent construction: path + "?" + sorted params + SK, MD5 hex.
+	want := md5.Sum([]byte("/ws/location/v1/ip?ip=114.114.114.114&key=ABCD-KEYmy-secret-sk"))
+	if got := gotQuery.Get("sig"); got != hex.EncodeToString(want[:]) {
+		t.Fatalf("sig = %q, want %q", got, hex.EncodeToString(want[:]))
+	}
+}
+
+func TestAMapSignatureIsAppended(t *testing.T) {
+	var gotQuery url.Values
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"1","info":"OK","province":"北京市","city":"北京市"}`))
+	}))
+	defer server.Close()
+	client, err := New("amap", "0123456789abcdef0123456789abcdef:sk-value", time.Second)
+	if err != nil {
+		t.Fatalf("New error: %v", err)
+	}
+	client.setBaseURL(server.URL)
+	if _, err := client.Lookup(context.Background(), netip.MustParseAddr("114.114.114.114")); err != nil {
+		t.Fatalf("Lookup error: %v", err)
+	}
+	want := md5.Sum([]byte("ip=114.114.114.114&key=0123456789abcdef0123456789abcdefsk-value"))
+	if got := gotQuery.Get("sig"); got != hex.EncodeToString(want[:]) {
+		t.Fatalf("sig = %q, want %q", got, hex.EncodeToString(want[:]))
+	}
+}
+
+func TestPlainKeysDoNotSign(t *testing.T) {
+	var gotQuery url.Values
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":0,"result":{"ad_info":{"nation":"中国","nation_code":"CN"}}}`))
+	}))
+	defer server.Close()
+	client, _ := New("tencent", "plain-key-no-sk", time.Second)
+	client.setBaseURL(server.URL)
+	if _, err := client.Lookup(context.Background(), netip.MustParseAddr("114.114.114.114")); err != nil {
+		t.Fatalf("Lookup error: %v", err)
+	}
+	if _, ok := gotQuery["sig"]; ok {
+		t.Fatal("plain key must not sign the request")
 	}
 }

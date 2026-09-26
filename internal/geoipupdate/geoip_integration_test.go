@@ -37,6 +37,7 @@ type integrationProvider struct {
 
 type integrationOnline struct {
 	Key      string           `json:"key"`
+	SK       string           `json:"sk"`
 	IP       string           `json:"ip"`
 	Expected expectedLocation `json:"expected"`
 }
@@ -75,6 +76,12 @@ func TestConfiguredGeoIPProviders(t *testing.T) {
 		if !ok {
 			continue
 		}
+		if missingProviderCredential(provider, fixture) {
+			t.Run(provider, func(t *testing.T) {
+				t.Skipf("provider %s has no credentials configured", provider)
+			})
+			continue
+		}
 		t.Run(provider, func(t *testing.T) {
 			if fixture.DatabasePath != "" {
 				t.Run("existing_database", func(t *testing.T) {
@@ -101,6 +108,19 @@ func TestConfiguredGeoIPProviders(t *testing.T) {
 	}
 }
 
+// missingProviderCredential reports whether a provider entry cannot run
+// because its required download credentials have not been filled in yet.
+func missingProviderCredential(provider string, fixture integrationProvider) bool {
+	switch provider {
+	case "maxmind":
+		return fixture.AccountID == "" || fixture.LicenseKey == ""
+	case "ip2location":
+		return fixture.Token == ""
+	default:
+		return false
+	}
+}
+
 // validateOnlineService exercises one configured online lookup service. An
 // entry with an empty key is treated as intentionally not configured.
 func validateOnlineService(t *testing.T, service string, fixture integrationOnline) {
@@ -111,7 +131,11 @@ func validateOnlineService(t *testing.T, service string, fixture integrationOnli
 	if _, err := geoiponline.NormalizeProvider(service); err != nil {
 		t.Fatalf("online provider %s: %v", service, err)
 	}
-	client, err := geoiponline.New(service, fixture.Key, 10*time.Second)
+	credential := fixture.Key
+	if fixture.SK != "" {
+		credential = fixture.Key + ":" + fixture.SK
+	}
+	client, err := geoiponline.New(service, credential, 10*time.Second)
 	if err != nil {
 		t.Fatalf("create online client %s: %v", service, err)
 	}

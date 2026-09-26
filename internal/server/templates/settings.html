@@ -42,7 +42,7 @@
         <label class="setting-toggle"><span><strong>{{t "online_geoip"}}</strong><small>{{t "online_privacy_warning"}}</small></span><span class="switch-control"><input type="checkbox" name="online_geoip_enabled" role="switch" {{if .OnlineGeoIPEnabled}}checked{{end}}><span aria-hidden="true"></span></span></label>
         <div class="field-grid two">
           <label class="field"><span>{{t "online_provider"}}</span><select name="online_geoip_provider"><option value="tencent" {{if eq .OnlineGeoIPProvider "tencent"}}selected{{end}}>腾讯位置服务</option><option value="amap" {{if eq .OnlineGeoIPProvider "amap"}}selected{{end}}>高德</option><option value="ipinfo" {{if eq .OnlineGeoIPProvider "ipinfo"}}selected{{end}}>IPinfo</option><option value="bigdatacloud" {{if eq .OnlineGeoIPProvider "bigdatacloud"}}selected{{end}}>BigDataCloud</option></select></label>
-          <label class="field"><span>{{t "online_api_key"}}</span><input type="password" name="online_geoip_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineGeoIPConfigured}}{{t "saved_credential"}}{{else}}API Key{{end}}"></label>
+          <label class="field"><span>{{t "online_api_key"}}</span><input type="password" name="online_geoip_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineGeoIPConfigured}}{{t "saved_credential"}}{{else}}API Key{{end}}"><small>{{t "online_api_key_hint"}}</small></label>
         </div>
         {{if .OnlineGeoIPConfigured}}<label class="toggle-field credential-clear"><span><strong>{{t "clear_online_key"}}</strong></span><input type="checkbox" name="clear_online_geoip_key" value="1"></label>{{end}}
       </div>

@@ -5,11 +5,14 @@ package geoiponline
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,6 +30,7 @@ const (
 type Client struct {
 	provider string
 	token    string
+	secret   string
 	baseURL  string
 	http     *http.Client
 
@@ -54,13 +58,23 @@ func NormalizeProvider(value string) (string, error) {
 	}
 }
 
-func New(provider, token string, timeout time.Duration) (*Client, error) {
+// New builds a client from the credential string. Tencent and Amap keys
+// created with signature verification take the form "KEY:SK", where SK is
+// the secret key used to sign every request; other providers use the plain
+// key. The credential never leaves this struct.
+func New(provider, credential string, timeout time.Duration) (*Client, error) {
 	normalized, err := NormalizeProvider(provider)
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(token) == "" {
+	if strings.TrimSpace(credential) == "" {
 		return nil, fmt.Errorf("online GeoIP provider %s requires an API key", normalized)
+	}
+	token, secret := credential, ""
+	if normalized == "tencent" || normalized == "amap" {
+		if key, sk, ok := strings.Cut(credential, ":"); ok {
+			token, secret = key, sk
+		}
 	}
 	if timeout <= 0 {
 		timeout = 3 * time.Second
@@ -74,6 +88,7 @@ func New(provider, token string, timeout time.Duration) (*Client, error) {
 	return &Client{
 		provider: normalized,
 		token:    strings.TrimSpace(token),
+		secret:   strings.TrimSpace(secret),
 		baseURL:  endpoints[normalized],
 		http:     &http.Client{Timeout: timeout},
 		cache:    make(map[netip.Addr]cacheEntry),
@@ -137,8 +152,12 @@ func (c *Client) fetch(ctx context.Context, address netip.Addr) (geoip.Location,
 	}
 }
 
-func (c *Client) get(ctx context.Context, path string, out any) error {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+func (c *Client) get(ctx context.Context, path string, query url.Values, out any) error {
+	target := c.baseURL + path
+	if len(query) > 0 {
+		target += "?" + query.Encode()
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return fmt.Errorf("create online GeoIP request: %w", err)
 	}
@@ -180,7 +199,9 @@ type tencentResponse struct {
 
 func (c *Client) fetchTencent(ctx context.Context, address netip.Addr) (geoip.Location, error) {
 	var payload tencentResponse
-	if err := c.get(ctx, "/ws/location/v1/ip?ip="+address.String()+"&key="+c.token, &payload); err != nil {
+	tencentQuery := url.Values{"ip": {address.String()}, "key": {c.token}}
+	c.signTencent("/ws/location/v1/ip", tencentQuery)
+	if err := c.get(ctx, "/ws/location/v1/ip", tencentQuery, &payload); err != nil {
 		return geoip.Location{}, err
 	}
 	if payload.Status != 0 {
@@ -211,7 +232,9 @@ type amapResponse struct {
 
 func (c *Client) fetchAMap(ctx context.Context, address netip.Addr) (geoip.Location, error) {
 	var payload amapResponse
-	if err := c.get(ctx, "/v3/ip?ip="+address.String()+"&key="+c.token, &payload); err != nil {
+	amapQuery := url.Values{"ip": {address.String()}, "key": {c.token}}
+	c.signAMap(amapQuery)
+	if err := c.get(ctx, "/v3/ip", amapQuery, &payload); err != nil {
 		return geoip.Location{}, err
 	}
 	if payload.Status != "1" {
@@ -252,7 +275,7 @@ type ipinfoResponse struct {
 
 func (c *Client) fetchIPinfo(ctx context.Context, address netip.Addr) (geoip.Location, error) {
 	var payload ipinfoResponse
-	if err := c.get(ctx, "/"+address.String()+"/json?token="+c.token, &payload); err != nil {
+	if err := c.get(ctx, "/"+address.String()+"/json", url.Values{"token": {c.token}}, &payload); err != nil {
 		return geoip.Location{}, err
 	}
 	location := geoip.Location{CountryCode: payload.Country, RegionName: payload.Region, City: payload.City}
@@ -264,32 +287,68 @@ func (c *Client) fetchIPinfo(ctx context.Context, address netip.Addr) (geoip.Loc
 }
 
 type bigDataCloudResponse struct {
-	CountryCode         string `json:"countryCode"`
-	CountryName         string `json:"countryName"`
-	PrincipalSubdivision string `json:"principalSubdivision"`
-	City                string `json:"city"`
-	Location            struct {
-		Latitude  string `json:"latitude"`
-		Longitude string `json:"longitude"`
+	Country struct {
+		IsoAlpha2 string `json:"isoAlpha2"`
+		Name      string `json:"name"`
+	} `json:"country"`
+	Location struct {
+		PrincipalSubdivision        string  `json:"principalSubdivision"`
+		IsoPrincipalSubdivisionCode string  `json:"isoPrincipalSubdivisionCode"`
+		City                        string  `json:"city"`
+		Latitude                    float64 `json:"latitude"`
+		Longitude                   float64 `json:"longitude"`
 	} `json:"location"`
 }
 
 func (c *Client) fetchBigDataCloud(ctx context.Context, address netip.Addr) (geoip.Location, error) {
 	var payload bigDataCloudResponse
-	if err := c.get(ctx, "/data/ip-geolocation?ip="+address.String()+"&key="+c.token, &payload); err != nil {
+	if err := c.get(ctx, "/data/ip-geolocation", url.Values{"ip": {address.String()}, "key": {c.token}}, &payload); err != nil {
 		return geoip.Location{}, err
 	}
 	location := geoip.Location{
-		CountryCode: payload.CountryCode,
-		CountryName: payload.CountryName,
-		RegionName:  payload.PrincipalSubdivision,
-		City:        payload.City,
+		CountryCode: payload.Country.IsoAlpha2,
+		CountryName: payload.Country.Name,
+		RegionCode:  bigDataCloudRegionCode(payload.Location.IsoPrincipalSubdivisionCode, payload.Country.IsoAlpha2),
+		RegionName:  payload.Location.PrincipalSubdivision,
+		City:        payload.Location.City,
 	}
-	if latitude, longitude, ok := parseLatLon(payload.Location.Latitude + "," + payload.Location.Longitude); ok {
+	latitude, longitude := payload.Location.Latitude, payload.Location.Longitude
+	if latitude != 0 || longitude != 0 {
 		location.Latitude = &latitude
 		location.Longitude = &longitude
 	}
 	return location, nil
+}
+
+// bigDataCloudRegionCode trims the "XX-" country prefix from ISO 3166-2
+// codes like "PK-SD" so the stored subdivision code matches the MMDB style.
+func bigDataCloudRegionCode(code, countryCode string) string {
+	if prefix := strings.ToUpper(countryCode) + "-"; strings.HasPrefix(strings.ToUpper(code), prefix) {
+		return code[len(prefix):]
+	}
+	return ""
+}
+
+// signTencent implements the WebService API signature: MD5 over the
+// request path, a "?", the parameters sorted by name (values unescaped),
+// and the SK appended directly, as a lowercase hex sig parameter. Keys
+// created without signature verification must not sign.
+func (c *Client) signTencent(path string, query url.Values) {
+	if c.secret == "" {
+		return
+	}
+	digest := md5.Sum([]byte(path + "?" + query.Encode() + c.secret))
+	query.Set("sig", hex.EncodeToString(digest[:]))
+}
+
+// signAMap implements the digital signature: MD5 over the parameters
+// sorted by name (values unescaped) with the SK appended directly.
+func (c *Client) signAMap(query url.Values) {
+	if c.secret == "" {
+		return
+	}
+	digest := md5.Sum([]byte(query.Encode() + c.secret))
+	query.Set("sig", hex.EncodeToString(digest[:]))
 }
 
 func parseLatLon(value string) (float64, float64, bool) {
