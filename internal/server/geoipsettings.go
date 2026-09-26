@@ -87,6 +87,9 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 	updated.GeoIPDomesticOnline = r.FormValue("geoip_domestic_online")
 	updated.GeoIPForeignOffline = r.FormValue("geoip_foreign_offline")
 	updated.GeoIPForeignOnline = r.FormValue("geoip_foreign_online")
+	updated.GeoIPBackupDBIP = r.FormValue("geoip_backup_dbip") == "1"
+	updated.GeoIPBackupBigDC = r.FormValue("geoip_backup_bigdatacloud") == "1"
+	updated.GeoIPBackupAmap = r.FormValue("geoip_backup_amap") == "1"
 	// Parse online service credentials from whichever inputs are visible.
 	updated.OnlineServices = make(map[string]config.OnlineServiceConfig)
 	for _, service := range []string{"ipinfo", "tencent", "amap", "bigdatacloud"} {

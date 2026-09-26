@@ -129,6 +129,9 @@ type adminSettingsData struct {
 	GeoIPForeignOffline    string
 	GeoIPForeignOnline     string
 	OnlineServiceKeys      map[string]bool
+	GeoIPBackupDBIP        bool
+	GeoIPBackupBigDC       bool
+	GeoIPBackupAmap        bool
 	IP2RegionOfficialURL   string
 	DBIPOfficialURL        string
 	MaxMindOfficialURL     string
@@ -306,6 +309,9 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 			return "ip2location"
 		}(),
 		GeoIPForeignOnline: s.Config.GeoIPForeignOnline,
+		GeoIPBackupDBIP:  s.Config.GeoIPBackupDBIP,
+		GeoIPBackupBigDC: s.Config.GeoIPBackupBigDC,
+		GeoIPBackupAmap:  s.Config.GeoIPBackupAmap,
 		OnlineServiceKeys: func() map[string]bool {
 			result := make(map[string]bool)
 			for name, svc := range s.Config.OnlineServices {

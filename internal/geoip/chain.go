@@ -224,8 +224,22 @@ func (c *Chain) vote(ctx context.Context, address netip.Addr, domestic bool, fal
 		if !ok {
 			existing = &vote{sample: location}
 			tally[key] = existing
-		} else if NormalizeCountryCode(existing.sample.CountryCode) == "" && NormalizeCountryCode(location.CountryCode) != "" {
-			existing.sample = location
+		} else {
+			// Prefer a sample that carries both a valid country code and
+			// coordinates, so the map can render the winning city.
+			if existing.sample.Latitude == nil && location.Latitude != nil {
+				if existing.sample.CountryCode == "" && location.CountryCode != "" {
+					existing.sample = location
+				} else if existing.sample.CountryCode != "" || location.CountryCode != "" {
+					// Keep the city but upgrade coordinates from the new sample.
+					upgraded := existing.sample
+					upgraded.Latitude = location.Latitude
+					upgraded.Longitude = location.Longitude
+					existing.sample = upgraded
+				}
+			} else if NormalizeCountryCode(existing.sample.CountryCode) == "" && NormalizeCountryCode(location.CountryCode) != "" {
+				existing.sample = location
+			}
 		}
 		existing.weight += weight
 		if backend.Name == c.branchName(domestic) {

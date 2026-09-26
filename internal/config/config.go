@@ -48,6 +48,9 @@ type Config struct {
 	GeoIPDomesticOnline  string `json:"geoip_domestic_online,omitempty"`
 	GeoIPForeignOffline  string `json:"geoip_foreign_offline,omitempty"`
 	GeoIPForeignOnline   string `json:"geoip_foreign_online,omitempty"`
+	GeoIPBackupDBIP      bool   `json:"geoip_backup_dbip,omitempty"`
+	GeoIPBackupBigDC     bool   `json:"geoip_backup_bigdatacloud,omitempty"`
+	GeoIPBackupAmap      bool   `json:"geoip_backup_amap,omitempty"`
 	GeoIPUpdate       string   `json:"geoip_update,omitempty"`
 	GeoIPUpdateURL    string   `json:"geoip_update_url,omitempty"`
 	GeoIPChecksumURL  string   `json:"geoip_checksum_url,omitempty"`
