@@ -26,6 +26,45 @@
       "expected": {
         "country_code": "CN"
       }
+    },
+    "ip2region": {
+      "database_path": "/absolute/path/to/ip2region_v4.xdb",
+      "ip": "114.114.114.114",
+      "download": false,
+      "expected": {
+        "country_code": "CN",
+        "city": "南京"
+      }
+    }
+  },
+  "online": {
+    "tencent": {
+      "key": "",
+      "ip": "114.114.114.114",
+      "expected": {
+        "country_code": "CN"
+      }
+    },
+    "amap": {
+      "key": "",
+      "ip": "114.114.114.114",
+      "expected": {
+        "country_code": "CN"
+      }
+    },
+    "ipinfo": {
+      "key": "",
+      "ip": "8.8.8.8",
+      "expected": {
+        "country_code": "US"
+      }
+    },
+    "bigdatacloud": {
+      "key": "",
+      "ip": "8.8.8.8",
+      "expected": {
+        "country_code": "US"
+      }
     }
   }
 }

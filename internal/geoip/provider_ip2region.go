@@ -13,7 +13,7 @@ func (ip2regionProvider) attribution() Attribution {
 
 func (ip2regionProvider) updateProfile() UpdateProfile {
 	return UpdateProfile{
-		URL:          "https://raw.githubusercontent.com/lionsoul2014/ip2region/master/data/ip2region.xdb",
+		URL:          "https://raw.githubusercontent.com/lionsoul2014/ip2region/master/data/ip2region_v4.xdb",
 		OfficialHost: "raw.githubusercontent.com",
 		FreshFor:     7 * 24 * time.Hour,
 	}

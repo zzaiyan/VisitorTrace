@@ -44,7 +44,9 @@ cp docs/geoip-test.example.json .geoip-test.json
 make geoip-integration
 ```
 
-`providers` 对象可以包含 `dbip`、`maxmind` 和 `ip2location`。每个条目必须提供 `ip`；`database_path` 会启用已有 MMDB 的 `ValidateWithProvider`、`OpenWithProvider` 和真实查询验证。设置 `download` 为 `true` 后，还会使用对应后端的官方地址，附加凭证，下载当前容器，执行校验和解包、后端结构验证，在临时目录原子激活，并查询激活后的数据库。仅测试下载链路时可以省略 `database_path`。可选的 `expected` 字段可以断言 `country_code`、`region_code` 和 `city`。
+`providers` 对象可以包含 `dbip`、`maxmind`、`ip2location` 和 `ip2region`。每个条目必须提供 `ip`；`database_path` 会启用已有数据库的 `ValidateWithProvider`、`OpenWithProvider` 和真实查询验证。设置 `download` 为 `true` 后，还会使用对应后端的官方地址，附加凭证，下载当前容器，执行校验和解包、后端结构验证，在临时目录原子激活，并查询激活后的数据库。仅测试下载链路时可以省略 `database_path`。`dbip` 和 `ip2region` 无需凭证；MaxMind 需要 `account_id`/`license_key`，IP2Location 需要 `token`。可选的 `expected` 字段可以断言 `country_code`、`region_code` 和 `city`。
+
+可选的 `online` 对象可以包含 `tencent`、`amap`、`ipinfo` 和 `bigdatacloud`，每项提供 `key` 和 `ip`。key 为空的服务会跳过，条目可保留、逐个补充凭证。这些测试会对所配置的在线服务发起真实网络请求。
 
 该文件已加入 Git 忽略规则，集成测试使用内存日志，因此凭证不会提交或打印。MaxMind 条目使用 `account_id` 和 `license_key`，IP2Location 使用 `token`，DB-IP 不需要凭证。该测试会发起真实网络请求并可能下载较大的数据库，因此只手动执行，不纳入默认 `make check`。
 

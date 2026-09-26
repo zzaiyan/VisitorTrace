@@ -12,14 +12,17 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
+	"github.com/zzaiyan/VisitorTrace/internal/geoiponline"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
 type integrationConfig struct {
 	Providers map[string]integrationProvider `json:"providers"`
+	Online    map[string]integrationOnline   `json:"online"`
 }
 
 type integrationProvider struct {
@@ -30,6 +33,12 @@ type integrationProvider struct {
 	LicenseKey   string           `json:"license_key"`
 	Token        string           `json:"token"`
 	Expected     expectedLocation `json:"expected"`
+}
+
+type integrationOnline struct {
+	Key      string           `json:"key"`
+	IP       string           `json:"ip"`
+	Expected expectedLocation `json:"expected"`
 }
 
 type expectedLocation struct {
@@ -53,15 +62,15 @@ func TestConfiguredGeoIPProviders(t *testing.T) {
 	if err := decoder.Decode(&cfg); err != nil {
 		t.Fatalf("decode GeoIP integration config: %v", err)
 	}
-	if len(cfg.Providers) == 0 {
-		t.Fatal("GeoIP integration config has no providers")
+	if len(cfg.Providers) == 0 && len(cfg.Online) == 0 {
+		t.Fatal("GeoIP integration config has no providers and no online services")
 	}
 	for provider := range cfg.Providers {
-		if provider != "dbip" && provider != "maxmind" && provider != "ip2location" {
+		if provider != "dbip" && provider != "maxmind" && provider != "ip2location" && provider != "ip2region" {
 			t.Errorf("unsupported provider %q in integration config", provider)
 		}
 	}
-	for _, provider := range []string{"dbip", "maxmind", "ip2location"} {
+	for _, provider := range []string{"dbip", "maxmind", "ip2location", "ip2region"} {
 		fixture, ok := cfg.Providers[provider]
 		if !ok {
 			continue
@@ -81,6 +90,43 @@ func TestConfiguredGeoIPProviders(t *testing.T) {
 			}
 		})
 	}
+	for _, service := range []string{"tencent", "amap", "ipinfo", "bigdatacloud"} {
+		fixture, ok := cfg.Online[service]
+		if !ok {
+			continue
+		}
+		t.Run("online/"+service, func(t *testing.T) {
+			validateOnlineService(t, service, fixture)
+		})
+	}
+}
+
+// validateOnlineService exercises one configured online lookup service. An
+// entry with an empty key is treated as intentionally not configured.
+func validateOnlineService(t *testing.T, service string, fixture integrationOnline) {
+	t.Helper()
+	if strings.TrimSpace(fixture.Key) == "" {
+		t.Skipf("online service %s has no key configured", service)
+	}
+	if _, err := geoiponline.NormalizeProvider(service); err != nil {
+		t.Fatalf("online provider %s: %v", service, err)
+	}
+	client, err := geoiponline.New(service, fixture.Key, 10*time.Second)
+	if err != nil {
+		t.Fatalf("create online client %s: %v", service, err)
+	}
+	address, err := netip.ParseAddr(fixture.IP)
+	if err != nil {
+		t.Fatalf("parse test IP %q: %v", fixture.IP, err)
+	}
+	location, err := client.Lookup(context.Background(), address)
+	if err != nil {
+		t.Fatalf("online lookup %s(%s): %v", service, fixture.IP, err)
+	}
+	if location.CountryCode == "" && location.City == "" && location.Latitude == nil {
+		t.Fatalf("online lookup %s(%s) returned an empty location", service, fixture.IP)
+	}
+	assertExpectedLocation(t, location, fixture.Expected)
 }
 
 func validateConfiguredDatabase(t *testing.T, provider string, fixture integrationProvider) {
