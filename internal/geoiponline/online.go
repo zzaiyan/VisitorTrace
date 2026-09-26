@@ -189,10 +189,10 @@ type tencentResponse struct {
 			Lng float64 `json:"lng"`
 		} `json:"location"`
 		AdInfo struct {
-			Nation     string `json:"nation"`
-			NationCode string `json:"nation_code"`
-			Province   string `json:"province"`
-			City       string `json:"city"`
+			Nation     string          `json:"nation"`
+			NationCode json.RawMessage `json:"nation_code"`
+			Province   string          `json:"province"`
+			City       string          `json:"city"`
 		} `json:"ad_info"`
 	} `json:"result"`
 }
@@ -211,7 +211,7 @@ func (c *Client) fetchTencent(ctx context.Context, address netip.Addr) (geoip.Lo
 	latitude := payload.Result.Location.Lat
 	longitude := payload.Result.Location.Lng
 	location := geoip.Location{
-		CountryCode: normalizeNationCode(payload.Result.AdInfo.NationCode),
+		CountryCode: tencentNationCode(payload.Result.AdInfo.NationCode, payload.Result.AdInfo.Nation),
 		CountryName: payload.Result.AdInfo.Nation,
 		RegionName:  payload.Result.AdInfo.Province,
 		City:        city,
@@ -226,7 +226,7 @@ func (c *Client) fetchTencent(ctx context.Context, address netip.Addr) (geoip.Lo
 type amapResponse struct {
 	Status   string          `json:"status"`
 	Info     string          `json:"info"`
-	Province string          `json:"province"`
+	Province json.RawMessage `json:"province"`
 	City     json.RawMessage `json:"city"`
 }
 
@@ -240,30 +240,64 @@ func (c *Client) fetchAMap(ctx context.Context, address netip.Addr) (geoip.Locat
 	if payload.Status != "1" {
 		return geoip.Location{}, fmt.Errorf("amap IP location failed: %s", payload.Info)
 	}
-	city := decodeAMapCity(payload.City)
-	if city == "" || city == payload.Province {
-		city = payload.Province
+	province := decodeAMapString(payload.Province)
+	city := decodeAMapString(payload.City)
+	if city == "" || city == province {
+		city = province
 	}
 	return geoip.Location{
 		CountryCode: "CN",
 		CountryName: "中国",
-		RegionName:  payload.Province,
+		RegionName:  province,
 		City:        strings.TrimSuffix(city, "市"),
 	}, nil
 }
 
-// decodeAMapCity handles the API returning either a city name or an empty
-// JSON array for province-level addresses.
-func decodeAMapCity(raw json.RawMessage) string {
+// decodeAMapString handles the API returning either a name or an empty
+// JSON array for province-level or uncovered addresses.
+func decodeAMapString(raw json.RawMessage) string {
 	value := strings.TrimSpace(string(raw))
 	if value == "" || value == "[]" || value == "null" {
 		return ""
 	}
-	var city string
-	if err := json.Unmarshal(raw, &city); err != nil {
+	var name string
+	if err := json.Unmarshal(raw, &name); err != nil {
 		return ""
 	}
-	return city
+	return name
+}
+
+// tencentNationCode accepts the documented string form and the numeric
+// ISO 3166 code the live API actually returns, falling back to the nation
+// name.
+func tencentNationCode(raw json.RawMessage, nation string) string {
+	value := strings.Trim(strings.TrimSpace(string(raw)), `"`)
+	if len(value) == 2 {
+		return strings.ToUpper(value)
+	}
+	if code, ok := isoNumericCountries[value]; ok {
+		return code
+	}
+	switch nation {
+	case "中国":
+		return "CN"
+	case "美国":
+		return "US"
+	case "日本":
+		return "JP"
+	case "韩国":
+		return "KR"
+	}
+	return ""
+}
+
+// isoNumericCountries maps the ISO 3166-1 numeric codes Tencent returns to
+// the alpha-2 codes VisitorTrace stores.
+var isoNumericCountries = map[string]string{
+	"156": "CN", "840": "US", "392": "JP", "410": "KR", "826": "GB",
+	"276": "DE", "250": "FR", "036": "AU", "36": "AU", "124": "CA", "643": "RU",
+	"356": "IN", "764": "TH", "704": "VN", "458": "MY", "360": "ID",
+	"608": "PH", "158": "TW", "344": "HK", "446": "MO", "398": "KZ",
 }
 
 type ipinfoResponse struct {
@@ -367,18 +401,3 @@ func parseLatLon(value string) (float64, float64, bool) {
 	return latitude, longitude, true
 }
 
-// normalizeNationCode maps the alpha-3 codes used by some Tencent responses
-// onto the ISO 3166-1 alpha-2 codes VisitorTrace stores.
-func normalizeNationCode(value string) string {
-	value = strings.ToUpper(strings.TrimSpace(value))
-	switch value {
-	case "CHN":
-		return "CN"
-	case "USA":
-		return "US"
-	}
-	if len(value) == 2 {
-		return value
-	}
-	return ""
-}

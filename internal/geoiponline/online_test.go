@@ -32,7 +32,7 @@ func TestLookupTencentCachesResult(t *testing.T) {
 			t.Errorf("unexpected request %s?%s", r.URL.Path, r.URL.RawQuery)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":0,"result":{"location":{"lat":32.06,"lng":118.78},"ad_info":{"nation":"中国","nation_code":"CN","province":"江苏省","city":"南京市"}}}`))
+		_, _ = w.Write([]byte(`{"status":0,"result":{"location":{"lat":32.06,"lng":118.78},"ad_info":{"nation":"中国","nation_code":156,"province":"江苏省","city":"南京市"}}}`))
 	}))
 	defer server.Close()
 	client, err := New("tencent", "test-key", time.Second)
@@ -173,7 +173,7 @@ func TestPlainKeysDoNotSign(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotQuery = r.URL.Query()
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":0,"result":{"ad_info":{"nation":"中国","nation_code":"CN"}}}`))
+		_, _ = w.Write([]byte(`{"status":0,"result":{"ad_info":{"nation":"中国","nation_code":156}}}`))
 	}))
 	defer server.Close()
 	client, _ := New("tencent", "plain-key-no-sk", time.Second)
