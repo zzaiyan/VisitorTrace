@@ -73,7 +73,7 @@ func runInit(args []string) int {
 	configPath := fs.String("config", config.DefaultConfigPath(), "protected config path")
 	passwordFile := fs.String("password-file", "", "protected file containing the administrator password")
 	geoIPPath := fs.String("geoip", "", "existing GeoIP MMDB path")
-	geoIPProvider := fs.String("geoip-provider", string(geoip.ProviderDBIP), "GeoIP provider: dbip, maxmind, or ip2location")
+	geoIPProvider := fs.String("geoip-provider", string(geoip.ProviderDBIP), "GeoIP provider: dbip, maxmind, ip2location, or ip2region")
 	geoIPUpdate := fs.String("geoip-update", "", "GeoIP update mode: automatic or disabled")
 	geoIPUpdateURL := fs.String("geoip-update-url", "", "GeoIP download URL template override")
 	geoIPChecksumURL := fs.String("geoip-checksum-url", "", "optional SHA-256 sidecar URL template")

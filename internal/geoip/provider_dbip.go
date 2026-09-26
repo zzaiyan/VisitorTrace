@@ -22,6 +22,10 @@ func (dbipProvider) updateProfile() UpdateProfile {
 	}
 }
 
+func (p dbipProvider) open(path string) (localDatabase, error) {
+	return openMMDB(p, path)
+}
+
 func (dbipProvider) validate(reader *maxminddb.Reader) error {
 	databaseType := strings.ToLower(reader.Metadata.DatabaseType)
 	if !strings.Contains(databaseType, "dbip") || !strings.Contains(databaseType, "city") {

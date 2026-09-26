@@ -26,6 +26,7 @@ const (
 	ProviderDBIP        Provider = "dbip"
 	ProviderMaxMind     Provider = "maxmind"
 	ProviderIP2Location Provider = "ip2location"
+	ProviderIP2Region   Provider = "ip2region"
 )
 
 type Attribution struct {
@@ -43,9 +44,47 @@ type UpdateProfile struct {
 type providerAdapter interface {
 	attribution() Attribution
 	updateProfile() UpdateProfile
+	open(path string) (localDatabase, error)
+}
+
+// localDatabase is one provider's loaded database, independent of the
+// on-disk format behind it.
+type localDatabase interface {
+	lookup(address netip.Addr) Location
+	close() error
+	verify() error
+}
+
+// mmdbSchema is the MaxMind-style lookup subset shared by MMDB providers.
+type mmdbSchema interface {
 	validate(*maxminddb.Reader) error
 	lookup(*maxminddb.Reader, net.IP) Location
 }
+
+type mmdbBackend struct {
+	reader *maxminddb.Reader
+	schema mmdbSchema
+}
+
+func openMMDB(schema mmdbSchema, path string) (localDatabase, error) {
+	reader, err := maxminddb.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open GeoIP database: %w", err)
+	}
+	if err := schema.validate(reader); err != nil {
+		_ = reader.Close()
+		return nil, err
+	}
+	return &mmdbBackend{reader: reader, schema: schema}, nil
+}
+
+func (b *mmdbBackend) lookup(address netip.Addr) Location {
+	return b.schema.lookup(b.reader, net.IP(address.AsSlice()))
+}
+
+func (b *mmdbBackend) close() error { return b.reader.Close() }
+
+func (b *mmdbBackend) verify() error { return b.reader.Verify() }
 
 func NormalizeProvider(value string) (string, error) {
 	value = strings.ToLower(strings.TrimSpace(value))
@@ -53,10 +92,10 @@ func NormalizeProvider(value string) (string, error) {
 		value = string(ProviderDBIP)
 	}
 	switch Provider(value) {
-	case ProviderDBIP, ProviderMaxMind, ProviderIP2Location:
+	case ProviderDBIP, ProviderMaxMind, ProviderIP2Location, ProviderIP2Region:
 		return value, nil
 	default:
-		return "", fmt.Errorf("unsupported GeoIP provider %q (want dbip, maxmind, or ip2location)", value)
+		return "", fmt.Errorf("unsupported GeoIP provider %q (want dbip, maxmind, ip2location, or ip2region)", value)
 	}
 }
 
@@ -99,14 +138,15 @@ func adapterFor(value string) (providerAdapter, error) {
 		return maxMindProvider{}, nil
 	case ProviderIP2Location:
 		return ip2LocationProvider{}, nil
+	case ProviderIP2Region:
+		return ip2regionProvider{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported GeoIP provider %q", value)
 	}
 }
 
 type Resolver struct {
-	reader   *maxminddb.Reader
-	provider providerAdapter
+	backend localDatabase
 }
 
 type nestedRecord struct {
@@ -139,15 +179,11 @@ func OpenWithProvider(provider, path string) (*Resolver, error) {
 	if strings.TrimSpace(path) == "" {
 		return nil, fmt.Errorf("GeoIP path is empty")
 	}
-	reader, err := maxminddb.Open(path)
+	backend, err := adapter.open(path)
 	if err != nil {
-		return nil, fmt.Errorf("open GeoIP database: %w", err)
-	}
-	if err := adapter.validate(reader); err != nil {
-		_ = reader.Close()
 		return nil, err
 	}
-	return &Resolver{reader: reader, provider: adapter}, nil
+	return &Resolver{backend: backend}, nil
 }
 
 func Validate(path string) error {
@@ -159,25 +195,22 @@ func ValidateWithProvider(provider, path string) error {
 	if err != nil {
 		return err
 	}
-	reader, err := maxminddb.Open(path)
+	backend, err := adapter.open(path)
 	if err != nil {
-		return fmt.Errorf("open GeoIP database: %w", err)
-	}
-	defer reader.Close()
-	if err := adapter.validate(reader); err != nil {
 		return err
 	}
-	if err := reader.Verify(); err != nil {
+	defer backend.close()
+	if err := backend.verify(); err != nil {
 		return fmt.Errorf("verify GeoIP database: %w", err)
 	}
 	return nil
 }
 
 func (r *Resolver) Lookup(address netip.Addr) Location {
-	if r == nil || r.reader == nil || !address.IsValid() {
+	if r == nil || r.backend == nil || !address.IsValid() {
 		return Location{}
 	}
-	return r.provider.lookup(r.reader, net.IP(address.AsSlice()))
+	return r.backend.lookup(address)
 }
 
 func lookupNested(reader *maxminddb.Reader, address net.IP) Location {
@@ -208,10 +241,10 @@ func locationFromNestedRecord(record nestedRecord) Location {
 }
 
 func (r *Resolver) Close() error {
-	if r == nil || r.reader == nil {
+	if r == nil || r.backend == nil {
 		return nil
 	}
-	return r.reader.Close()
+	return r.backend.close()
 }
 
 func localizedName(values map[string]string) string {

@@ -23,6 +23,10 @@ func (maxMindProvider) updateProfile() UpdateProfile {
 	}
 }
 
+func (p maxMindProvider) open(path string) (localDatabase, error) {
+	return openMMDB(p, path)
+}
+
 func (maxMindProvider) validate(reader *maxminddb.Reader) error {
 	databaseType := strings.ToLower(reader.Metadata.DatabaseType)
 	if (!strings.Contains(databaseType, "geoip2") && !strings.Contains(databaseType, "geolite2")) || !strings.Contains(databaseType, "city") {

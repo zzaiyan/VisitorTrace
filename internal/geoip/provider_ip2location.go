@@ -32,6 +32,10 @@ func (ip2LocationProvider) updateProfile() UpdateProfile {
 	}
 }
 
+func (p ip2LocationProvider) open(path string) (localDatabase, error) {
+	return openMMDB(p, path)
+}
+
 func (ip2LocationProvider) validate(reader *maxminddb.Reader) error {
 	networks := reader.Networks(maxminddb.SkipAliasedNetworks)
 	if !networks.Next() {
