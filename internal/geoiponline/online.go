@@ -205,6 +205,9 @@ func (c *Client) fetchTencent(ctx context.Context, address netip.Addr) (geoip.Lo
 		return geoip.Location{}, err
 	}
 	if payload.Status != 0 {
+		if strings.Contains(payload.Message, "无法定位") {
+			return geoip.Location{}, nil
+		}
 		return geoip.Location{}, fmt.Errorf("tencent IP location failed: %s", payload.Message)
 	}
 	city := strings.TrimSuffix(payload.Result.AdInfo.City, "市")
@@ -242,6 +245,11 @@ func (c *Client) fetchAMap(ctx context.Context, address netip.Addr) (geoip.Locat
 	}
 	province := decodeAMapString(payload.Province)
 	city := decodeAMapString(payload.City)
+	if province == "" && city == "" {
+		// Amap cannot say anything about uncovered (typically foreign)
+		// addresses; report a miss instead of claiming China.
+		return geoip.Location{}, nil
+	}
 	if city == "" || city == province {
 		city = province
 	}

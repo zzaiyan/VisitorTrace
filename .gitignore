@@ -30,3 +30,6 @@ visitortrace.json
 /docs/adr/
 /docs/research/
 /docs/internal/
+
+# Local GeoIP integration cache
+/.geoip-cache/
