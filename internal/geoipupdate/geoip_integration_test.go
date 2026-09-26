@@ -20,32 +20,37 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
+// The integration configuration keeps credentials and test addresses apart:
+// every configured provider is paired with every address in the shared list,
+// so one run compares how each backend geolocates the same inputs. Providers
+// and services whose credentials are empty are skipped, so the file can carry
+// the full matrix at all times.
 type integrationConfig struct {
+	IPs       []integrationAddress        `json:"ips"`
 	Providers map[string]integrationProvider `json:"providers"`
 	Online    map[string]integrationOnline   `json:"online"`
 }
 
-type integrationProvider struct {
-	DatabasePath string           `json:"database_path"`
-	IP           string           `json:"ip"`
-	Download     bool             `json:"download"`
-	AccountID    string           `json:"account_id"`
-	LicenseKey   string           `json:"license_key"`
-	Token        string           `json:"token"`
-	Expected     expectedLocation `json:"expected"`
-}
-
-type integrationOnline struct {
-	Key      string           `json:"key"`
-	SK       string           `json:"sk"`
-	IP       string           `json:"ip"`
-	Expected expectedLocation `json:"expected"`
-}
-
-type expectedLocation struct {
+type integrationAddress struct {
+	IP          string `json:"ip"`
 	CountryCode string `json:"country_code"`
 	RegionCode  string `json:"region_code"`
 	City        string `json:"city"`
+}
+
+type integrationProvider struct {
+	Download    bool   `json:"download"`
+	DownloadURL string `json:"download_url"`
+	DatabasePath string `json:"database_path"`
+	AccountID   string `json:"account_id"`
+	LicenseKey  string `json:"license_key"`
+	Token       string `json:"token"`
+}
+
+type integrationOnline struct {
+	Key string   `json:"key"`
+	SK  string   `json:"sk"`
+	IPs []string `json:"ips"`
 }
 
 func TestConfiguredGeoIPProviders(t *testing.T) {
@@ -63,12 +68,28 @@ func TestConfiguredGeoIPProviders(t *testing.T) {
 	if err := decoder.Decode(&cfg); err != nil {
 		t.Fatalf("decode GeoIP integration config: %v", err)
 	}
+	if len(cfg.IPs) == 0 {
+		t.Fatal("GeoIP integration config has no test addresses")
+	}
+	addresses := make([]netip.Addr, len(cfg.IPs))
+	for index, entry := range cfg.IPs {
+		parsed, err := netip.ParseAddr(entry.IP)
+		if err != nil {
+			t.Fatalf("parse test IP %q: %v", entry.IP, err)
+		}
+		addresses[index] = parsed
+	}
 	if len(cfg.Providers) == 0 && len(cfg.Online) == 0 {
 		t.Fatal("GeoIP integration config has no providers and no online services")
 	}
 	for provider := range cfg.Providers {
 		if provider != "dbip" && provider != "maxmind" && provider != "ip2location" && provider != "ip2region" {
 			t.Errorf("unsupported provider %q in integration config", provider)
+		}
+	}
+	for service := range cfg.Online {
+		if _, err := geoiponline.NormalizeProvider(service); err != nil {
+			t.Errorf("unsupported online service %q in integration config", service)
 		}
 	}
 	for _, provider := range []string{"dbip", "maxmind", "ip2location", "ip2region"} {
@@ -83,16 +104,30 @@ func TestConfiguredGeoIPProviders(t *testing.T) {
 			continue
 		}
 		t.Run(provider, func(t *testing.T) {
-			if fixture.DatabasePath != "" {
-				t.Run("existing_database", func(t *testing.T) {
-					validateConfiguredDatabase(t, provider, fixture)
-				})
-			} else if !fixture.Download {
-				t.Fatal("database_path is required when download is false")
-			}
-			if fixture.Download {
+			databasePath := strings.TrimSpace(fixture.DatabasePath)
+			if databasePath == "" && fixture.Download {
+				directory := t.TempDir()
 				t.Run("official_update", func(t *testing.T) {
-					validateConfiguredDownload(t, provider, fixture)
+					databasePath = downloadConfiguredDatabase(t, directory, provider, fixture)
+				})
+			}
+			if databasePath == "" {
+				t.Skipf("provider %s has no database: enable download or set database_path", provider)
+			}
+			resolver, err := geoip.OpenWithProvider(provider, databasePath)
+			if err != nil {
+				t.Fatalf("open %s database: %v", provider, err)
+			}
+			defer resolver.Close()
+			for index, entry := range cfg.IPs {
+				address := entry
+				t.Run(address.IP, func(t *testing.T) {
+					location := resolver.Lookup(addresses[index])
+					if location.CountryCode == "" && location.City == "" && location.Latitude == nil {
+						t.Fatalf("%s returned an empty location for %s", provider, address.IP)
+					}
+					t.Logf("location = %+v", location)
+					assertExpectedLocation(t, location, address)
 				})
 			}
 		})
@@ -102,8 +137,38 @@ func TestConfiguredGeoIPProviders(t *testing.T) {
 		if !ok {
 			continue
 		}
+		if strings.TrimSpace(fixture.Key) == "" {
+			t.Run("online/"+service, func(t *testing.T) {
+				t.Skipf("online service %s has no key configured", service)
+			})
+			continue
+		}
 		t.Run("online/"+service, func(t *testing.T) {
-			validateOnlineService(t, service, fixture)
+			credential := fixture.Key
+			if fixture.SK != "" {
+				credential = fixture.Key + ":" + fixture.SK
+			}
+			client, err := geoiponline.New(service, credential, 10*time.Second)
+			if err != nil {
+				t.Fatalf("create online client %s: %v", service, err)
+			}
+			for index, entry := range cfg.IPs {
+				address := entry
+				if len(fixture.IPs) > 0 && !containsAddress(fixture.IPs, address.IP) {
+					continue
+				}
+				t.Run(address.IP, func(t *testing.T) {
+					location, err := client.Lookup(context.Background(), addresses[index])
+					if err != nil {
+						t.Fatalf("online lookup %s(%s): %v", service, address.IP, err)
+					}
+					if location.CountryCode == "" && location.City == "" && location.Latitude == nil {
+						t.Fatalf("online lookup %s(%s) returned an empty location", service, address.IP)
+					}
+					t.Logf("location = %+v", location)
+					assertExpectedLocation(t, location, address)
+				})
+			}
 		})
 	}
 }
@@ -121,71 +186,23 @@ func missingProviderCredential(provider string, fixture integrationProvider) boo
 	}
 }
 
-// validateOnlineService exercises one configured online lookup service. An
-// entry with an empty key is treated as intentionally not configured.
-func validateOnlineService(t *testing.T, service string, fixture integrationOnline) {
+// downloadConfiguredDatabase runs one official update into the given
+// directory and returns the activated database path. The directory must
+// outlive the download subtest it runs in.
+func downloadConfiguredDatabase(t *testing.T, dir string, provider string, fixture integrationProvider) string {
 	t.Helper()
-	if strings.TrimSpace(fixture.Key) == "" {
-		t.Skipf("online service %s has no key configured", service)
-	}
-	if _, err := geoiponline.NormalizeProvider(service); err != nil {
-		t.Fatalf("online provider %s: %v", service, err)
-	}
-	credential := fixture.Key
-	if fixture.SK != "" {
-		credential = fixture.Key + ":" + fixture.SK
-	}
-	client, err := geoiponline.New(service, credential, 10*time.Second)
-	if err != nil {
-		t.Fatalf("create online client %s: %v", service, err)
-	}
-	address, err := netip.ParseAddr(fixture.IP)
-	if err != nil {
-		t.Fatalf("parse test IP %q: %v", fixture.IP, err)
-	}
-	location, err := client.Lookup(context.Background(), address)
-	if err != nil {
-		t.Fatalf("online lookup %s(%s): %v", service, fixture.IP, err)
-	}
-	if location.CountryCode == "" && location.City == "" && location.Latitude == nil {
-		t.Fatalf("online lookup %s(%s) returned an empty location", service, fixture.IP)
-	}
-	assertExpectedLocation(t, location, fixture.Expected)
-}
-
-func validateConfiguredDatabase(t *testing.T, provider string, fixture integrationProvider) {
-	t.Helper()
-	if err := geoip.ValidateWithProvider(provider, fixture.DatabasePath); err != nil {
-		t.Fatalf("ValidateWithProvider(%s) error = %v", provider, err)
-	}
-	resolver, err := geoip.OpenWithProvider(provider, fixture.DatabasePath)
-	if err != nil {
-		t.Fatalf("OpenWithProvider(%s) error = %v", provider, err)
-	}
-	defer resolver.Close()
-	address, err := netip.ParseAddr(fixture.IP)
-	if err != nil {
-		t.Fatalf("parse test IP %q: %v", fixture.IP, err)
-	}
-	location := resolver.Lookup(address)
-	if location.CountryCode == "" && location.City == "" && location.Latitude == nil {
-		t.Fatalf("Lookup(%s, %s) returned an empty location", provider, fixture.IP)
-	}
-	assertExpectedLocation(t, location, fixture.Expected)
-}
-
-func validateConfiguredDownload(t *testing.T, provider string, fixture integrationProvider) {
-	t.Helper()
-	dir := t.TempDir()
 	cfg := config.Default(dir)
 	cfg.GeoIPProvider = provider
 	cfg.GeoIPUpdate = "automatic"
-	cfg.GeoIPPath = filepath.Join(dir, "geoip.mmdb")
+	cfg.GeoIPPath = filepath.Join(dir, "geoip.db")
 	profile, err := geoip.UpdateProfileForProvider(provider)
 	if err != nil {
 		t.Fatalf("provider profile %s: %v", provider, err)
 	}
 	cfg.GeoIPUpdateURL = profile.URL
+	if strings.TrimSpace(fixture.DownloadURL) != "" {
+		cfg.GeoIPUpdateURL = strings.TrimSpace(fixture.DownloadURL)
+	}
 	cfg.GeoIPChecksumURL = ""
 	cfg.MaxMindAccountID = fixture.AccountID
 	cfg.MaxMindLicenseKey = fixture.LicenseKey
@@ -209,23 +226,19 @@ func validateConfiguredDownload(t *testing.T, provider string, fixture integrati
 	if err := geoip.ValidateWithProvider(provider, cfg.GeoIPPath); err != nil {
 		t.Fatalf("validate activated %s database: %v", provider, err)
 	}
-	resolver, err := geoip.OpenWithProvider(provider, cfg.GeoIPPath)
-	if err != nil {
-		t.Fatalf("open activated %s database: %v", provider, err)
-	}
-	defer resolver.Close()
-	address, err := netip.ParseAddr(fixture.IP)
-	if err != nil {
-		t.Fatalf("parse test IP %q: %v", fixture.IP, err)
-	}
-	location := resolver.Lookup(address)
-	if location.CountryCode == "" && location.City == "" && location.Latitude == nil {
-		t.Fatalf("activated %s database returned an empty location", provider)
-	}
-	assertExpectedLocation(t, location, fixture.Expected)
+	return cfg.GeoIPPath
 }
 
-func assertExpectedLocation(t *testing.T, got geoip.Location, want expectedLocation) {
+func containsAddress(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func assertExpectedLocation(t *testing.T, got geoip.Location, want integrationAddress) {
 	t.Helper()
 	if want.CountryCode != "" && !strings.EqualFold(got.CountryCode, want.CountryCode) {
 		t.Errorf("country_code = %q, want %q", got.CountryCode, want.CountryCode)

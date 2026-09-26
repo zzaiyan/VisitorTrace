@@ -44,9 +44,11 @@ cp docs/geoip-test.example.json .geoip-test.json
 make geoip-integration
 ```
 
-The `providers` object may contain `dbip`, `maxmind`, `ip2location`, and `ip2region`. Each entry requires an `ip`; `database_path` enables validation of an existing database with `ValidateWithProvider`, `OpenWithProvider`, and a real lookup. Set `download` to `true` to additionally use the provider's official URL, attach credentials, download the current container, verify and unpack it, validate the provider schema, atomically activate it in a temporary directory, and query the activated database. `database_path` may be omitted when only the download path is being tested. `dbip` and `ip2region` need no credentials; MaxMind requires `account_id`/`license_key` and IP2Location requires `token`. Optional `expected` fields can assert `country_code`, `region_code`, and `city`.
+The configuration keeps test addresses and credentials apart: `ips` lists the shared test addresses with optional `country_code`, `region_code`, and `city` assertions, while `providers` and `online` hold the credentials. Every configured backend is paired with every address, and `-v` output doubles as a cross-backend comparison view for the same inputs. Backends and services with empty credentials are skipped, so the file can carry the full matrix at all times.
 
-The optional `online` object may contain `tencent`, `amap`, `ipinfo`, and `bigdatacloud`, each with a `key` and an `ip`. Services with an empty key are skipped, so entries can stay in place while credentials are filled in one by one. These tests perform real network requests against the configured online services.
+`providers` may contain `dbip` and `ip2region` (both credential-free; `download: true` exercises the official update chain), `maxmind` (`account_id` + `license_key`), and `ip2location` (`token`). `database_path` tests an existing database file without downloading, and `download_url` overrides the official source — for example with a mirror when MaxMind answers HTTP 451 for your egress network.
+
+`online` may contain `tencent` and `amap` (keys with signature verification also need `sk`), `ipinfo`, and `bigdatacloud`. An optional `ips` list restricts one service to a subset of addresses — Amap, for instance, only covers domestic IPs. These tests perform real network requests against the configured online services.
 
 The file is ignored by Git and the integration test uses an in-memory logger, so credentials are not committed or printed. MaxMind entries use `account_id` and `license_key`; IP2Location entries use `token`; DB-IP requires no credential. The test performs live network requests and may download a large database, so run it manually rather than from the default `make check` target.
 
