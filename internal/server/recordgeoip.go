@@ -38,7 +38,7 @@ func (s *Server) adminRefreshSiteRecordGeoIP(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	result, err := s.Store.RefreshPageviewGeoIP(r.Context(), siteID, func(address netip.Addr) store.PageviewGeography {
-		location := s.geoIP.Lookup(address)
+		location := s.locate(r.Context(), address)
 		return store.PageviewGeography{
 			CountryCode: location.CountryCode, RegionCode: location.RegionCode, City: location.City,
 			Latitude: location.Latitude, Longitude: location.Longitude,

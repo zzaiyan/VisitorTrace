@@ -16,7 +16,8 @@ VisitorTrace 是一个单进程 Go 服务。生产运行只依赖可执行文件
 - `internal/maprender`：无外部运行时依赖的 SVG 地图渲染；
 - `internal/backup`：一致性快照、归档校验与恢复；
 - `internal/maintenance`：进程内定期维护和有界清理调度；
-- `internal/geoip`：面向后端的本地 MMDB 查询，以及 DB-IP、MaxMind、IP2Location 到统一地理位置字段的映射。
+- `internal/geoip`：面向后端的本地数据库查询（MMDB 与 ip2region xdb），以及各后端到统一地理位置字段的映射。
+- `internal/geoiponline`：默认关闭的在线定位回填（腾讯位置服务、高德、IPinfo、BigDataCloud），本地数据库未命中时按短超时查询并缓存结果。
 - `internal/geoipupdate`：按后端下载、归档解包、校验、原子替换、热加载与回滚。
 - `internal/selfupdate`：签名清单、候选验证、版本切换、启动确认与失败回滚。
 

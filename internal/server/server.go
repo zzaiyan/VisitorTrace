@@ -21,6 +21,7 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/clientip"
 	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
+	"github.com/zzaiyan/VisitorTrace/internal/geoiponline"
 	"github.com/zzaiyan/VisitorTrace/internal/maprender"
 	"github.com/zzaiyan/VisitorTrace/internal/pageview"
 	"github.com/zzaiyan/VisitorTrace/internal/ratelimit"
@@ -54,6 +55,7 @@ type Server struct {
 	logger        *slog.Logger
 	geoMu         sync.RWMutex
 	geoIP         *geoip.Resolver
+	onlineGeoIP   *geoiponline.Client
 	mapCache      *mapCache
 	loginLimit    *ratelimit.Limiter
 	recordGeoIPMu sync.Mutex
@@ -70,7 +72,7 @@ func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
 	if len(loggers) > 0 && loggers[0] != nil {
 		logger = loggers[0]
 	}
-	return &Server{
+	server := &Server{
 		Config:     cfg,
 		Store:      st,
 		Started:    time.Now().UTC(),
@@ -83,6 +85,41 @@ func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
 		basePath:   config.BasePath(cfg.BaseURL),
 		restart:    make(chan struct{}),
 	}
+	if cfg.OnlineGeoIPEnabled {
+		if client, err := geoiponline.New(cfg.OnlineGeoIPProvider, cfg.OnlineGeoIPKey, 3*time.Second); err == nil {
+			server.onlineGeoIP = client
+		} else {
+			server.logger.Warn("online GeoIP disabled", "error", err)
+		}
+	}
+	return server
+}
+
+// locate resolves visitor geography through the local database first and
+// falls back to the opt-in online provider when the local result is empty.
+// The online call carries a short deadline so collection never blocks for
+// long and skips addresses that cannot be geolocated anyway.
+func (s *Server) locate(ctx context.Context, address netip.Addr) geoip.Location {
+	s.geoMu.RLock()
+	resolver := s.geoIP
+	online := s.onlineGeoIP
+	s.geoMu.RUnlock()
+	var location geoip.Location
+	if resolver != nil {
+		location = resolver.Lookup(address)
+	}
+	if online == nil || !address.IsValid() || address.IsPrivate() || address.IsLoopback() || address.IsUnspecified() {
+		return location
+	}
+	if location.CountryCode != "" || location.City != "" {
+		return location
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if fallback, err := online.Lookup(lookupCtx, address); err == nil {
+		location = fallback
+	}
+	return location
 }
 
 func (s *Server) Handler() http.Handler {
@@ -453,12 +490,7 @@ func (s *Server) recordImagePageview(r *http.Request, configuredSite store.Site,
 }
 
 func (s *Server) recordResolvedPageview(ctx context.Context, configuredSite store.Site, address netip.Addr, digest []byte, hostname, path string, classification useragent.Classification, method string) error {
-	s.geoMu.RLock()
-	location := geoip.Location{}
-	if s.geoIP != nil {
-		location = s.geoIP.Lookup(address)
-	}
-	s.geoMu.RUnlock()
+	location := s.locate(ctx, address)
 	_, err := s.Store.RecordPageview(ctx, store.PageviewObservation{
 		SiteID:           configuredSite.ID,
 		Hostname:         hostname,

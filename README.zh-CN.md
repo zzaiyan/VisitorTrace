@@ -14,7 +14,7 @@
 - 按 Site 隔离的 Pageview 采集
 - 多域名 Site 按访问 hostname 独立统计
 - SQLite 逐条记录和持久化聚合
-- 支持 DB-IP、MaxMind、IP2Location 的可插拔本地 GeoIP 查询与后台更新管理
+- 支持 DB-IP、MaxMind、IP2Location、ip2region 的可插拔本地 GeoIP 查询与后台更新管理，以及可选的在线定位回填（腾讯位置服务、高德、IPinfo、BigDataCloud）
 - 带后端归因信息的 SVG 访客地图
 - 站点管理页交互地图，以及支持日期联动的公开/后台分析
 - 简体中文、日语和英文界面，以及按 Site 配置的公开页默认语言

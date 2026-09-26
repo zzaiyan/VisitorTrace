@@ -16,7 +16,8 @@ Package responsibilities:
 - `internal/maprender`: SVG map rendering without an external runtime dependency;
 - `internal/backup`: consistent snapshots, archive verification, and restoration;
 - `internal/maintenance`: in-process scheduling and bounded cleanup;
-- `internal/geoip`: provider-aware local MMDB lookup and unified location mapping for DB-IP, MaxMind, and IP2Location.
+- `internal/geoip`: provider-aware local database lookup (MMDB and ip2region xdb) with unified location mapping.
+- `internal/geoiponline`: opt-in online lookup fallback (Tencent LBS, Amap, IPinfo, BigDataCloud) that queries with a short timeout and caches results when the local database misses.
 - `internal/geoipupdate`: provider-aware download, archive extraction, verification, atomic activation, hot reload, and rollback.
 - `internal/selfupdate`: signed manifests, candidate checks, release switching, readiness confirmation, and rollback.
 

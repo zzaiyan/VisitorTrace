@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
+	"github.com/zzaiyan/VisitorTrace/internal/geoiponline"
 )
 
 const CurrentVersion = 1
@@ -31,6 +32,9 @@ type Config struct {
 	MaxMindAccountID  string   `json:"maxmind_account_id,omitempty"`
 	MaxMindLicenseKey string   `json:"maxmind_license_key,omitempty"`
 	IP2LocationToken  string   `json:"ip2location_download_token,omitempty"`
+	OnlineGeoIPEnabled  bool   `json:"online_geoip_enabled,omitempty"`
+	OnlineGeoIPProvider string `json:"online_geoip_provider,omitempty"`
+	OnlineGeoIPKey      string `json:"online_geoip_key,omitempty"`
 	BackupDir         string   `json:"backup_dir,omitempty"`
 	UpdateManifestURL string   `json:"update_manifest_url,omitempty"`
 	Listen            string   `json:"listen"`
@@ -209,7 +213,17 @@ func (c Config) Validate() error {
 			}
 		}
 	}
-	for name, value := range map[string]string{"maxmind_account_id": c.MaxMindAccountID, "maxmind_license_key": c.MaxMindLicenseKey, "ip2location_download_token": c.IP2LocationToken} {
+	if c.OnlineGeoIPEnabled {
+		provider, err := geoiponline.NormalizeProvider(c.OnlineGeoIPProvider)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(c.OnlineGeoIPKey) == "" {
+			return errors.New("online_geoip_key is required when online GeoIP lookups are enabled")
+		}
+		c.OnlineGeoIPProvider = provider
+	}
+	for name, value := range map[string]string{"maxmind_account_id": c.MaxMindAccountID, "maxmind_license_key": c.MaxMindLicenseKey, "ip2location_download_token": c.IP2LocationToken, "online_geoip_key": c.OnlineGeoIPKey} {
 		if strings.ContainsAny(value, "\r\n") {
 			return fmt.Errorf("%s must not contain line breaks", name)
 		}

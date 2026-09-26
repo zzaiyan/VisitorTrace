@@ -10,6 +10,7 @@ import (
 
 	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
+	"github.com/zzaiyan/VisitorTrace/internal/geoiponline"
 )
 
 const maxConfigurationSettingsBody = 40 * 1024
@@ -79,6 +80,21 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 	updated.IP2LocationToken, err = updatedSecret(r.FormValue("ip2location_token"), r.FormValue("clear_ip2location_token") == "1", updated.IP2LocationToken, "IP2Location Token", adminLanguage(r))
 	if err != nil {
 		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
+		return
+	}
+	updated.OnlineGeoIPEnabled = r.FormValue("online_geoip_enabled") == "on"
+	updated.OnlineGeoIPProvider, err = geoiponline.NormalizeProvider(r.FormValue("online_geoip_provider"))
+	if err != nil {
+		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
+		return
+	}
+	updated.OnlineGeoIPKey, err = updatedSecret(r.FormValue("online_geoip_key"), r.FormValue("clear_online_geoip_key") == "1", updated.OnlineGeoIPKey, "Online GeoIP Key", adminLanguage(r))
+	if err != nil {
+		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
+		return
+	}
+	if updated.OnlineGeoIPEnabled && strings.TrimSpace(updated.OnlineGeoIPKey) == "" {
+		s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_online_key"))
 		return
 	}
 	if err := config.Save(s.ConfigPath, updated); err != nil {

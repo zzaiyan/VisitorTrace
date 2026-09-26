@@ -122,6 +122,10 @@ type adminSettingsData struct {
 	GeoIPChecksumURL       string
 	GeoIPOfficialSource    bool
 	GeoIPOfficialURL       string
+	OnlineGeoIPEnabled     bool
+	OnlineGeoIPProvider    string
+	OnlineGeoIPConfigured  bool
+	IP2RegionOfficialURL   string
 	DBIPOfficialURL        string
 	MaxMindOfficialURL     string
 	IP2LocationOfficialURL string
@@ -261,6 +265,7 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 	dbipProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderDBIP))
 	maxMindProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderMaxMind))
 	ip2LocationProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderIP2Location))
+	ip2RegionProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderIP2Region))
 	operationSnapshot := operations.Collect(r.Context(), s.Config, s.Store, s.Started, time.Now())
 	backups, err := backupservice.List(s.Config.BackupDir)
 	if err != nil {
@@ -276,7 +281,10 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		GeoIPProvider: s.Config.GeoIPProvider, GeoIPUpdate: s.Config.GeoIPUpdate,
 		GeoIPUpdateURL: s.Config.GeoIPUpdateURL, GeoIPChecksumURL: s.Config.GeoIPChecksumURL,
 		GeoIPOfficialSource: s.Config.GeoIPUpdateURL == profile.URL, GeoIPOfficialURL: profile.URL,
+		OnlineGeoIPEnabled: s.Config.OnlineGeoIPEnabled, OnlineGeoIPProvider: s.Config.OnlineGeoIPProvider,
+		OnlineGeoIPConfigured: strings.TrimSpace(s.Config.OnlineGeoIPKey) != "",
 		DBIPOfficialURL: dbipProfile.URL, MaxMindOfficialURL: maxMindProfile.URL, IP2LocationOfficialURL: ip2LocationProfile.URL,
+		IP2RegionOfficialURL: ip2RegionProfile.URL,
 		MaxMindConfigured:     s.Config.MaxMindAccountID != "" && s.Config.MaxMindLicenseKey != "",
 		MaxMindHasCredentials: s.Config.MaxMindAccountID != "" || s.Config.MaxMindLicenseKey != "",
 		IP2LocationConfigured: s.Config.IP2LocationToken != "", GeoIPFile: operationSnapshot.GeoIP, Backups: backups,
