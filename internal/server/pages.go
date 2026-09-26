@@ -123,7 +123,11 @@ type adminSettingsData struct {
 	GeoIPOfficialSource    bool
 	GeoIPOfficialURL       string
 	GeoIPPreset            string
-	OnlineServices         map[string]bool
+	GeoIPBasicProvider     string
+	GeoIPDomesticOffline   string
+	GeoIPDomesticOnline    string
+	GeoIPForeignOffline    string
+	GeoIPForeignOnline     string
 	OnlineServiceKeys      map[string]bool
 	IP2RegionOfficialURL   string
 	DBIPOfficialURL        string
@@ -282,13 +286,26 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		GeoIPUpdateURL: s.Config.GeoIPUpdateURL, GeoIPChecksumURL: s.Config.GeoIPChecksumURL,
 		GeoIPOfficialSource: s.Config.GeoIPUpdateURL == profile.URL, GeoIPOfficialURL: profile.URL,
 		GeoIPPreset: s.Config.GeoIPPreset,
-		OnlineServices: func() map[string]bool {
-			result := make(map[string]bool)
-			for name := range s.Config.OnlineServices {
-				result[name] = true
+		GeoIPBasicProvider: func() string {
+			if s.Config.GeoIPDomesticOffline != "" {
+				return s.Config.GeoIPDomesticOffline
 			}
-			return result
+			return "dbip"
 		}(),
+		GeoIPDomesticOffline: func() string {
+			if s.Config.GeoIPDomesticOffline != "" {
+				return s.Config.GeoIPDomesticOffline
+			}
+			return "ip2region"
+		}(),
+		GeoIPDomesticOnline: s.Config.GeoIPDomesticOnline,
+		GeoIPForeignOffline: func() string {
+			if s.Config.GeoIPForeignOffline != "" {
+				return s.Config.GeoIPForeignOffline
+			}
+			return "ip2location"
+		}(),
+		GeoIPForeignOnline: s.Config.GeoIPForeignOnline,
 		OnlineServiceKeys: func() map[string]bool {
 			result := make(map[string]bool)
 			for name, svc := range s.Config.OnlineServices {

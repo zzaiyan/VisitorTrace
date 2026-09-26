@@ -29,8 +29,16 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .stepup-dialog h3 { margin: 0; }
 .stepup-dialog .field { display: grid; gap: 6px; }
 .stepup-actions { display: flex; justify-content: flex-end; gap: 10px; }
-.preset-options { display: grid; gap: 8px; }
-.online-services { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: #fafbfa; }
+.preset-cards { display: flex; gap: 10px; }
+.preset-card { flex: 1; display: grid; gap: 4px; padding: 14px 16px; border: 2px solid var(--line); border-radius: 8px; cursor: pointer; text-align: center; transition: border-color .15s, background .15s; }
+.preset-card input { position: absolute; opacity: 0; }
+.preset-card:has(input:checked) { border-color: var(--green); background: #f0f6f3; }
+.preset-card strong { font-size: 14px; color: var(--ink); }
+.preset-card small { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.geoip-branches { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: #fafbfa; }
+.branch-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.branch-card { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 6px; background: white; }
+.branch-card h4 { margin: 0; font-size: 12px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: .05em; }
 .toast-host { position: fixed; right: 18px; bottom: 18px; z-index: 60; display: flex; flex-direction: column; gap: 10px; max-width: min(360px, calc(100vw - 36px)); }
 .toast { padding: 12px 15px; border-left: 3px solid; background: white; box-shadow: var(--shadow); font-size: 13px; opacity: 0; transform: translateY(6px); transition: opacity .25s ease, transform .25s ease; cursor: pointer; }
 .toast.is-visible { opacity: 1; transform: none; }

@@ -23,26 +23,143 @@
     </div>
 
     <div class="configuration-group">
-      <div class="configuration-group-heading"><p class="eyebrow">Geolocation</p><h3>{{t "geoip_preset"}}</h3><p>{{t "provider_credentials_help"}}</p></div>
-      <div class="configuration-fields">
-        <div class="preset-options" role="radiogroup" aria-label="{{t "geoip_preset"}}">
-          <label class="setting-toggle"><span><strong>{{t "preset_basic"}}</strong><small>{{t "preset_basic_help"}}</small></span><span class="switch-control"><input type="radio" name="geoip_preset" value="basic" {{if eq .GeoIPPreset "basic"}}checked{{end}}><span aria-hidden="true"></span></span></label>
-          <label class="setting-toggle"><span><strong>{{t "preset_recommended"}}</strong><small>{{t "preset_recommended_help"}}</small></span><span class="switch-control"><input type="radio" name="geoip_preset" value="recommended" {{if or (eq .GeoIPPreset "recommended") (eq .GeoIPPreset "")}}checked{{end}}><span aria-hidden="true"></span></span></label>
-          <label class="setting-toggle"><span><strong>{{t "preset_precise"}}</strong><small>{{t "preset_precise_help"}}</small></span><span class="switch-control"><input type="radio" name="geoip_preset" value="precise" {{if eq .GeoIPPreset "precise"}}checked{{end}}><span aria-hidden="true"></span></span></label>
+      <div class="configuration-group-heading"><p class="eyebrow">Geolocation</p><h3>{{t "geoip_preset"}}</h3></div>
+      <div class="configuration-fields geoip-config" data-geoip-config>
+        <div class="preset-cards" role="radiogroup" aria-label="{{t "geoip_preset"}}">
+          <label class="preset-card"><input type="radio" name="geoip_preset" value="basic" {{if eq .GeoIPPreset "basic"}}checked{{end}}><strong>{{t "preset_basic"}}</strong><small>{{t "preset_basic_help"}}</small></label>
+          <label class="preset-card"><input type="radio" name="geoip_preset" value="recommended" {{if or (eq .GeoIPPreset "recommended") (eq .GeoIPPreset "")}}checked{{end}}><strong>{{t "preset_recommended"}}</strong><small>{{t "preset_recommended_help"}}</small></label>
+          <label class="preset-card"><input type="radio" name="geoip_preset" value="precise" {{if eq .GeoIPPreset "precise"}}checked{{end}}><strong>{{t "preset_precise"}}</strong><small>{{t "preset_precise_help"}}</small></label>
         </div>
-        <div class="online-services">
-          <label class="setting-toggle"><span><strong>IPinfo</strong><small>5 万次/月 · <a href="https://ipinfo.io/" target="_blank" rel="noopener">获取 Key</a></small></span><span class="switch-control"><input type="checkbox" name="online_ipinfo_enabled" role="switch" {{if .OnlineServices.ipinfo}}checked{{end}}><span aria-hidden="true"></span></span></label>
-          {{if or .OnlineServices.ipinfo .OnlineServiceKeys.ipinfo}}<label class="field"><span>Key</span><input type="password" name="online_ipinfo_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.ipinfo}}已保存，留空保持{{else}}token{{end}}"></label>{{end}}
-          <label class="setting-toggle"><span><strong>腾讯位置服务</strong><small>1 万次/天 · <a href="https://lbs.qq.com/" target="_blank" rel="noopener">获取 Key</a> · 需实名</small></span><span class="switch-control"><input type="checkbox" name="online_tencent_enabled" role="switch" {{if .OnlineServices.tencent}}checked{{end}}><span aria-hidden="true"></span></span></label>
-          {{if or .OnlineServices.tencent .OnlineServiceKeys.tencent}}<div class="field-grid two"><label class="field"><span>Key</span><input type="password" name="online_tencent_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.tencent}}已保存，留空保持{{else}}KEY{{end}}"></label><label class="field"><span>SK（签名校验）</span><input type="password" name="online_tencent_sk" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.tencent}}已保存，留空保持{{else}}SK{{end}}"></label></div>{{end}}
-          <label class="setting-toggle"><span><strong>高德</strong><small>5000 次/天 · <a href="https://lbs.amap.com/" target="_blank" rel="noopener">获取 Key</a> · 仅国内 · 需实名</small></span><span class="switch-control"><input type="checkbox" name="online_amap_enabled" role="switch" {{if .OnlineServices.amap}}checked{{end}}><span aria-hidden="true"></span></span></label>
-          {{if or .OnlineServices.amap .OnlineServiceKeys.amap}}<div class="field-grid two"><label class="field"><span>Key</span><input type="password" name="online_amap_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.amap}}已保存，留空保持{{else}}KEY{{end}}"></label><label class="field"><span>SK（数字签名）</span><input type="password" name="online_amap_sk" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.amap}}已保存，留空保持{{else}}SK{{end}}"></label></div>{{end}}
-          <label class="setting-toggle"><span><strong>BigDataCloud</strong><small>1 万次/月 · <a href="https://www.bigdatacloud.com/" target="_blank" rel="noopener">获取 Key</a></small></span><span class="switch-control"><input type="checkbox" name="online_bigdatacloud_enabled" role="switch" {{if .OnlineServices.bigdatacloud}}checked{{end}}><span aria-hidden="true"></span></span></label>
-          {{if or .OnlineServices.bigdatacloud .OnlineServiceKeys.bigdatacloud}}<label class="field"><span>Key</span><input type="password" name="online_bigdatacloud_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.bigdatacloud}}已保存，留空保持{{else}}key{{end}}"></label>{{end}}
+
+        <div class="geoip-branches" data-preset="basic" hidden>
+          <label class="field"><span>离线数据库</span>
+            <select name="geoip_basic_provider">
+              <option value="dbip" {{if eq .GeoIPBasicProvider "dbip"}}selected{{end}}>DB-IP City Lite（无需凭证）</option>
+              <option value="ip2region" {{if eq .GeoIPBasicProvider "ip2region"}}selected{{end}}>ip2region（中文城市，无需凭证）</option>
+              <option value="ip2location" {{if eq .GeoIPBasicProvider "ip2location"}}selected{{end}}>IP2Location LITE DB11</option>
+              <option value="maxmind" {{if eq .GeoIPBasicProvider "maxmind"}}selected{{end}}>MaxMind GeoLite2 City</option>
+            </select>
+          </label>
+          <div data-cred="ip2location" hidden><label class="field"><span>IP2Location Token</span><input type="password" name="ip2location_token" autocomplete="new-password" maxlength="512" placeholder="{{if .IP2LocationConfigured}}已保存，留空保持{{else}}免费注册后获取{{end}}"></label></div>
+          <div data-cred="maxmind" hidden><div class="field-grid two"><label class="field"><span>Account ID</span><input type="text" name="maxmind_account_id" autocomplete="off" maxlength="512"></label><label class="field"><span>License Key</span><input type="password" name="maxmind_license_key" autocomplete="new-password" maxlength="512"></label></div></div>
+        </div>
+
+        <div class="geoip-branches" data-preset="recommended" hidden>
+          <div class="branch-grid">
+            <div class="branch-card">
+              <h4>国内分支</h4>
+              <label class="field"><span>离线库</span>
+                <select name="geoip_domestic_offline">
+                  <option value="ip2region" {{if eq .GeoIPDomesticOffline "ip2region"}}selected{{end}}>ip2region（推荐）</option>
+                  <option value="dbip" {{if eq .GeoIPDomesticOffline "dbip"}}selected{{end}}>DB-IP City Lite</option>
+                  <option value="ip2location" {{if eq .GeoIPDomesticOffline "ip2location"}}selected{{end}}>IP2Location LITE</option>
+                </select>
+              </label>
+            </div>
+            <div class="branch-card">
+              <h4>国外分支</h4>
+              <label class="field"><span>离线库</span>
+                <select name="geoip_foreign_offline">
+                  <option value="ip2location" {{if eq .GeoIPForeignOffline "ip2location"}}selected{{end}}>IP2Location LITE（推荐）</option>
+                  <option value="dbip" {{if eq .GeoIPForeignOffline "dbip"}}selected{{end}}>DB-IP City Lite</option>
+                  <option value="maxmind" {{if eq .GeoIPForeignOffline "maxmind"}}selected{{end}}>MaxMind GeoLite2</option>
+                </select>
+              </label>
+              <div data-cred-foreign="ip2location" hidden><label class="field"><span>IP2Location Token</span><input type="password" name="ip2location_token" autocomplete="new-password" maxlength="512" placeholder="{{if .IP2LocationConfigured}}已保存{{else}}免费注册获取{{end}}"></label></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="geoip-branches" data-preset="precise" hidden>
+          <div class="branch-grid">
+            <div class="branch-card">
+              <h4>国内分支</h4>
+              <label class="field"><span>离线库</span>
+                <select name="geoip_domestic_offline">
+                  <option value="ip2region" {{if eq .GeoIPDomesticOffline "ip2region"}}selected{{end}}>ip2region（推荐）</option>
+                  <option value="dbip" {{if eq .GeoIPDomesticOffline "dbip"}}selected{{end}}>DB-IP City Lite</option>
+                  <option value="ip2location" {{if eq .GeoIPDomesticOffline "ip2location"}}selected{{end}}>IP2Location LITE</option>
+                </select>
+              </label>
+              <label class="field"><span>在线服务</span>
+                <select name="geoip_domestic_online">
+                  <option value="">不启用</option>
+                  <option value="tencent" {{if eq .GeoIPDomesticOnline "tencent"}}selected{{end}}>腾讯位置服务（推荐，需实名）</option>
+                  <option value="ipinfo" {{if eq .GeoIPDomesticOnline "ipinfo"}}selected{{end}}>IPinfo</option>
+                  <option value="bigdatacloud" {{if eq .GeoIPDomesticOnline "bigdatacloud"}}selected{{end}}>BigDataCloud</option>
+                  <option value="amap" {{if eq .GeoIPDomesticOnline "amap"}}selected{{end}}>高德（仅国内，需实名）</option>
+                </select>
+              </label>
+              <div data-online-cred="tencent" hidden><div class="field-grid two"><label class="field"><span>腾讯 Key</span><input type="password" name="online_tencent_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.tencent}}已保存{{else}}KEY{{end}}"></label><label class="field"><span>SK</span><input type="password" name="online_tencent_sk" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.tencent}}已保存{{else}}SK{{end}}"></label></div></div>
+              <div data-online-cred="ipinfo" hidden><label class="field"><span>IPinfo Key</span><input type="password" name="online_ipinfo_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.ipinfo}}已保存{{else}}token{{end}}"></label></div>
+              <div data-online-cred="bigdatacloud" hidden><label class="field"><span>BigDataCloud Key</span><input type="password" name="online_bigdatacloud_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.bigdatacloud}}已保存{{else}}key{{end}}"></label></div>
+              <div data-online-cred="amap" hidden><div class="field-grid two"><label class="field"><span>高德 Key</span><input type="password" name="online_amap_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.amap}}已保存{{else}}KEY{{end}}"></label><label class="field"><span>SK</span><input type="password" name="online_amap_sk" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.amap}}已保存{{else}}SK{{end}}"></label></div></div>
+            </div>
+            <div class="branch-card">
+              <h4>国外分支</h4>
+              <label class="field"><span>离线库</span>
+                <select name="geoip_foreign_offline">
+                  <option value="ip2location" {{if eq .GeoIPForeignOffline "ip2location"}}selected{{end}}>IP2Location LITE（推荐）</option>
+                  <option value="dbip" {{if eq .GeoIPForeignOffline "dbip"}}selected{{end}}>DB-IP City Lite</option>
+                  <option value="maxmind" {{if eq .GeoIPForeignOffline "maxmind"}}selected{{end}}>MaxMind GeoLite2</option>
+                </select>
+              </label>
+              <label class="field"><span>在线服务</span>
+                <select name="geoip_foreign_online">
+                  <option value="">不启用</option>
+                  <option value="ipinfo" {{if eq .GeoIPForeignOnline "ipinfo"}}selected{{end}}>IPinfo（推荐）</option>
+                  <option value="tencent" {{if eq .GeoIPForeignOnline "tencent"}}selected{{end}}>腾讯位置服务</option>
+                  <option value="bigdatacloud" {{if eq .GeoIPForeignOnline "bigdatacloud"}}selected{{end}}>BigDataCloud</option>
+                </select>
+              </label>
+            </div>
+          </div>
           <small>{{t "online_privacy_warning"}}</small>
         </div>
       </div>
     </div>
+    <script>
+    (function () {
+      var root = document.querySelector("[data-geoip-config]");
+      if (!root) return;
+      var presets = root.querySelectorAll('input[name="geoip_preset"]');
+      var sections = root.querySelectorAll("[data-preset]");
+      function syncPreset() {
+        var value = root.querySelector('input[name="geoip_preset"]:checked');
+        sections.forEach(function (section) {
+          section.hidden = section.dataset.preset !== (value ? value.value : "");
+        });
+        syncCred();
+      }
+      function syncCred() {
+        var value = root.querySelector('input[name="geoip_preset"]:checked');
+        var mode = value ? value.value : "";
+        root.querySelectorAll("[data-cred]").forEach(function (el) {
+          var select = mode === "basic" ? root.querySelector('select[name="geoip_basic_provider"]') : null;
+          var key = select ? select.value : "";
+          el.hidden = el.dataset.cred !== key;
+        });
+        var foreignSel = root.querySelector('select[name="geoip_foreign_offline"]');
+        if (foreignSel) {
+          root.querySelectorAll("[data-cred-foreign]").forEach(function (el) {
+            el.hidden = el.dataset.credForeign !== foreignSel.value;
+          });
+        }
+        ["domestic", "foreign"].forEach(function (branch) {
+          var sel = root.querySelector('select[name="geoip_' + branch + '_online"]');
+          if (!sel) return;
+          root.querySelectorAll("[data-online-cred]").forEach(function (el) {
+            if (el.closest("." + branch + " ") || el.closest(".branch-card") === sel.closest(".branch-card")) {
+              el.hidden = sel.value === "" || el.dataset.onlineCred !== sel.value;
+            }
+          });
+        });
+      }
+      presets.forEach(function (radio) { radio.addEventListener("change", syncPreset); });
+      root.querySelectorAll("select").forEach(function (sel) { sel.addEventListener("change", syncCred); });
+      syncPreset();
+    })();
+    </script>
 
     <div class="configuration-actions">
       <div class="configuration-action-copy"><strong>{{t "apply_configuration"}}</strong><span>{{t "apply_configuration_help"}}</span></div>

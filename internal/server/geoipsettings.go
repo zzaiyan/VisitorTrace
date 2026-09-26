@@ -81,37 +81,42 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
 		return
 	}
-	// GeoIP preset selection replaces the old per-provider configuration.
+	// GeoIP preset and per-branch backend selection.
 	updated.GeoIPPreset = r.FormValue("geoip_preset")
-	// Parse multiple online services: each has an enable checkbox, key,
-	// and optional SK. Only entries with a non-empty key are kept.
+	updated.GeoIPDomesticOffline = r.FormValue("geoip_domestic_offline")
+	updated.GeoIPDomesticOnline = r.FormValue("geoip_domestic_online")
+	updated.GeoIPForeignOffline = r.FormValue("geoip_foreign_offline")
+	updated.GeoIPForeignOnline = r.FormValue("geoip_foreign_online")
+	// Parse online service credentials from whichever inputs are visible.
 	updated.OnlineServices = make(map[string]config.OnlineServiceConfig)
 	for _, service := range []string{"ipinfo", "tencent", "amap", "bigdatacloud"} {
-		if r.FormValue("online_"+service+"_enabled") != "on" {
+		key := strings.TrimSpace(r.FormValue("online_" + service + "_key"))
+		sk := strings.TrimSpace(r.FormValue("online_" + service + "_sk"))
+		if key == "" && sk == "" {
+			if existing, ok := s.Config.OnlineServices[service]; ok && existing.Key != "" {
+				updated.OnlineServices[service] = existing
+			}
 			continue
 		}
-		key := strings.TrimSpace(r.FormValue("online_" + service + "_key"))
 		if key == "" {
-			// Preserve previously saved keys when the field is left blank.
-			if existing, ok := s.Config.OnlineServices[service]; ok && existing.Key != "" {
+			if existing, ok := s.Config.OnlineServices[service]; ok {
 				key = existing.Key
-			} else {
-				continue
 			}
 		}
-		sk := strings.TrimSpace(r.FormValue("online_" + service + "_sk"))
 		if sk == "" {
 			if existing, ok := s.Config.OnlineServices[service]; ok {
 				sk = existing.SK
 			}
 		}
-		entry := config.OnlineServiceConfig{Key: key}
-		if sk != "" {
-			entry.SK = sk
+		if key != "" {
+			entry := config.OnlineServiceConfig{Key: key}
+			if sk != "" {
+				entry.SK = sk
+			}
+			updated.OnlineServices[service] = entry
 		}
-		updated.OnlineServices[service] = entry
 	}
-	if updated.GeoIPPreset == "precise" && len(updated.OnlineServices) == 0 {
+	if updated.GeoIPPreset == "precise" && updated.GeoIPDomesticOnline == "" && updated.GeoIPForeignOnline == "" {
 		s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_online_key"))
 		return
 	}
