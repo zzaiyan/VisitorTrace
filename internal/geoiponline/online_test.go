@@ -59,7 +59,7 @@ func TestLookupTencentCachesResult(t *testing.T) {
 func TestLookupAMapEmptyCityArray(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"1","info":"OK","province":"青海省","city":[]}`))
+		_, _ = w.Write([]byte(`{"status":"1","info":"OK","province":"青海省","city":[],"rectangle":"90,30;100,40"}`))
 	}))
 	defer server.Close()
 	client, _ := New("amap", "test-key", time.Second)
@@ -68,15 +68,40 @@ func TestLookupAMapEmptyCityArray(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Lookup error: %v", err)
 	}
-	if location.CountryCode != "CN" || location.RegionName != "青海省" || location.City != "青海省" {
+	if location.CountryCode != "CN" || location.RegionName != "青海省" || location.City != "青海省" || location.Latitude != nil || location.Longitude != nil {
 		t.Fatalf("Lookup = %+v", location)
+	}
+}
+
+func TestLookupAMapUsesCityRectangleCenter(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"1","info":"OK","province":"北京市","city":"北京市","rectangle":"116.0119343,39.66127144;116.7829835,40.2164962"}`))
+	}))
+	defer server.Close()
+	client, _ := New("amap", "test-key", time.Second)
+	client.setBaseURL(server.URL)
+	location, err := client.Lookup(context.Background(), netip.MustParseAddr("114.247.50.2"))
+	if err != nil {
+		t.Fatalf("Lookup error: %v", err)
+	}
+	if location.City != "北京" || location.Latitude == nil || location.Longitude == nil || *location.Latitude != 39.93888382 || *location.Longitude != 116.3974589 {
+		t.Fatalf("Lookup = %+v", location)
+	}
+}
+
+func TestAMapRectangleCenterRejectsInvalidBounds(t *testing.T) {
+	for _, rectangle := range []string{"", "[]", "116,39", "117,40;116,39", "116,39;117,91", "0,0;0,0", "NaN,39;117,40"} {
+		if _, _, ok := amapRectangleCenter(rectangle); ok {
+			t.Errorf("accepted invalid rectangle %q", rectangle)
+		}
 	}
 }
 
 func TestLookupIPinfoParsesCoordinates(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/8.8.8.8/json" {
-			t.Errorf("unexpected path %s", r.URL.Path)
+		if r.URL.Path != "/8.8.8.8/json" || r.URL.Query().Get("token") != "test-token" {
+			t.Errorf("unexpected IPinfo request path %s or token", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ip":"8.8.8.8","city":"Mountain View","region":"California","country":"US","loc":"37.4056,-122.0775"}`))

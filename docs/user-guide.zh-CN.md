@@ -2,7 +2,7 @@
 
 [英文版](./user-guide.md)
 
-VisitorTrace 是面向个人主页、博客和其他小型网站的轻量级自托管访客地图与 Pageview 记录服务。生产环境只需要一个 Go 可执行文件、SQLite 数据库和本地 GeoIP MMDB。
+VisitorTrace 是面向个人主页、博客和其他小型网站的轻量级自托管访客地图与 Pageview 记录服务。生产环境需要一个 Go 可执行文件和 SQLite 数据库；GeoIP 可以使用本地数据库、在线服务或两者组合。
 
 ## 快速预览
 
@@ -33,15 +33,15 @@ make build
 
 ## 安装发布版
 
-正式版本在 GitHub Releases 提供带版本号且无需 Go 环境的 Linux 二进制。根据服务器架构选择 `visitortrace-<版本>-linux-amd64` 或 `visitortrace-<版本>-linux-arm64`，同时下载 `checksums.txt`。例如，校验 `0.3.0` 的 AMD64 版本：
+正式版本在 GitHub Releases 提供带版本号且无需 Go 环境的 Linux 二进制。根据服务器架构选择 `visitortrace-<版本>-linux-amd64` 或 `visitortrace-<版本>-linux-arm64`，同时下载 `checksums.txt`。例如，校验 `0.4.0` 的 AMD64 版本：
 
 ```sh
-grep ' visitortrace-0.3.0-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-0.3.0-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.4.0-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.4.0-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-实际安装时将 `0.3.0` 替换为下载的版本号；ARM64 服务器使用 `linux-arm64` 文件名。每个 Release 还会提供 GPL 文本和来自同一标签的对应源码归档。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
+实际安装时将 `0.4.0` 替换为下载的版本号；ARM64 服务器使用 `linux-arm64` 文件名。每个 Release 还会提供 GPL 文本和来自同一标签的对应源码归档。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
 
 ## 初始化
 
@@ -110,9 +110,9 @@ Site 管理页的“聚合分析”使用相同日期范围和交互组件，并
 
 后台默认使用简体中文，语言开关会把中文、日语或英文偏好保存在浏览器中。每个 Site 可把 Public Analytics 默认语言设为“自动”、简体中文、日语或英文；自动模式按访客带权重的 `Accept-Language` 偏好选择语言。公开页的语言开关以及 `lang=zh-CN`、`lang=ja`、`lang=en` URL 参数可覆写默认值。Map Preset 中的 SVG 标题和 PV/UV 标签不随界面语言自动改写。
 
-管理总览顶部显示应用版本与运行时长、SQLite 版本/Schema/占用、可用磁盘空间、GeoIP 文件和最近本地备份。任务表记录最近一次备份、维护清理和 GeoIP 更新的结果；低磁盘、超过 48 小时没有新备份、超过 35 天的 GeoIP、清理停滞或任务失败会显示告警。页面可直接触发立即备份、立即清理和 GeoIP 检查。
+管理总览顶部显示应用版本与运行时长、SQLite 版本/Schema/占用、可用磁盘空间、已有文件或凭据/已选择的 GeoIP 数据源数量和最近本地备份。任务表记录最近一次备份、维护清理和 GeoIP 更新的结果；低磁盘、超过 48 小时没有新备份、超过 35 天的 GeoIP、清理停滞或任务失败会显示告警。页面可直接触发立即备份、立即清理和 GeoIP 检查。
 
-“管理员设置 > 服务配置”把公开 Base URL、GeoIP 后端、更新策略、官方源/自定义镜像、可选校验地址和后端凭证合并为一个表单。已保存的秘密不会回显到浏览器：凭证输入框留空表示保持原值，显式勾选清除项才会删除。一次管理员密码验证会原子保存所有变更，并只请求一次受管重启。“GeoIP 数据维护”是独立的操作区，用于查看数据库状态与最近任务摘要、立即检查，或在“仅手动”策略下强制重新下载。
+“管理员设置 > 服务配置”保留公开 Base URL、GeoIP 方案、主库和备用库选择，以及全局更新策略。各后端卡片可展开编辑凭证；离线库还可分别选择官方源或自定义镜像及校验地址。新选中的后端会先显示待保存卡片。凭证不会回显，留空表示保留已保存值。所有配置通过一次管理员验证原子保存，并请求一次受管重启。存在未保存改动时，单项维护按钮暂时停用；保存后可在各卡片分别检查或强制更新离线库、测试在线服务。
 
 ### 访问明细与导出
 
@@ -213,7 +213,15 @@ URL 参数只覆写当前请求，不会改变保存的 Map Preset。
 
 ## GeoIP
 
-VisitorTrace 同时只启用一个本地 MMDB 后端，并把不同数据库结构统一映射为国家代码/名称、地区代码/名称、城市、纬度和经度。通过 `geoip_provider` 选择后端：
+基础方案使用一个数据库；推荐方案按国内外分别使用一个主库；精确方案在两个分支中各使用两个主库，并至少选一个备用库参与冲突投票。各方案均可混合选择受支持的在线服务与离线数据库；每张 GeoIP 状态卡片会标注类型、凭据和维护状态。在线服务会接收用于查询的访客 IP。
+
+| 方案 | 推荐组合与顺序 |
+| --- | --- |
+| 基础 | 建议 IPinfo；如需仅在本地查询，建议 IP2Location。ip2region 无坐标，不可作为唯一主库 |
+| 推荐 | 国内建议 IPinfo，国外建议 IP2Location。IPinfo 需要 API Token；IP2Location 的官方下载需要 Download Token。ip2region 不可作为任一分支的唯一主库 |
+| 精确 | 建议国内 ip2region + 腾讯、国外 IP2Location + IPinfo，备用高德。ip2region 的城市结果只在其他来源确认同城并提供坐标时补齐坐标 |
+
+精确方案可以继续加入未被选为主库的备用后端。基础方案通过 `geoip_basic_backend` 选择后端；离线库沿用 `geoip_provider` 指定本地数据格式：
 
 | 后端 | 数据库格式 | 默认更新方式 |
 | --- | --- | --- |
@@ -221,7 +229,7 @@ VisitorTrace 同时只启用一个本地 MMDB 后端，并把不同数据库结�
 | `maxmind` | MaxMind GeoLite2 City（`.tar.gz`） | 自动更新，需要 Account ID 和 License Key |
 | `ip2location` | IP2Location LITE DB11 MMDB（`.zip`） | 每月自动更新，需要 Download Token |
 
-默认后端是 `dbip`。三种后端使用同一套自动更新、校验和原子激活流程。MaxMind 可使用账户后台提供的凭据初始化：
+初始安装使用无需凭证的 `dbip`；可以在管理员设置中切换方案。离线后端使用自动更新、校验和原子激活流程。MaxMind 可使用账户后台提供的凭据初始化：
 
 ```sh
 visitortrace init \
@@ -261,12 +269,12 @@ VisitorTrace 在启动时检查，并每 24 小时再次检查。DB-IP 与 IP2Lo
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-使用 `--force` 可忽略当前后端的新鲜度策略重新下载。命令行更新发生在另一个进程中，若服务正在运行，更新后需要通过 systemd 重启服务；服务内置的自动更新会直接热加载。
+命令默认处理全部已选的离线数据集，可用 `--dataset foreign`、`--dataset domestic_b`、`--dataset foreign_b` 或 `--dataset backup_<后端>` 指定一个。`--force` 会忽略新鲜度策略；在“仅手动”模式下也必须带上该参数。命令行更新发生在另一个进程中，若服务正在运行，更新后需要重启服务；服务内置的自动更新会直接热加载。
 
 需要诊断某个 IP 为什么显示成特定城市时，可以查询原始 MMDB 记录：
 
 ```sh
-# 使用配置文件中的 geoip_path。
+# 使用当前方案中第一个已选的本地 MMDB。
 ./scripts/query-mmdb.sh --binary ./bin/visitortrace \
   --config "$HOME/.config/visitortrace/config.json" \
   1.2.3.4
@@ -277,7 +285,7 @@ VisitorTrace 在启动时检查，并每 24 小时再次检查。DB-IP 与 IP2Lo
   1.2.3.4
 ```
 
-命令输出格式化 JSON，包括数据库元数据、命中的 CIDR、`found` 状态和未修改的 MMDB `record` 字段树。它不会应用 VisitorTrace 的城市级标签规范化。地址未命中时返回 `found: false` 和 `null` 的 `record`。在已部署的服务器上，也可以直接使用已安装的可执行文件，例如 `sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip query --config /etc/visitortrace/config.json 1.2.3.4`。
+可用 `visitortrace geoip query --dataset foreign IP` 指定已选的本地 MMDB；在线服务与 ip2region 的 XDB 不支持原始 MMDB 查询。命令输出格式化 JSON，包括数据库元数据、命中的 CIDR、`found` 状态和未修改的 MMDB `record` 字段树。它不会应用 VisitorTrace 的城市级标签规范化。地址未命中时返回 `found: false` 和 `null` 的 `record`。在已部署的服务器上，也可以直接使用已安装的可执行文件，例如 `sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip query --config /etc/visitortrace/config.json 1.2.3.4`。
 
 更新器可以使用提供任一受支持容器和可选 SHA-256 sidecar 的 HTTPS 镜像。后端凭据只会附加到对应后端的准确官方主机名，不会发送给自定义镜像。使用私有或国内镜像时可显式配置：
 
@@ -289,13 +297,15 @@ VisitorTrace 在启动时检查，并每 24 小时再次检查。DB-IP 与 IP2Lo
 }
 ```
 
-`geoip_checksum_url` 可省略；配置后会在解压前校验下载容器的 SHA-256。远程源必须使用 HTTPS，本机回环测试地址例外。设置 `"geoip_update": "disabled"` 可关闭下载。读取旧配置时，`"monthly"` 会迁移为 `"automatic"`。
+`geoip_checksum_url` 可省略；配置后会在解压前校验下载容器的 SHA-256。远程源必须使用 HTTPS，本机回环测试地址例外。设置 `"geoip_update": "disabled"` 可关闭自动下载；管理员状态卡片仍可手动维护，命令行手动下载需加 `--force`。读取旧配置时，`"monthly"` 会迁移为 `"automatic"`。
+
+本地主库使用 `geoip_update_url` 和 `geoip_checksum_url`。其他已选本地数据集可通过 `geoip_dataset_sources` 独立配置下载源，键名为 `foreign`、`domestic_b`、`foreign_b` 或 `backup_<后端>`；管理员设置中的状态卡片会管理这些字段。
 
 账户凭据属于敏感信息。配置文件权限应保持为 `0600`；备份中包含配置文件，也需要限制访问；不要把凭据直接写入更新 URL。
 
-已有安装不需要重新执行 `init` 即可切换后端：进入“管理员设置 > 服务配置”，按需填写新凭证并保存合并配置，服务会使用新后端重启。其他后端已经保存的凭证会继续保留，除非显式清除。
+已有安装不需要重新执行 `init` 即可切换后端：进入“管理员设置 > 服务配置”，按需填写新凭证并保存配置，服务会使用所选数据源重启。此前保存的凭证会留在受保护配置中，以供后续切换使用。
 
-GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/health/ready` 返回不可用，新 Pageview 不会获得地理位置。地图悬浮提示、后台预览和 Public Analytics 会展示当前后端的归因信息。DB-IP 中国城市标签规范化只作用于 DB-IP 记录；MaxMind 和 IP2Location 的城市名称按数据库原值映射。
+GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/health/ready` 返回不可用，新 Pageview 不会获得地理位置。地图悬浮提示、后台预览和 Public Analytics 会展示已选本地数据源的归因信息。DB-IP 中国城市标签规范化只作用于 DB-IP 记录；MaxMind 和 IP2Location 的城市名称按数据库原值映射。
 
 ## 备份与恢复
 
@@ -388,7 +398,7 @@ visitortrace update apply --config "$HOME/.config/visitortrace/config.json"
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.3.0-linux-amd64 \
+  --binary ./visitortrace-0.4.0-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 
@@ -417,7 +427,3 @@ VisitorTrace 采用 [GNU 通用公共许可证第 3 版](../LICENSE)发布。第
 ## 管理后台恢复备份
 
 “管理员设置 > 恢复备份”会列出本机 `.vtbackup` 归档，并提供“恢复备份”功能。选择归档、输入当前管理员密码并确认后，VisitorTrace 会校验归档旁的校验文件和归档内容，在 `backup_dir/pre-restore` 创建新的恢复前安全快照，并安排在下一次受管重启时替换数据库。当前配置文件不会被覆盖；恢复成功后所有管理员会话都会失效，服务就绪后需要重新登录。
-
-## 当前状态
-
-当前版本已经实现此前确定的首版功能，包括 Pageview 采集与聚合、规则生效历史、自动清理、GeoIP 自动更新、带有界缓存的 SVG 地图、双语交互分析、管理员数据与运行状态、密码和 Site 生命周期、备份恢复，以及签名验证的一键自更新。

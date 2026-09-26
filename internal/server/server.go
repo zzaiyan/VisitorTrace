@@ -45,25 +45,29 @@ type pageviewPayload struct {
 }
 
 type Server struct {
-	Config        config.Config
-	ConfigPath    string
-	Store         *store.Store
-	Started       time.Time
-	clientIP      *clientip.Resolver
-	ipLimit       *ratelimit.Limiter
-	siteLimit     *ratelimit.Limiter
-	logger        *slog.Logger
-	geoMu         sync.RWMutex
-	geoIP         *geoip.Resolver
-	geoChain      *geoip.Chain
-	mapCache      *mapCache
-	loginLimit    *ratelimit.Limiter
-	recordGeoIPMu sync.Mutex
-	restoreMu     sync.Mutex
-	restoreActive bool
-	basePath      string
-	restartOnce   sync.Once
-	restart       chan struct{}
+	Config          config.Config
+	ConfigPath      string
+	Store           *store.Store
+	Started         time.Time
+	clientIP        *clientip.Resolver
+	ipLimit         *ratelimit.Limiter
+	siteLimit       *ratelimit.Limiter
+	logger          *slog.Logger
+	geoMu           sync.RWMutex
+	geoIP           *geoip.Resolver
+	geoForeign      *geoip.Resolver
+	geoChain        *geoip.Chain
+	geoSingleOnline geoip.OnlineLookup
+	geoBackups      map[string]*geoip.Resolver
+	geoProbeMu      sync.Mutex
+	mapCache        *mapCache
+	loginLimit      *ratelimit.Limiter
+	recordGeoIPMu   sync.Mutex
+	restoreMu       sync.Mutex
+	restoreActive   bool
+	basePath        string
+	restartOnce     sync.Once
+	restart         chan struct{}
 }
 
 func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
@@ -85,11 +89,60 @@ func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
 		basePath:   config.BasePath(cfg.BaseURL),
 		restart:    make(chan struct{}),
 	}
-	// Build the chain for recommended/precise presets; the offline
-	// resolvers attach later once databases are opened.
+	if cfg.GeoIPPreset == "basic" {
+		basic := cfg.GeoIPBasicBackend
+		if basic == "" {
+			basic = cfg.GeoIPProvider
+		}
+		if _, err := geoip.NormalizeProvider(basic); err != nil {
+			svc := cfg.OnlineServices[basic]
+			credential := svc.Key
+			if svc.SK != "" {
+				credential += ":" + svc.SK
+			}
+			if client, err := geoiponline.New(basic, credential, 3*time.Second); err == nil {
+				server.geoSingleOnline = client
+			} else {
+				server.logger.Warn("online GeoIP service unavailable", "service", basic, "error", err)
+			}
+		}
+	}
+	// Build the chain for recommended/precise presets. Offline resolvers
+	// attach later once databases are opened.
 	if cfg.GeoIPPreset == "recommended" || cfg.GeoIPPreset == "precise" {
+		domesticID := cfg.GeoIPDomesticOffline
+		if domesticID == "" {
+			if cfg.GeoIPPreset == "recommended" {
+				domesticID = "ipinfo"
+			} else {
+				domesticID = "ip2region"
+			}
+		}
+		foreignID := cfg.GeoIPForeignOffline
+		if foreignID == "" {
+			foreignID = "ip2location"
+		}
+		selected := []string{domesticID, foreignID}
+		if cfg.GeoIPPreset == "precise" {
+			selected = append(selected, cfg.GeoIPDomesticOnline, cfg.GeoIPForeignOnline)
+			selected = append(selected, cfg.GeoIPBackups...)
+		}
 		backends := []*geoip.ChainBackend{}
-		for name, svc := range cfg.OnlineServices {
+		added := map[string]bool{}
+		for _, name := range selected {
+			if added[name] {
+				continue
+			}
+			added[name] = true
+			if _, err := geoip.NormalizeProvider(name); err == nil {
+				dom, fo := geoip.DefaultChainWeights(name)
+				backends = append(backends, &geoip.ChainBackend{Name: name, DomesticWeight: dom, ForeignWeight: fo})
+				continue
+			}
+			svc, configured := cfg.OnlineServices[name]
+			if !configured {
+				continue
+			}
 			credential := svc.Key
 			if svc.SK != "" {
 				credential = svc.Key + ":" + svc.SK
@@ -101,7 +154,8 @@ func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
 				server.logger.Warn("online GeoIP service unavailable", "service", name, "error", err)
 			}
 		}
-		server.geoChain = geoip.NewChain(backends, "ip2region", "ip2location", true)
+		server.geoChain = geoip.NewChain(backends, domesticID, foreignID, true)
+		server.geoChain.SetCross(cfg.GeoIPDomesticOnline, cfg.GeoIPForeignOnline)
 	}
 	return server
 }
@@ -114,11 +168,21 @@ func (s *Server) locate(ctx context.Context, address netip.Addr) geoip.Location 
 		return geoip.Location{}
 	}
 	s.geoMu.RLock()
+	defer s.geoMu.RUnlock()
 	chain := s.geoChain
 	resolver := s.geoIP
-	s.geoMu.RUnlock()
+	online := s.geoSingleOnline
 	if chain != nil {
 		return chain.Lookup(ctx, address)
+	}
+	if online != nil {
+		lookupCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		location, err := online.Lookup(lookupCtx, address)
+		if err == nil {
+			return geoip.PostprocessLocation(location)
+		}
+		return geoip.Location{}
 	}
 	if resolver != nil {
 		return geoip.PostprocessLocation(resolver.Lookup(address))
@@ -239,13 +303,43 @@ func (s *Server) SetGeoIP(resolver *geoip.Resolver) {
 func (s *Server) SetGeoIPForeign(resolver *geoip.Resolver) {
 	s.geoMu.Lock()
 	defer s.geoMu.Unlock()
+	previous := s.geoForeign
+	s.geoForeign = resolver
 	if s.geoChain != nil {
 		s.geoChain.SetForeign(resolver)
+	}
+	if previous != nil && previous != resolver {
+		_ = previous.Close()
+	}
+}
+
+func (s *Server) SetGeoIPBackup(name string, resolver *geoip.Resolver) {
+	s.geoMu.Lock()
+	defer s.geoMu.Unlock()
+	if s.geoBackups == nil {
+		s.geoBackups = make(map[string]*geoip.Resolver)
+	}
+	previous := s.geoBackups[name]
+	s.geoBackups[name] = resolver
+	if s.geoChain != nil {
+		s.geoChain.SetBackup(name, resolver)
+	}
+	if previous != nil && previous != resolver {
+		_ = previous.Close()
 	}
 }
 
 func (s *Server) CloseGeoIP() {
 	s.SetGeoIP(nil)
+	s.SetGeoIPForeign(nil)
+	s.geoMu.Lock()
+	defer s.geoMu.Unlock()
+	for name, resolver := range s.geoBackups {
+		if resolver != nil {
+			_ = resolver.Close()
+		}
+		delete(s.geoBackups, name)
+	}
 }
 
 func (s *Server) Ready(ctx context.Context) bool {
@@ -257,7 +351,7 @@ func (s *Server) Ready(ctx context.Context) bool {
 	}
 	s.geoMu.RLock()
 	defer s.geoMu.RUnlock()
-	return s.geoIP != nil
+	return s.geoIPAvailableLocked()
 }
 
 func (s *Server) RequestRestart() {
@@ -281,7 +375,7 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 		checks["schema"] = true
 	}
 	s.geoMu.RLock()
-	geoAvailable := s.geoIP != nil
+	geoAvailable := s.geoIPAvailableLocked()
 	s.geoMu.RUnlock()
 	if geoAvailable {
 		checks["geoip"] = true

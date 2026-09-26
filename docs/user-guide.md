@@ -2,7 +2,7 @@
 
 [Chinese](./user-guide.zh-CN.md)
 
-VisitorTrace is a lightweight self-hosted visitor map and Pageview tracker for personal homepages, blogs, and other small websites. Production requires one Go executable, one SQLite database, and a local GeoIP MMDB.
+VisitorTrace is a lightweight self-hosted visitor map and Pageview tracker for personal homepages, blogs, and other small websites. Production requires one Go executable and one SQLite database; GeoIP can use local databases, online services, or both.
 
 ## Quick Preview
 
@@ -33,15 +33,15 @@ make build
 
 ## Install a Release
 
-GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.3.0` on AMD64:
+GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.4.0` on AMD64:
 
 ```sh
-grep ' visitortrace-0.3.0-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-0.3.0-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.4.0-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.4.0-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-Replace `0.3.0` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
+Replace `0.4.0` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
 
 ## Initialize
 
@@ -110,9 +110,9 @@ Aggregate Analytics on the Site management page uses the same ranges and interac
 
 The Admin Console defaults to Simplified Chinese and stores the selected Chinese, Japanese, or English choice in the browser. Every Site can set Public Analytics to automatic, Simplified Chinese, Japanese, or English. Automatic mode follows the visitor's weighted `Accept-Language` preference; the public language switch and `lang=zh-CN`, `lang=ja`, or `lang=en` URL parameter override that default. SVG titles and PV/UV labels remain explicit Map Preset content and are not translated with the interface.
 
-The top of the Admin dashboard reports application version and uptime, SQLite version/schema/size, available disk space, the GeoIP file, and the latest local backup. A task table retains the latest backup, maintenance cleanup, and GeoIP update outcomes. Low disk, a backup older than 48 hours, GeoIP data older than 35 days, stalled cleanup, or failed operations produce warnings. The page can trigger an immediate backup, cleanup, or GeoIP check.
+The top of the Admin dashboard reports application version and uptime, SQLite version/schema/size, available disk space, the number of GeoIP sources with files or credentials and the number selected, and the latest local backup. A task table retains the latest backup, maintenance cleanup, and GeoIP update outcomes. Low disk, a backup older than 48 hours, GeoIP data older than 35 days, stalled cleanup, or failed operations produce warnings. The page can trigger an immediate backup, cleanup, or GeoIP check.
 
-**Administrator Settings > Service configuration** groups the Public Base URL, GeoIP provider, update policy, official/custom source, optional checksum URL, and provider credentials into one form. Saved secrets are never rendered back to the browser: an empty credential field retains its value, while the explicit removal checkbox clears it. One Administrator-password confirmation saves every changed field atomically and requests one supervised restart. **GeoIP data** is a separate operational section for database status, the latest task summary, an immediate check, or a forced download even when the update policy is **Manual only**.
+**Administrator Settings > Service configuration** holds the Public Base URL, GeoIP preset, backend selection, and global update policy. Each selected backend's card in **GeoIP data** has an expandable editor for its credentials; local database cards also contain their own official/custom download source and optional checksum URL. Newly selected backends appear as pending cards before saving. Saved secrets are never rendered back to the browser: an empty credential field retains its value. All configuration edits are saved atomically with one Administrator-password confirmation and one supervised restart. While edits are pending, immediate maintenance actions are disabled so they cannot discard unsaved input. Each local dataset shows its own file, loaded state, and latest update, with separate check and force-download controls even when the update policy is **Manual only**. Each online service shows its credential state and latest connection test, with a separate test button.
 
 ### Pageview Records and Exports
 
@@ -213,7 +213,15 @@ Equivalent parameters normalize to one SVG cache entry. Public maps return an `E
 
 ## GeoIP
 
-VisitorTrace uses one active local MMDB provider at a time and maps all supported schemas to the same internal fields: country code/name, region code/name, city, latitude, and longitude. Select the provider with `geoip_provider`:
+The Basic GeoIP preset uses one provider. Recommended uses one primary per branch. Precise requires two primaries per branch and at least one backup for conflict voting. Supported online services and offline databases can be mixed in every preset. Each GeoIP status card shows the source type, credentials, and maintenance state. Online services receive visitor IPs needed for lookups.
+
+| Preset | Recommended order |
+| --- | --- |
+| Basic | IPinfo is recommended; choose IP2Location for local-only lookups. ip2region has no coordinates and cannot be the only primary. |
+| Recommended | IPinfo is suggested domestically and IP2Location abroad. IPinfo needs an API token; the official IP2Location download needs a Download Token. ip2region cannot be the only primary in either branch. |
+| Precise | Suggested: ip2region + Tencent domestically, IP2Location + IPinfo abroad, with Amap as backup. An ip2region city gains coordinates only when another source confirms that city and supplies coordinates. |
+
+Precise also accepts an ordered `geoip_backups` list of other supported backends not selected as primaries. Offline backup databases are stored under `data_dir` as `geoip-backup-<provider>.mmdb`, except ip2region, which uses `geoip-backup-ip2region.xdb`. With automatic updates enabled, each selected offline backup is checked at startup and every 24 hours using its configured source. The local providers map their schemas to the same internal fields: country code/name, region code/name, city, latitude, and longitude; ip2region itself has no coordinates. Select the Basic backend with `geoip_basic_backend`; `geoip_provider` remains the local file format selector for offline databases:
 
 | Provider | Database format | Default update behavior |
 | --- | --- | --- |
@@ -221,7 +229,7 @@ VisitorTrace uses one active local MMDB provider at a time and maps all supporte
 | `maxmind` | MaxMind GeoLite2 City (`.tar.gz`) | Automatic, Account ID and License Key required |
 | `ip2location` | IP2Location LITE DB11 MMDB (`.zip`) | Monthly, Download Token required |
 
-The default provider is `dbip`. All providers use the same automatic updater and atomic activation path. Initialize MaxMind with credentials from the MaxMind account portal:
+New installations start with credential-free `dbip`; the preset can be changed in Administrator Settings. Offline providers use automatic updates, validation, and atomic activation. Initialize MaxMind with credentials from the MaxMind account portal:
 
 ```sh
 visitortrace init \
@@ -252,7 +260,7 @@ IP2Location: https://www.ip2location.com/download?file=DB11LITEMMDB
 
 IP2Location publishes the exact download code in the account Download page. `DB11LITEMMDB` is the built-in LITE DB11 MMDB code; if the account page shows a different code, override `geoip_update_url` with the URL shown there. The updater follows the HTTPS redirects used by MaxMind and IP2Location.
 
-VisitorTrace checks at startup and every 24 hours. DB-IP and IP2Location use a calendar-month freshness policy; MaxMind is checked after 72 hours. It recognizes raw MMDB, gzip-compressed MMDB, tar.gz, and ZIP by file signature. VisitorTrace bounds downloaded and expanded sizes, verifies the complete MMDB search tree and data section, validates the configured provider's database shape, and only then atomically replaces and hot-loads the database. The prior version remains at `<geoip_path>.previous`; a failed activation rolls back automatically.
+VisitorTrace checks the configured local databases at startup and every 24 hours. DB-IP and IP2Location use a calendar-month freshness policy; MaxMind is checked after 72 hours. It recognizes raw MMDB, gzip-compressed MMDB, tar.gz, and ZIP by file signature. VisitorTrace bounds downloaded and expanded sizes, verifies the complete MMDB search tree and data section, validates the configured provider's database shape, and only then atomically replaces and hot-loads the database. The prior version remains at `<database_path>.previous`; a failed activation rolls back automatically.
 
 Check and update manually with:
 
@@ -261,12 +269,12 @@ Check and update manually with:
   --config "$HOME/.config/visitortrace/config.json"
 ```
 
-Use `--force` to download again despite the provider's freshness policy. A command-line update runs in a separate process, so restart a running systemd service afterward. The built-in automatic update hot-loads the new database directly.
+The command processes every selected offline dataset by default. Use `--dataset foreign`, `--dataset domestic_b`, `--dataset foreign_b`, or `--dataset backup_<provider>` to update one. `--force` ignores freshness and is required for command-line downloads in **Manual only** mode. A command-line update runs in a separate process, so restart a running service afterward. Built-in automatic updates hot-load the database directly.
 
 Inspect the raw MMDB record for one IP when diagnosing a city-level result:
 
 ```sh
-# Use the configured geoip_path.
+# Use the first selected local MMDB in the current preset.
 ./scripts/query-mmdb.sh --binary ./bin/visitortrace \
   --config "$HOME/.config/visitortrace/config.json" \
   1.2.3.4
@@ -277,7 +285,7 @@ Inspect the raw MMDB record for one IP when diagnosing a city-level result:
   1.2.3.4
 ```
 
-The command prints formatted JSON containing the database metadata, the matched CIDR, a `found` flag, and the unmodified MMDB `record` tree. It does not apply VisitorTrace's city-level label normalization. A missing address returns `found: false` and a `null` record. On a deployed system, the same operation can be run directly with the installed executable, for example `sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip query --config /etc/visitortrace/config.json 1.2.3.4`.
+Use `visitortrace geoip query --dataset foreign IP` to select a local MMDB. Online services and ip2region XDB files do not support raw MMDB queries. The command prints formatted JSON containing the database metadata, the matched CIDR, a `found` flag, and the unmodified MMDB `record` tree. It does not apply VisitorTrace's city-level label normalization. A missing address returns `found: false` and a `null` record. On a deployed system, the same operation can be run directly with the installed executable, for example `sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip query --config /etc/visitortrace/config.json 1.2.3.4`.
 
 The updater can consume an HTTPS mirror that exposes any supported container and an optional SHA-256 sidecar. Provider credentials are attached only to that provider's exact official hostname and are never sent to a custom mirror. Configure a private or domestic mirror explicitly:
 
@@ -289,13 +297,15 @@ The updater can consume an HTTPS mirror that exposes any supported container and
 }
 ```
 
-`geoip_checksum_url` is optional. When present, VisitorTrace verifies the downloaded container's SHA-256 before extraction. Remote sources must use HTTPS, except loopback test endpoints. Set `"geoip_update": "disabled"` to disable downloads. Existing `"monthly"` values are migrated to `"automatic"` when read.
+`geoip_checksum_url` is optional. When present, VisitorTrace verifies the downloaded container's SHA-256 before extraction. Remote sources must use HTTPS, except loopback test endpoints. Set `"geoip_update": "disabled"` to disable automatic downloads; manual maintenance remains available from the Admin cards, and the CLI requires `--force` for manual downloads. Existing `"monthly"` values are migrated to `"automatic"` when read.
+
+The primary local database uses `geoip_update_url` and `geoip_checksum_url`. Other selected local datasets can use independent sources through `geoip_dataset_sources`, keyed by `foreign`, `domestic_b`, `foreign_b`, or `backup_<provider>`; each entry stores its `provider`, optional custom `url`, and optional `checksum_url`. The Settings cards manage these fields automatically. Official provider credentials are required for automatic updates only when that dataset uses its official source.
 
 The account credentials are secrets. Keep the configuration at mode `0600`, restrict backup access because backups include the configuration, and do not put credentials in either update URL.
 
-Existing installations can switch providers without rerunning `init`: use **Administrator Settings > Service configuration**, enter new credentials when required, and save the combined configuration. The service restarts with the new provider. Credentials saved for other providers remain available for a later switch unless explicitly removed.
+Existing installations can switch providers without rerunning `init`: use **Administrator Settings > Service configuration**, enter new credentials when required, and save the combined configuration. The service restarts with the selected sources. Previously saved credentials remain in the protected configuration for later reuse.
 
-Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. The map hover details, Admin previews, and Public Analytics show the attribution for the active provider. DB-IP Chinese city-label normalization applies only to DB-IP records; MaxMind and IP2Location city names are mapped as supplied by those databases.
+Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. The map hover details, Admin previews, and Public Analytics show attribution for selected local data sources. DB-IP Chinese city-label normalization applies only to DB-IP records; MaxMind and IP2Location city names are mapped as supplied by those databases.
 
 ## Backup and Restore
 
@@ -388,7 +398,7 @@ When a release binary has already been downloaded manually, use the repository s
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.3.0-linux-amd64 \
+  --binary ./visitortrace-0.4.0-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 
@@ -417,7 +427,3 @@ VisitorTrace is distributed under the [GNU General Public License, version 3](..
 ## Admin Backup Restore
 
 **Administrator Settings > Backup restore** lists local `.vtbackup` archives and provides **Restore backup**. Select an archive, enter the current Administrator password, and confirm the destructive operation. VisitorTrace verifies both the sidecar and archive contents, creates a new safety snapshot under `backup_dir/pre-restore`, and schedules the replacement for the next supervised restart. The active configuration file is not overwritten. A successful restore revokes all Administrator sessions, so sign in again after the service becomes ready.
-
-## Current Status
-
-The current milestone implements the agreed first-version scope, including Pageview ingestion and aggregates, counting-rule history, automatic cleanup, automatic GeoIP updates, bounded SVG-map caching, bilingual interactive analytics, administrative data and health views, password and Site lifecycles, backup/restore, and signature-verified one-click self-update.

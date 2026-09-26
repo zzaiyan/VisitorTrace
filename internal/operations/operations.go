@@ -42,6 +42,8 @@ type Snapshot struct {
 	DiskTotal     uint64
 	DiskLow       bool
 	GeoIP         FileStatus
+	GeoIPReady    int
+	GeoIPSelected int
 	Backup        FileStatus
 	Tasks         []TaskStatus
 	Warnings      []string
@@ -61,11 +63,32 @@ func Collect(ctx context.Context, cfg config.Config, st *store.Store, startedAt,
 	if result.DiskLow {
 		result.Warnings = append(result.Warnings, "disk_low")
 	}
-	result.GeoIP = fileStatus(cfg.GeoIPPath)
-	result.GeoIP.Stale = result.GeoIP.Exists && now.Sub(result.GeoIP.ModifiedAt) > 35*24*time.Hour
-	if !result.GeoIP.Exists {
+	for _, dataset := range cfg.SelectedGeoIPDatasets() {
+		result.GeoIPSelected++
+		if dataset.Online {
+			if cfg.OnlineServices[dataset.Provider].Key != "" {
+				result.GeoIPReady++
+			}
+			continue
+		}
+		file := fileStatus(dataset.Path)
+		if !file.Exists {
+			continue
+		}
+		result.GeoIPReady++
+		result.GeoIP.Size += file.Size
+		if file.ModifiedAt.After(result.GeoIP.ModifiedAt) {
+			result.GeoIP.ModifiedAt = file.ModifiedAt
+		}
+		if now.Sub(file.ModifiedAt) > 35*24*time.Hour {
+			result.GeoIP.Stale = true
+		}
+	}
+	result.GeoIP.Exists = result.GeoIPReady > 0
+	if result.GeoIPReady < result.GeoIPSelected {
 		result.Warnings = append(result.Warnings, "geoip_missing")
-	} else if result.GeoIP.Stale {
+	}
+	if result.GeoIP.Stale {
 		result.Warnings = append(result.Warnings, "geoip_stale")
 	}
 	result.Backup = latestBackup(cfg.BackupDir)

@@ -14,7 +14,7 @@ A tiny self-hosted visitor map and Pageview tracker for personal homepages, blog
 - Site-isolated Pageview ingestion
 - Hostname-separated statistics for multi-domain Sites
 - SQLite Pageview Records and durable aggregates
-- Pluggable local GeoIP lookup and Admin-managed updates for DB-IP, MaxMind, IP2Location, and ip2region, plus an opt-in online lookup fallback (Tencent LBS, Amap, IPinfo, BigDataCloud)
+- Three GeoIP presets with configurable local databases (DB-IP, MaxMind, IP2Location, ip2region) and online services (Tencent LBS, Amap, IPinfo, BigDataCloud), individual source status cards, and per-source maintenance
 - SVG visitor maps with provider-specific attribution
 - Interactive visitor maps on Site management and date-linked Public/Admin Analytics
 - Simplified Chinese, Japanese, and English interfaces with a per-Site public default

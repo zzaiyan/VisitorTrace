@@ -15,7 +15,7 @@ Options:
   -h, --help     Show this help
 
 The remaining options are passed to `visitortrace geoip query`, including
---config PATH and --mmdb PATH.
+--config PATH, --dataset ID, and --mmdb PATH.
 EOF
 }
 

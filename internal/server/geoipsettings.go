@@ -47,30 +47,17 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 		s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_mode"))
 		return
 	}
-	profile, _ := geoip.UpdateProfileForProvider(provider)
-	updateURL := profile.URL
-	if r.FormValue("geoip_source") == "custom" {
-		updateURL = strings.TrimSpace(r.FormValue("geoip_update_url"))
-		if updateURL == "" {
-			s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_url_required"))
-			return
-		}
-	} else if r.FormValue("geoip_source") != "official" {
-		s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_source"))
-		return
-	}
-	checksumURL := strings.TrimSpace(r.FormValue("geoip_checksum_url"))
-	if len(updateURL) > 4096 || len(checksumURL) > 4096 {
-		s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_url_long"))
-		return
-	}
-
 	updated := s.Config
 	updated.BaseURL = baseURL
 	updated.GeoIPProvider = provider
+	defaultMMDB := filepath.Join(updated.DataDir, "geoip.mmdb")
+	defaultXDB := filepath.Join(updated.DataDir, "geoip.xdb")
+	if provider == string(geoip.ProviderIP2Region) && updated.GeoIPPath == defaultMMDB {
+		updated.GeoIPPath = defaultXDB
+	} else if provider != string(geoip.ProviderIP2Region) && updated.GeoIPPath == defaultXDB {
+		updated.GeoIPPath = defaultMMDB
+	}
 	updated.GeoIPUpdate = updateMode
-	updated.GeoIPUpdateURL = updateURL
-	updated.GeoIPChecksumURL = checksumURL
 	updated.MaxMindAccountID, updated.MaxMindLicenseKey, err = updatedMaxMindCredentials(r, updated)
 	if err != nil {
 		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
@@ -83,13 +70,20 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 	}
 	// GeoIP preset and per-branch backend selection.
 	updated.GeoIPPreset = r.FormValue("geoip_preset")
+	if basic := r.FormValue("geoip_basic_provider"); basic != "" {
+		updated.GeoIPBasicBackend = basic
+	}
 	updated.GeoIPDomesticOffline = r.FormValue("geoip_domestic_offline")
 	updated.GeoIPDomesticOnline = r.FormValue("geoip_domestic_online")
 	updated.GeoIPForeignOffline = r.FormValue("geoip_foreign_offline")
 	updated.GeoIPForeignOnline = r.FormValue("geoip_foreign_online")
-	updated.GeoIPBackupDBIP = r.FormValue("geoip_backup_dbip") == "1"
-	updated.GeoIPBackupBigDC = r.FormValue("geoip_backup_bigdatacloud") == "1"
-	updated.GeoIPBackupAmap = r.FormValue("geoip_backup_amap") == "1"
+	if updated.GeoIPPreset == "precise" {
+		if err := r.ParseForm(); err != nil {
+			s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_source"))
+			return
+		}
+		updated.GeoIPBackups = append([]string(nil), r.PostForm["geoip_backups"]...)
+	}
 	// Parse online service credentials from whichever inputs are visible.
 	updated.OnlineServices = make(map[string]config.OnlineServiceConfig)
 	for _, service := range []string{"ipinfo", "tencent", "amap", "bigdatacloud"} {
@@ -119,9 +113,56 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 			updated.OnlineServices[service] = entry
 		}
 	}
-	if updated.GeoIPPreset == "precise" && updated.GeoIPDomesticOnline == "" && updated.GeoIPForeignOnline == "" {
-		s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_online_key"))
-		return
+	updated.GeoIPDatasetSources = make(map[string]config.GeoIPDatasetSource, len(s.Config.GeoIPDatasetSources))
+	for id, source := range s.Config.GeoIPDatasetSources {
+		updated.GeoIPDatasetSources[id] = source
+	}
+	for _, dataset := range updated.SelectedGeoIPDatasets() {
+		if dataset.Online {
+			continue
+		}
+		mode := r.FormValue("geoip_source_" + dataset.ID)
+		if mode == "" && dataset.ID == "primary" {
+			mode = r.FormValue("geoip_source")
+		}
+		if mode == "" {
+			mode = "official"
+		}
+		profile, _ := geoip.UpdateProfileForProvider(dataset.Provider)
+		updateURL := profile.URL
+		if mode == "custom" {
+			updateURL = strings.TrimSpace(r.FormValue("geoip_update_url_" + dataset.ID))
+			if updateURL == "" && dataset.ID == "primary" {
+				updateURL = strings.TrimSpace(r.FormValue("geoip_update_url"))
+			}
+			if updateURL == "" {
+				s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_url_required"))
+				return
+			}
+		} else if mode != "official" {
+			s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_source"))
+			return
+		}
+		checksumURL := strings.TrimSpace(r.FormValue("geoip_checksum_url_" + dataset.ID))
+		if checksumURL == "" && dataset.ID == "primary" {
+			checksumURL = strings.TrimSpace(r.FormValue("geoip_checksum_url"))
+		}
+		if len(updateURL) > 4096 || len(checksumURL) > 4096 {
+			s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_url_long"))
+			return
+		}
+		if dataset.ID == "primary" {
+			updated.GeoIPUpdateURL = updateURL
+			updated.GeoIPChecksumURL = checksumURL
+		} else if mode == "custom" || checksumURL != "" {
+			source := config.GeoIPDatasetSource{Provider: dataset.Provider, ChecksumURL: checksumURL}
+			if mode == "custom" {
+				source.URL = updateURL
+			}
+			updated.GeoIPDatasetSources[dataset.ID] = source
+		} else {
+			delete(updated.GeoIPDatasetSources, dataset.ID)
+		}
 	}
 	if err := config.Save(s.ConfigPath, updated); err != nil {
 		message := fmt.Sprintf(translate(adminLanguage(r), "configuration_save_failed"), err, filepath.Dir(s.ConfigPath))

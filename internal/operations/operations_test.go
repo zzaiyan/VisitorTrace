@@ -55,3 +55,26 @@ func TestCollectReportsFilesAndTaskOutcomes(t *testing.T) {
 		}
 	}
 }
+
+func TestCollectTreatsSelectedOnlineGeoIPAsAvailable(t *testing.T) {
+	ctx := context.Background()
+	cfg := config.Default(t.TempDir())
+	cfg.GeoIPPreset = "basic"
+	cfg.GeoIPBasicBackend = "ipinfo"
+	cfg.OnlineServices = map[string]config.OnlineServiceConfig{"ipinfo": {Key: "token"}}
+	st, err := store.Initialize(ctx, cfg.DatabasePath, "test-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	now := time.Now().UTC()
+	snapshot := Collect(ctx, cfg, st, now, now)
+	if snapshot.GeoIPReady != 1 || snapshot.GeoIPSelected != 1 || !snapshot.GeoIP.Exists {
+		t.Fatalf("online GeoIP status = %#v", snapshot)
+	}
+	for _, warning := range snapshot.Warnings {
+		if warning == "geoip_missing" || warning == "geoip_stale" {
+			t.Fatalf("online provider produced %q warning", warning)
+		}
+	}
+}

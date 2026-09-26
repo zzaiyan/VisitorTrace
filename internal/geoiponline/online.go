@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/netip"
 	"net/url"
@@ -227,10 +228,11 @@ func (c *Client) fetchTencent(ctx context.Context, address netip.Addr) (geoip.Lo
 }
 
 type amapResponse struct {
-	Status   string          `json:"status"`
-	Info     string          `json:"info"`
-	Province json.RawMessage `json:"province"`
-	City     json.RawMessage `json:"city"`
+	Status    string          `json:"status"`
+	Info      string          `json:"info"`
+	Province  json.RawMessage `json:"province"`
+	City      json.RawMessage `json:"city"`
+	Rectangle json.RawMessage `json:"rectangle"`
 }
 
 func (c *Client) fetchAMap(ctx context.Context, address netip.Addr) (geoip.Location, error) {
@@ -250,15 +252,50 @@ func (c *Client) fetchAMap(ctx context.Context, address netip.Addr) (geoip.Locat
 		// addresses; report a miss instead of claiming China.
 		return geoip.Location{}, nil
 	}
+	hasCity := city != ""
 	if city == "" || city == province {
 		city = province
 	}
-	return geoip.Location{
+	location := geoip.Location{
 		CountryCode: "CN",
 		CountryName: "中国",
 		RegionName:  province,
 		City:        strings.TrimSuffix(city, "市"),
-	}, nil
+	}
+	if hasCity {
+		if latitude, longitude, ok := amapRectangleCenter(decodeAMapString(payload.Rectangle)); ok {
+			location.Latitude = &latitude
+			location.Longitude = &longitude
+		}
+	}
+	return location, nil
+}
+
+// amapRectangleCenter returns the midpoint of Amap's southwest;northeast
+// city bounds. This is a representative city point, not the visitor's location.
+func amapRectangleCenter(rectangle string) (latitude, longitude float64, ok bool) {
+	parts := strings.Split(rectangle, ";")
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	parseCorner := func(value string) (longitude, latitude float64, valid bool) {
+		coordinates := strings.Split(value, ",")
+		if len(coordinates) != 2 {
+			return 0, 0, false
+		}
+		longitude, lonErr := strconv.ParseFloat(strings.TrimSpace(coordinates[0]), 64)
+		latitude, latErr := strconv.ParseFloat(strings.TrimSpace(coordinates[1]), 64)
+		if lonErr != nil || latErr != nil || math.IsNaN(longitude) || math.IsNaN(latitude) || math.IsInf(longitude, 0) || math.IsInf(latitude, 0) || longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90 {
+			return 0, 0, false
+		}
+		return longitude, latitude, true
+	}
+	west, south, validSW := parseCorner(parts[0])
+	east, north, validNE := parseCorner(parts[1])
+	if !validSW || !validNE || west > east || south > north || (west == 0 && east == 0 && south == 0 && north == 0) {
+		return 0, 0, false
+	}
+	return (south + north) / 2, (west + east) / 2, true
 }
 
 // decodeAMapString handles the API returning either a name or an empty
@@ -408,4 +445,3 @@ func parseLatLon(value string) (float64, float64, bool) {
 	}
 	return latitude, longitude, true
 }
-

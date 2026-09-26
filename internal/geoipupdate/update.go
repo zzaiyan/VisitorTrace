@@ -40,15 +40,16 @@ type Result struct {
 }
 
 type Runner struct {
-	Config   config.Config
-	Profile  geoip.UpdateProfile
-	Store    *store.Store
-	Logger   *slog.Logger
-	Client   *http.Client
-	Now      func() time.Time
-	Validate func(string) error
-	Probe    func(string) error
-	Activate func(string) error
+	Config        config.Config
+	Profile       geoip.UpdateProfile
+	OperationName string
+	Store         *store.Store
+	Logger        *slog.Logger
+	Client        *http.Client
+	Now           func() time.Time
+	Validate      func(string) error
+	Probe         func(string) error
+	Activate      func(string) error
 }
 
 func New(cfg config.Config, st *store.Store, logger *slog.Logger) *Runner {
@@ -63,7 +64,7 @@ func New(cfg config.Config, st *store.Store, logger *slog.Logger) *Runner {
 		},
 	}
 	return &Runner{
-		Config: cfg, Profile: profile, Store: st, Logger: logger, Client: client, Now: time.Now,
+		Config: cfg, Profile: profile, OperationName: "geoip_update", Store: st, Logger: logger, Client: client, Now: time.Now,
 		Validate: func(path string) error {
 			return geoip.ValidateWithProvider(cfg.GeoIPProvider, path)
 		},
@@ -78,18 +79,28 @@ func New(cfg config.Config, st *store.Store, logger *slog.Logger) *Runner {
 }
 
 func (r *Runner) Start(ctx context.Context) <-chan struct{} {
+	return StartAll(ctx, r)
+}
+
+// StartAll checks every configured database in order so optional backends
+// cannot collide with the primary database's update transaction.
+func StartAll(ctx context.Context, runners ...*Runner) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		r.runLogged(ctx, false)
 		ticker := time.NewTicker(checkInterval)
 		defer ticker.Stop()
 		for {
+			for _, runner := range runners {
+				if ctx.Err() != nil {
+					return
+				}
+				runner.runLogged(ctx, false)
+			}
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				r.runLogged(ctx, false)
 			}
 		}
 	}()
@@ -108,7 +119,11 @@ func (r *Runner) RunOnce(ctx context.Context, force bool) (Result, error) {
 	if !force && r.currentDatabaseIsFresh(now) {
 		return Result{}, nil
 	}
-	if err := r.Store.StartOperation(ctx, "geoip_update", now); err != nil {
+	operation := r.OperationName
+	if operation == "" {
+		operation = "geoip_update"
+	}
+	if err := r.Store.StartOperation(ctx, operation, now); err != nil {
 		return Result{}, err
 	}
 	result, runErr := r.downloadAndInstall(ctx, now)
@@ -119,7 +134,7 @@ func (r *Runner) RunOnce(ctx context.Context, force bool) (Result, error) {
 	if runErr != nil {
 		summary = "error=" + runErr.Error()
 	}
-	if err := r.Store.FinishOperation(ctx, "geoip_update", r.Now().UTC(), runErr == nil, summary); err != nil && runErr == nil {
+	if err := r.Store.FinishOperation(ctx, operation, r.Now().UTC(), runErr == nil, summary); err != nil && runErr == nil {
 		runErr = err
 	}
 	return result, runErr
@@ -517,11 +532,11 @@ func (r *Runner) runLogged(ctx context.Context, force bool) {
 	result, err := r.RunOnce(ctx, force)
 	if err != nil {
 		if ctx.Err() == nil {
-			r.Logger.Error("GeoIP update failed", "error", err)
+			r.Logger.Error("GeoIP update failed", "provider", r.Config.GeoIPProvider, "error", err)
 		}
 		return
 	}
 	if result.Updated {
-		r.Logger.Info("GeoIP database updated", "source", result.Source, "sha256", result.SHA256, "bytes", result.CompressedSize)
+		r.Logger.Info("GeoIP database updated", "provider", r.Config.GeoIPProvider, "source", result.Source, "sha256", result.SHA256, "bytes", result.CompressedSize)
 	}
 }

@@ -205,46 +205,52 @@ func runServe(args []string) int {
 		return 1
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	// Open the domestic (primary) database.
-	domesticProvider := cfg.GeoIPProvider
-	if cfg.GeoIPPreset == "recommended" || cfg.GeoIPPreset == "precise" {
-		domesticProvider = string(geoip.ProviderIP2Region)
-	}
-	geoResolver, geoErr := geoip.OpenWithProvider(domesticProvider, cfg.GeoIPPath)
-	if geoErr != nil {
-		logger.Warn("GeoIP database is unavailable", "path", cfg.GeoIPPath, "error", geoErr)
-	}
 	app := server.New(cfg, st, logger)
 	app.ConfigPath = *configPath
-	app.SetGeoIP(geoResolver)
 	defer app.CloseGeoIP()
-	// Open the foreign database for the recommended and precise presets.
-	if cfg.GeoIPPreset == "recommended" || cfg.GeoIPPreset == "precise" {
-		foreignPath := cfg.GeoIPForeignPath
-		if foreignPath == "" {
-			foreignPath = filepath.Join(cfg.DataDir, "geoip-foreign.mmdb")
-		}
-		if foreignResolver, err := geoip.OpenWithProvider(string(geoip.ProviderIP2Location), foreignPath); err == nil {
-			app.SetGeoIPForeign(foreignResolver)
-			defer foreignResolver.Close()
-		} else {
-			logger.Warn("foreign GeoIP database is unavailable", "path", foreignPath, "error", err)
+	selectedDatasets := cfg.SelectedGeoIPDatasets()
+	attachResolver := func(dataset config.GeoIPDataset, resolver *geoip.Resolver) {
+		switch dataset.ID {
+		case "primary":
+			app.SetGeoIP(resolver)
+		case "foreign":
+			app.SetGeoIPForeign(resolver)
+		default:
+			app.SetGeoIPBackup(dataset.Provider, resolver)
 		}
 	}
 	httpServer := app.HTTPServer()
 	stopCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	maintenanceDone := maintenance.New(st, logger).Start(stopCtx)
-	geoUpdater := geoipupdate.New(cfg, st, logger)
-	geoUpdater.Activate = func(path string) error {
-		resolver, err := geoip.OpenWithProvider(domesticProvider, path)
-		if err != nil {
-			return err
+	var geoRunners []*geoipupdate.Runner
+	for _, dataset := range selectedDatasets {
+		if dataset.Online {
+			continue
 		}
-		app.SetGeoIP(resolver)
-		return nil
+		if resolver, err := geoip.OpenWithProvider(dataset.Provider, dataset.Path); err == nil {
+			attachResolver(dataset, resolver)
+		} else {
+			logger.Warn("GeoIP database is unavailable", "provider", dataset.Provider, "path", dataset.Path, "error", err)
+		}
+		updateConfig := cfg
+		updateConfig.GeoIPProvider = dataset.Provider
+		updateConfig.GeoIPPath = dataset.Path
+		updateConfig.GeoIPUpdateURL = dataset.UpdateURL
+		updateConfig.GeoIPChecksumURL = dataset.ChecksumURL
+		updater := geoipupdate.New(updateConfig, st, logger)
+		updater.OperationName = dataset.Operation
+		updater.Activate = func(path string) error {
+			resolver, err := geoip.OpenWithProvider(dataset.Provider, path)
+			if err != nil {
+				return err
+			}
+			attachResolver(dataset, resolver)
+			return nil
+		}
+		geoRunners = append(geoRunners, updater)
 	}
-	geoIPDone := geoUpdater.Start(stopCtx)
+	geoIPDone := geoipupdate.StartAll(stopCtx, geoRunners...)
 	updateReadyDone := watchPendingUpdate(stopCtx, cfg, st, app, logger)
 	serverErrors := make(chan error, 1)
 	go func() {
@@ -372,11 +378,30 @@ func runDoctor(args []string) int {
 	} else {
 		fmt.Println("backup: warning (no local snapshot)")
 	}
-	if err := geoip.ValidateWithProvider(cfg.GeoIPProvider, cfg.GeoIPPath); err != nil {
-		fmt.Printf("geoip: failed (%v)\n", err)
+	available := 0
+	selected := cfg.SelectedGeoIPDatasets()
+	for _, dataset := range selected {
+		if dataset.Online {
+			if cfg.OnlineServices[dataset.Provider].Key != "" {
+				fmt.Printf("geoip %s: configured online service (test in Administrator Settings)\n", dataset.Provider)
+				available++
+			} else {
+				fmt.Printf("geoip %s: unavailable (missing credential)\n", dataset.Provider)
+			}
+			continue
+		}
+		if err := geoip.ValidateWithProvider(dataset.Provider, dataset.Path); err != nil {
+			fmt.Printf("geoip %s: unavailable (%v)\n", dataset.Provider, err)
+			continue
+		}
+		fmt.Printf("geoip %s: ok (%s)\n", dataset.Provider, dataset.Path)
+		available++
+	}
+	if available == 0 {
+		fmt.Println("geoip: failed (no selected dataset is available)")
 		return 1
 	}
-	fmt.Printf("geoip: ok (%s)\n", cfg.GeoIPPath)
+	fmt.Printf("geoip: %d/%d selected datasets available\n", available, len(selected))
 	return 0
 }
 

@@ -63,16 +63,16 @@ func DefaultChainWeights(name string) (domestic, foreign float64) {
 	}
 }
 
-// Chain resolves an address through a dual-library consensus route: the
-// domestic and foreign offline primaries are queried together, their
-// country codes decide the branch, and the branch's online counterpart
-// cross-validates the city. Disagreements fall through to a weighted vote
-// across every configured backend. Numeric ISO codes and the HK/TW/MO codes
-// are post-processed at the chain output.
+// Chain routes addresses through domestic and foreign primaries. With a
+// second primary in each branch it cross-checks cities and votes on conflicts.
+// Numeric ISO codes and HK/TW/MO are normalized at the output.
 type Chain struct {
 	backends             []*ChainBackend
 	domesticID           string
 	foreignID            string
+	domesticCrossID      string
+	foreignCrossID       string
+	crossConfigured      bool
 	greaterChinaDomestic bool
 }
 
@@ -85,13 +85,21 @@ func NewChain(backends []*ChainBackend, domestic, foreign string, greaterChinaDo
 	return &Chain{backends: backends, domesticID: domestic, foreignID: foreign, greaterChinaDomestic: greaterChinaDomestic}
 }
 
+// SetCross selects the second backend used to check each branch's primary.
+// An empty name means that branch has no cross-checking backend.
+func (c *Chain) SetCross(domestic, foreign string) {
+	c.domesticCrossID, c.foreignCrossID = domestic, foreign
+	c.crossConfigured = true
+}
+
 // SetDomestic attaches or replaces the domestic-branch offline resolver.
 func (c *Chain) SetDomestic(resolver *Resolver) {
 	if backend := c.backend(c.domesticID); backend != nil {
 		backend.Offline = resolver
 		return
 	}
-	c.backends = append(c.backends, &ChainBackend{Name: c.domesticID, Offline: resolver, DomesticWeight: 1.1, ForeignWeight: 0.3})
+	domestic, foreign := DefaultChainWeights(c.domesticID)
+	c.backends = append(c.backends, &ChainBackend{Name: c.domesticID, Offline: resolver, DomesticWeight: domestic, ForeignWeight: foreign})
 }
 
 // SetForeign attaches or replaces the foreign-branch offline resolver.
@@ -100,7 +108,18 @@ func (c *Chain) SetForeign(resolver *Resolver) {
 		backend.Offline = resolver
 		return
 	}
-	c.backends = append(c.backends, &ChainBackend{Name: c.foreignID, Offline: resolver})
+	domestic, foreign := DefaultChainWeights(c.foreignID)
+	c.backends = append(c.backends, &ChainBackend{Name: c.foreignID, Offline: resolver, DomesticWeight: domestic, ForeignWeight: foreign})
+}
+
+// SetBackup attaches an offline resolver that participates in conflict votes.
+func (c *Chain) SetBackup(name string, resolver *Resolver) {
+	if backend := c.backend(name); backend != nil {
+		backend.Offline = resolver
+		return
+	}
+	domestic, foreign := DefaultChainWeights(name)
+	c.backends = append(c.backends, &ChainBackend{Name: name, Offline: resolver, DomesticWeight: domestic, ForeignWeight: foreign})
 }
 
 func (c *Chain) backend(name string) *ChainBackend {
@@ -112,7 +131,20 @@ func (c *Chain) backend(name string) *ChainBackend {
 	return nil
 }
 
-// routeDomestic decides the branch from the two offline primaries: when
+// Available reports whether any selected backend can currently answer a lookup.
+func (c *Chain) Available() bool {
+	if c == nil {
+		return false
+	}
+	for _, backend := range c.backends {
+		if backend.Offline != nil || backend.Online != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// routeDomestic decides the branch from the two primaries: when
 // both indicate China (or the foreign library has no data), the address
 // goes to the domestic branch. When the domestic library labels an address
 // CN but the foreign library labels it HK/TW/MO, the greaterChinaDomestic
@@ -138,10 +170,36 @@ func (c *Chain) routeDomestic(domestic, foreign Location) bool {
 	}
 }
 
-// Lookup resolves one address through the full chain: query both offline
-// primaries, decide the branch from their consensus, cross-validate with
-// the branch's online counterpart, and vote on disagreements.
+// Lookup resolves one address through the selected branch and, where
+// configured, cross-checks it against a second primary.
 func (c *Chain) Lookup(ctx context.Context, address netip.Addr) Location {
+	// With one primary per branch, the foreign offline source first determines
+	// whether an online domestic lookup is needed. This saves online quota for
+	// addresses already identified as foreign.
+	if c.crossConfigured && c.domesticCrossID == "" && c.foreignCrossID == "" {
+		foreignResult := Location{}
+		if backend := c.backend(c.foreignID); backend != nil {
+			foreignResult = backend.lookup(ctx, address)
+		}
+		foreignCC := NormalizeCountryCode(foreignResult.CountryCode)
+		if foreignCC != "" && foreignCC != "CN" && foreignCC != "HK" && foreignCC != "TW" && foreignCC != "MO" {
+			return PostprocessLocation(foreignResult)
+		}
+		domesticResult := Location{}
+		if backend := c.backend(c.domesticID); backend != nil {
+			domesticResult = backend.lookup(ctx, address)
+		}
+		if c.routeDomestic(domesticResult, foreignResult) {
+			if domesticResult.CountryCode != "" || domesticResult.City != "" {
+				return PostprocessLocation(domesticResult)
+			}
+			return PostprocessLocation(foreignResult)
+		}
+		if foreignResult.CountryCode != "" || foreignResult.City != "" {
+			return PostprocessLocation(foreignResult)
+		}
+		return PostprocessLocation(domesticResult)
+	}
 	// Always query both offline primaries; their results drive routing and
 	// are reused as the branch primary answer.
 	domesticResult := Location{}
@@ -161,26 +219,42 @@ func (c *Chain) Lookup(ctx context.Context, address netip.Addr) Location {
 
 	// Cross-validate against the branch's online counterpart.
 	cross := Location{}
-	for _, backend := range c.backends {
-		if backend.Online == nil || backend.Name == c.branchName(domestic) {
-			continue
+	if c.crossConfigured {
+		name := c.foreignCrossID
+		if domestic {
+			name = c.domesticCrossID
 		}
-		if domestic && backend.DomesticWeight <= 0 {
-			continue
+		if name != "" && name != c.branchName(domestic) {
+			if backend := c.backend(name); backend != nil {
+				cross = backend.lookup(ctx, address)
+			}
 		}
-		if !domestic && backend.ForeignWeight <= 0 {
-			continue
-		}
-		candidate := backend.lookup(ctx, address)
-		if candidate.City != "" || candidate.CountryCode != "" {
-			if cross.City == "" && cross.CountryCode == "" {
-				cross = candidate
+	} else {
+		for _, backend := range c.backends {
+			if backend.Online == nil || backend.Name == c.branchName(domestic) {
+				continue
+			}
+			if domestic && backend.DomesticWeight <= 0 {
+				continue
+			}
+			if !domestic && backend.ForeignWeight <= 0 {
+				continue
+			}
+			candidate := backend.lookup(ctx, address)
+			if candidate.City != "" || candidate.CountryCode != "" {
+				if cross.City == "" && cross.CountryCode == "" {
+					cross = candidate
+				}
 			}
 		}
 	}
 	city := NormalizeCityEN(primary.City)
 	crossCity := NormalizeCityEN(cross.City)
 	if city != "" && city == crossCity {
+		if primary.Latitude == nil && cross.Latitude != nil && (primary.CountryCode == "" || cross.CountryCode == "" || NormalizeCountryCode(primary.CountryCode) == NormalizeCountryCode(cross.CountryCode)) {
+			primary.Latitude = cross.Latitude
+			primary.Longitude = cross.Longitude
+		}
 		return PostprocessLocation(primary)
 	}
 	if city == "" && crossCity == "" {
@@ -202,9 +276,10 @@ func (c *Chain) vote(ctx context.Context, address netip.Addr, domestic bool, fal
 		weight  float64
 		sample  Location
 		primary bool
+		order   int
 	}
 	tally := map[string]*vote{}
-	for _, backend := range c.backends {
+	for order, backend := range c.backends {
 		weight := backend.DomesticWeight
 		if !domestic {
 			weight = backend.ForeignWeight
@@ -222,7 +297,7 @@ func (c *Chain) vote(ctx context.Context, address netip.Addr, domestic bool, fal
 		}
 		existing, ok := tally[key]
 		if !ok {
-			existing = &vote{sample: location}
+			existing = &vote{sample: location, order: order}
 			tally[key] = existing
 		} else {
 			// Prefer a sample that carries both a valid country code and
@@ -253,7 +328,7 @@ func (c *Chain) vote(ctx context.Context, address netip.Addr, domestic bool, fal
 		if entry.primary {
 			primaryWeight = entry.weight
 		}
-		if entry.weight > bestWeight {
+		if entry.weight > bestWeight+0.01 || (best != nil && entry.weight >= bestWeight-0.01 && ((entry.primary && !best.primary) || (entry.primary == best.primary && entry.order < best.order))) {
 			bestWeight, best = entry.weight, entry
 		}
 	}

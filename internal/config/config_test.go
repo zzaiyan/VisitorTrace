@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -86,11 +87,263 @@ func TestLoadDefaultsBackupDirectoryForExistingConfig(t *testing.T) {
 	if got.BackupDir != filepath.Join(dataDir, "backups") {
 		t.Fatalf("BackupDir = %q", got.BackupDir)
 	}
+	if got.GeoIPPreset != "basic" {
+		t.Fatalf("legacy GeoIP preset = %q, want basic", got.GeoIPPreset)
+	}
 	if got.GeoIPUpdate != "automatic" || !strings.Contains(got.GeoIPUpdateURL, "{YYYY-MM}") {
 		t.Fatalf("GeoIP update defaults = %q, %q", got.GeoIPUpdate, got.GeoIPUpdateURL)
 	}
 	if !strings.Contains(got.UpdateManifestURL, "VisitorTrace/releases/latest") {
 		t.Fatalf("UpdateManifestURL = %q", got.UpdateManifestURL)
+	}
+}
+
+func TestPrecisePresetRequiresCredentialsForSelectedOnlineBackend(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "precise"
+	cfg.IP2LocationToken = "download-token"
+	cfg.GeoIPDomesticOnline = "ipinfo"
+	cfg.GeoIPForeignOnline = "ipinfo"
+	cfg.GeoIPBackups = []string{"dbip"}
+	cfg.OnlineServices = map[string]OnlineServiceConfig{"amap": {Key: "amap-key"}}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate() accepted an unconfigured selected online backend")
+	}
+	cfg.OnlineServices["ipinfo"] = OnlineServiceConfig{Key: "ipinfo-key"}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() rejected configured online backend: %v", err)
+	}
+}
+
+func TestPreciseBackupListRoundTripAndValidation(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "precise"
+	cfg.GeoIPDomesticOffline = "dbip"
+	cfg.GeoIPUpdate = "disabled"
+	cfg.GeoIPDomesticOnline = "tencent"
+	cfg.GeoIPForeignOnline = "ipinfo"
+	cfg.OnlineServices = map[string]OnlineServiceConfig{"tencent": {Key: "key", SK: "secret"}, "ipinfo": {Key: "key"}, "amap": {Key: "key", SK: "secret"}, "bigdatacloud": {Key: "key"}}
+	cfg.GeoIPBackups = []string{"ip2region", "amap", "maxmind", "bigdatacloud"}
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := Save(path, cfg); err != nil {
+		t.Fatalf("Save(): %v", err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load(): %v", err)
+	}
+	if !reflect.DeepEqual(loaded.GeoIPBackups, cfg.GeoIPBackups) {
+		t.Fatalf("backup order = %v", loaded.GeoIPBackups)
+	}
+	for _, backups := range [][]string{{"dbip"}, {"ip2location"}, {"tencent"}, {"amap", "amap"}, {"unknown"}} {
+		cfg.GeoIPBackups = backups
+		if err := cfg.Validate(); err == nil {
+			t.Errorf("Validate() accepted backups %v", backups)
+		}
+	}
+	cfg.GeoIPBackups = []string{"maxmind"}
+	cfg.GeoIPUpdate = "automatic"
+	cfg.IP2LocationToken = "download-token"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate() accepted MaxMind backup without credentials")
+	}
+	cfg.MaxMindAccountID, cfg.MaxMindLicenseKey = "account", "license"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() rejected credentialed backup: %v", err)
+	}
+}
+
+func TestBasicPresetRejectsIP2RegionAsOnlyDatabase(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "basic"
+	cfg.GeoIPProvider = "ip2region"
+	cfg.GeoIPUpdate = "disabled"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate() accepted ip2region as the only database")
+	}
+}
+
+func TestRecommendedForeignDatabaseRequiresUpdateCredentials(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "recommended"
+	cfg.OnlineServices = map[string]OnlineServiceConfig{"ipinfo": {Key: "token"}}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate() accepted the default IP2Location foreign database without a token")
+	}
+	cfg.IP2LocationToken = "download-token"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() rejected credentialed foreign database: %v", err)
+	}
+}
+
+func TestDatasetSourcesRequireSafeURLsAndKnownIDs(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPDatasetSources = map[string]GeoIPDatasetSource{"foreign": {Provider: "ip2location", URL: "https://mirror.example.com/city.mmdb"}}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("valid source rejected: %v", err)
+	}
+	cfg.GeoIPDatasetSources["foreign"] = GeoIPDatasetSource{Provider: "ip2location", URL: "http://mirror.example.com/city.mmdb"}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("insecure dataset source accepted")
+	}
+	cfg.GeoIPDatasetSources = map[string]GeoIPDatasetSource{"backup_wrong": {Provider: "dbip", URL: "https://mirror.example.com/city.mmdb"}}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("unknown dataset source ID accepted")
+	}
+}
+
+func TestDatasetCustomMirrorDoesNotRequireOfficialCredentials(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "precise"
+	cfg.GeoIPDomesticOnline = "ipinfo"
+	cfg.GeoIPForeignOnline = "ipinfo"
+	cfg.OnlineServices = map[string]OnlineServiceConfig{"ipinfo": {Key: "token"}}
+	cfg.GeoIPBackups = []string{"maxmind"}
+	cfg.GeoIPDatasetSources = map[string]GeoIPDatasetSource{
+		"foreign":        {Provider: "ip2location", URL: "https://mirror.example.com/foreign.mmdb"},
+		"backup_maxmind": {Provider: "maxmind", URL: "https://mirror.example.com/maxmind.mmdb"},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("custom mirrors rejected without official credentials: %v", err)
+	}
+	delete(cfg.GeoIPDatasetSources, "foreign")
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("official foreign source accepted without token")
+	}
+}
+
+func TestPrecisePresetRequiresFourPrimariesAndBackup(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "precise"
+	cfg.GeoIPUpdate = "disabled"
+	cfg.GeoIPDomesticOnline = "tencent"
+	cfg.GeoIPForeignOnline = "ipinfo"
+	cfg.GeoIPBackups = []string{"dbip"}
+	cfg.OnlineServices = map[string]OnlineServiceConfig{"tencent": {Key: "key"}, "ipinfo": {Key: "token"}}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("complete precise preset rejected: %v", err)
+	}
+	missingDomestic := cfg
+	missingDomestic.GeoIPDomesticOnline = ""
+	if err := missingDomestic.Validate(); err == nil {
+		t.Fatal("missing domestic primary B accepted")
+	}
+	missingForeign := cfg
+	missingForeign.GeoIPForeignOnline = ""
+	if err := missingForeign.Validate(); err == nil {
+		t.Fatal("missing foreign primary B accepted")
+	}
+	missingBackup := cfg
+	missingBackup.GeoIPBackups = nil
+	if err := missingBackup.Validate(); err == nil {
+		t.Fatal("precise preset without a backup accepted")
+	}
+	duplicateDomestic := cfg
+	duplicateDomestic.GeoIPDomesticOffline = "tencent"
+	if err := duplicateDomestic.Validate(); err == nil {
+		t.Fatal("duplicate domestic primaries accepted")
+	}
+}
+
+func TestRecommendedPresetRejectsIP2RegionAsSoleDomesticPrimary(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "recommended"
+	cfg.GeoIPUpdate = "disabled"
+	cfg.GeoIPDomesticOffline = "ip2region"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("recommended preset accepted ip2region without a domestic coordinate source")
+	}
+}
+
+func TestRecommendedPresetDefaultsToCoordinateBearingPair(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "recommended"
+	cfg.GeoIPUpdate = "disabled"
+	cfg.OnlineServices = map[string]OnlineServiceConfig{"ipinfo": {Key: "token"}}
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := Save(path, cfg); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.GeoIPDomesticOffline != "ipinfo" || loaded.GeoIPForeignOffline != "ip2location" || loaded.GeoIPProvider != "dbip" || loaded.GeoIPPath != filepath.Join(cfg.DataDir, "geoip.mmdb") {
+		t.Fatalf("recommended defaults = %#v", loaded)
+	}
+	datasets := loaded.SelectedGeoIPDatasets()
+	if len(datasets) != 2 || datasets[0].ID != "online_ipinfo" || datasets[1].Provider != "ip2location" {
+		t.Fatalf("recommended datasets = %#v", datasets)
+	}
+}
+
+func TestBasicPresetSupportsOnlineProvider(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "basic"
+	cfg.GeoIPBasicBackend = "ipinfo"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("basic online provider accepted without a key")
+	}
+	cfg.OnlineServices = map[string]OnlineServiceConfig{"ipinfo": {Key: "token"}}
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := Save(path, cfg); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	datasets := loaded.SelectedGeoIPDatasets()
+	if loaded.GeoIPBasicBackend != "ipinfo" || len(datasets) != 1 || datasets[0].ID != "online_ipinfo" || !datasets[0].Online {
+		t.Fatalf("basic online selection = %#v; datasets = %#v", loaded, datasets)
+	}
+}
+
+func TestRecommendedPresetSupportsOnlineForeignPrimary(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "recommended"
+	cfg.GeoIPUpdate = "disabled"
+	cfg.GeoIPDomesticOffline = "dbip"
+	cfg.GeoIPForeignOffline = "ipinfo"
+	cfg.OnlineServices = map[string]OnlineServiceConfig{"ipinfo": {Key: "token"}}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("online foreign primary rejected: %v", err)
+	}
+	datasets := cfg.SelectedGeoIPDatasets()
+	if len(datasets) != 2 || datasets[0].Provider != "dbip" || datasets[1].ID != "online_ipinfo" {
+		t.Fatalf("recommended datasets = %#v", datasets)
+	}
+}
+
+func TestPrecisePresetSupportsOfflineSecondaries(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "precise"
+	cfg.GeoIPUpdate = "disabled"
+	cfg.GeoIPDomesticOffline = "ip2region"
+	cfg.GeoIPDomesticOnline = "dbip"
+	cfg.GeoIPForeignOffline = "ip2location"
+	cfg.GeoIPForeignOnline = "maxmind"
+	cfg.GeoIPBackups = []string{"amap"}
+	cfg.OnlineServices = map[string]OnlineServiceConfig{"amap": {Key: "key"}}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("offline secondaries rejected: %v", err)
+	}
+	datasets := cfg.SelectedGeoIPDatasets()
+	if len(datasets) != 5 || datasets[1].ID != "domestic_b" || datasets[1].Online || datasets[1].Path != filepath.Join(cfg.DataDir, "geoip-domestic-b.mmdb") || datasets[3].ID != "foreign_b" || datasets[3].Online {
+		t.Fatalf("precise datasets = %#v", datasets)
+	}
+}
+
+func TestPrecisePresetRequiresSelectedOnlineBackupKey(t *testing.T) {
+	cfg := Default(t.TempDir())
+	cfg.GeoIPPreset = "precise"
+	cfg.GeoIPUpdate = "disabled"
+	cfg.GeoIPDomesticOnline = "tencent"
+	cfg.GeoIPForeignOnline = "ipinfo"
+	cfg.GeoIPBackups = []string{"amap"}
+	cfg.OnlineServices = map[string]OnlineServiceConfig{"tencent": {Key: "key"}, "ipinfo": {Key: "token"}}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("precise preset accepted an unconfigured online backup")
 	}
 }
 

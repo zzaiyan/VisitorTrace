@@ -31,9 +31,7 @@ func (s *Server) adminRefreshSiteRecordGeoIP(w http.ResponseWriter, r *http.Requ
 	}
 	defer s.recordGeoIPMu.Unlock()
 
-	s.geoMu.RLock()
-	defer s.geoMu.RUnlock()
-	if s.geoIP == nil {
+	if !s.geoIPAvailable() {
 		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", translate(adminLanguage(r), "err_geoip_unavailable"))
 		return
 	}
@@ -64,7 +62,11 @@ func (s *Server) adminRefreshSiteRecordGeoIP(w http.ResponseWriter, r *http.Requ
 func (s *Server) geoIPAvailable() bool {
 	s.geoMu.RLock()
 	defer s.geoMu.RUnlock()
-	return s.geoIP != nil
+	return s.geoIPAvailableLocked()
+}
+
+func (s *Server) geoIPAvailableLocked() bool {
+	return s.geoIP != nil || s.geoSingleOnline != nil || s.geoChain.Available()
 }
 
 func recordGeoIPFlash(r *http.Request, lang string) string {

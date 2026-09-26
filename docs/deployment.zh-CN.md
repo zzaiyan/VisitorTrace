@@ -18,7 +18,7 @@
 设置版本和架构，然后下载对应二进制及校验文件：
 
 ```sh
-VERSION=0.3.0
+VERSION=0.4.0
 ARCH=amd64
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/visitortrace-${VERSION}-linux-${ARCH}"
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/checksums.txt"
@@ -47,7 +47,7 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
 
 默认配置监听 `127.0.0.1:8790`，把 SQLite 和 GeoIP 数据保存在 `/var/lib/visitortrace`，并使用 DB-IP City Lite 作为自动更新后端。MaxMind GeoLite2 City 与 IP2Location LITE DB11 具备同等的自动更新支持，但需要账户凭据。可在初始化命令中加入 `--geoip-provider maxmind --maxmind-account-id ACCOUNT_ID --maxmind-license-key LICENSE_KEY`，或加入 `--geoip-provider ip2location --ip2location-token DOWNLOAD_TOKEN`。配置文件权限应保持为 `0600`；备份包含这些凭据，需要采用同等的访问控制。
 
-安装完成后，可以在“管理员设置 > GeoIP 数据库”修改后端、凭证、下载源和更新策略。表单会原子更新同一份受保护配置并请求由 systemd 拉起服务，因此 systemd 单元需要保留后文所示的 `Restart=always`，并允许写入 `/etc/visitortrace`。
+安装完成后，可在“管理员设置 > 服务配置”选择 GeoIP 方案和数据源，并在“GeoIP 数据”卡片中分别配置凭证和下载源。表单会原子更新同一份受保护配置并请求由 systemd 拉起服务，因此 systemd 单元需要保留后文所示的 `Restart=always`，并允许写入 `/etc/visitortrace`。
 
 接入反向代理前，在 `/etc/visitortrace/config.json` 中把本机回环地址加入 `trusted_proxies`：
 
@@ -94,7 +94,7 @@ sudo -u visitortrace /usr/local/bin/visitortrace update bootstrap \
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.3.0-linux-amd64 \
+  --binary ./visitortrace-0.4.0-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 
@@ -316,7 +316,7 @@ sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip u
 sudo systemctl restart visitortrace
 ```
 
-命令行 GeoIP 更新运行在服务进程之外，因此手动更新成功后必须重启服务。若自动更新被关闭或不可用，应通过可信网络或镜像取得与当前后端匹配的有效 MMDB，以 `visitortrace` 所有者和 `0600` 权限放到配置的 `geoip_path`，然后重启服务。关闭自动更新并不能取消本地有效 MMDB 的要求。
+命令行 GeoIP 更新会处理全部已选本地数据集，运行在服务进程之外，因此更新成功后需重启服务。可用 `--dataset ID` 指定单个数据源；“仅手动”模式需加 `--force`。若所选本地数据库无法下载，应通过可信网络或镜像取得与后端匹配的文件，放到 GeoIP 状态卡片显示的路径，设为 `visitortrace` 所有者和 `0600` 权限，然后重启。只选择在线服务时无需本地 MMDB。
 
 根路径部署时，访问 `https://stats.example.com/` 会跳转到 `/admin`；后台入口是 `https://stats.example.com/admin/login`，公开 Site 使用 `/public/<SITE-ID>/analytics`。子路径部署时，在这些路径前加上已经设置的前缀即可。若希望裸域名直接跳转到子路径后台，可在代理规则旁添加精确匹配：
 

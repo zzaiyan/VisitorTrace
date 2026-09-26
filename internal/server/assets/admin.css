@@ -29,8 +29,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .stepup-dialog h3 { margin: 0; }
 .stepup-dialog .field { display: grid; gap: 6px; }
 .stepup-actions { display: flex; justify-content: flex-end; gap: 10px; }
-.preset-cards { display: flex; gap: 10px; }
-.preset-card { flex: 1; display: grid; gap: 4px; padding: 14px 16px; border: 2px solid var(--line); border-radius: 8px; cursor: pointer; text-align: center; transition: border-color .15s, background .15s; }
+.preset-cards { display: flex; gap: 10px; min-width: 0; }
+.preset-card { flex: 1; display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; padding: 14px 16px; border: 2px solid var(--line); border-radius: 8px; cursor: pointer; text-align: center; transition: border-color .15s, background .15s; }
 .preset-card input { position: absolute; opacity: 0; }
 .preset-card:has(input:checked) { border-color: var(--green); background: #f0f6f3; }
 .preset-card strong { font-size: 14px; color: var(--ink); }
@@ -45,6 +45,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .cred-field input { width: 180px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px; background: white; }
 .cred-field input::placeholder { color: var(--muted); font-size: 11px; }
 .cred-none { font-size: 12px; color: var(--green); font-weight: 500; }
+.backup-list { display: grid; flex: 1 1 100%; min-width: 0; gap: 10px; }
+.backup-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: white; }
+.backup-item > .field { grid-column: 1; grid-row: 1; }
+.backup-item > .cred-panel { grid-column: 1 / -1; grid-row: 2; margin-top: 0; }
+.backup-item > .button { grid-column: 2; grid-row: 1; align-self: end; }
+.backup-group > small { flex: 1 1 100%; }
 .toast-host { position: fixed; right: 18px; bottom: 18px; z-index: 60; display: flex; flex-direction: column; gap: 10px; max-width: min(360px, calc(100vw - 36px)); }
 .toast { padding: 12px 15px; border-left: 3px solid; background: white; box-shadow: var(--shadow); font-size: 13px; opacity: 0; transform: translateY(6px); transition: opacity .25s ease, transform .25s ease; cursor: pointer; }
 .toast.is-visible { opacity: 1; transform: none; }
@@ -341,6 +347,33 @@ tbody tr:hover { background: #f6f9f7; }
 .geoip-status { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .geoip-status strong { display: block; min-height: 24px; font-size: 15px; }
 .geoip-status small { display: block; margin-top: 6px; font-size: 10px; }
+.geoip-dataset-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.geoip-dataset { display: flex; min-width: 0; flex-direction: column; padding: 18px; border: 1px solid var(--line); background: white; }
+.geoip-dataset-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 13px; border-bottom: 1px solid var(--line); }
+.geoip-dataset-head h3 { margin: 0 0 5px; font-size: 16px; }
+.geoip-dataset-head .eyebrow { margin-bottom: 5px; }
+.geoip-dataset-head small { font-size: 11px; }
+.geoip-dataset-detail { display: grid; min-width: 0; gap: 4px; padding-top: 12px; }
+.geoip-dataset-detail > span, .geoip-dataset-summary > span { color: var(--muted); font-size: 11px; }
+.geoip-dataset-detail strong { font-size: 14px; }
+.geoip-dataset-detail small { font-size: 11px; }
+.geoip-dataset-detail code { overflow-wrap: anywhere; color: var(--muted); font-size: 10px; }
+.geoip-dataset-summary { display: grid; min-width: 0; gap: 4px; padding-top: 12px; }
+.geoip-dataset-summary code { overflow-wrap: anywhere; font-size: 11px; }
+.geoip-dataset-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 16px; }
+.geoip-dataset-actions form { margin: 0; }
+.geoip-dataset-draft { border-style: dashed; border-color: var(--green); background: #f9fcfa; }
+.geoip-dataset-removing { opacity: .65; }
+.geoip-dataset-editor { min-width: 0; margin-top: 14px; padding: 11px 12px; border: 1px solid var(--line); background: #f8faf9; }
+.geoip-dataset-editor > summary { cursor: pointer; color: var(--green); font-size: 12px; font-weight: 700; }
+.geoip-dataset-editor > [data-editor-fields] { display: grid; gap: 12px; padding-top: 12px; }
+.geoip-editor-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.geoip-editor-fields > strong { grid-column: 1 / -1; font-size: 11px; }
+.geoip-editor-fields .field { min-width: 0; }
+.geoip-editor-fields input { width: 100%; }
+.geoip-official-url { overflow-wrap: anywhere; font-size: 10px; }
+.geoip-config-save { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line); background: #f3f7f4; }
+.geoip-config-save span { color: var(--muted); font-size: 12px; }
 .task-summary { display: grid; grid-template-columns: 100px minmax(0, 1fr); min-width: 0; border: 1px solid var(--line); border-top: 0; background: #f5f8f6; font-size: 11px; }
 .task-summary > span { padding: 13px 14px; border-right: 1px solid var(--line); color: var(--muted); font-weight: 700; }
 .task-summary code { padding: 13px 14px; overflow-wrap: anywhere; color: var(--ink); line-height: 1.5; white-space: normal; }
@@ -492,6 +525,11 @@ tbody tr:hover { background: #f6f9f7; }
 	.geoip-manual { align-items: stretch; flex-direction: column; }
 	.geoip-manual .inline-actions { width: 100%; }
 	.geoip-manual .button { flex: 1; }
+	.geoip-dataset-grid { grid-template-columns: 1fr; }
+	.geoip-dataset-actions form { flex: 1; }
+	.geoip-dataset-actions .button { width: 100%; }
+	.geoip-editor-fields { grid-template-columns: 1fr; }
+	.geoip-config-save { align-items: stretch; flex-direction: column; }
 	.records-section-heading { align-items: flex-start; flex-direction: column; }
 	.records-heading-actions { width: 100%; align-items: stretch; flex-direction: column; }
 	.records-heading-actions form, .records-heading-actions .button { width: 100%; }
@@ -514,4 +552,10 @@ tbody tr:hover { background: #f6f9f7; }
   h1 { font-size: 32px; }
   .analytics-heading h1 { font-size: 40px; }
   .public-footer { align-items: flex-start; flex-direction: column; gap: 8px; }
+}
+@media (max-width: 360px) {
+  .sidebar { grid-template-columns: minmax(0, 1fr) auto; }
+  .logout-form { grid-column: 2; grid-row: 1; }
+  .admin-language-nav { grid-column: 1 / -1; grid-row: 2; justify-self: start; margin: 0; }
+  .side-nav { grid-row: 3; min-width: 0; }
 }

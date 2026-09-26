@@ -2,9 +2,33 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
+
+	"github.com/zzaiyan/VisitorTrace/internal/config"
+	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
+
+func TestDoctorAcceptsOnlineOnlyGeoIP(t *testing.T) {
+	cfg := config.Default(t.TempDir())
+	cfg.GeoIPPreset = "basic"
+	cfg.GeoIPBasicBackend = "ipinfo"
+	cfg.OnlineServices = map[string]config.OnlineServiceConfig{"ipinfo": {Key: "token"}}
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	if err := config.Save(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+	st, err := store.Initialize(context.Background(), cfg.DatabasePath, "test-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if code := runDoctor([]string{"--config", configPath}); code != 0 {
+		t.Fatalf("doctor rejected configured online-only GeoIP: %d", code)
+	}
+}
 
 func TestWriteMMDBQueryOutput(t *testing.T) {
 	var output bytes.Buffer

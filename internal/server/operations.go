@@ -1,13 +1,18 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
+	"net/netip"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
 
 	backupservice "github.com/zzaiyan/VisitorTrace/internal/backup"
+	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
+	"github.com/zzaiyan/VisitorTrace/internal/geoiponline"
 	"github.com/zzaiyan/VisitorTrace/internal/geoipupdate"
 	"github.com/zzaiyan/VisitorTrace/internal/maintenance"
 )
@@ -130,24 +135,74 @@ func (s *Server) runGeoIPUpdate(w http.ResponseWriter, r *http.Request, fromSett
 		target = "/admin/settings#geoip"
 	}
 	cfg := s.Config
-	if cfg.GeoIPUpdate == "disabled" && !fromSettings {
-		s.redirectWithError(w, r, "/admin", translate(adminLanguage(r), "err_geoip_disabled"))
-		return
-	}
-	if fromSettings {
-		cfg.GeoIPUpdate = "automatic"
-	}
 	if err := cfg.Validate(); err != nil {
 		s.redirectWithError(w, r, target, translate(adminLanguage(r), "err_geoip_settings_failed")+err.Error())
 		return
 	}
+	datasetID := "primary"
+	selectedDatasets := cfg.SelectedGeoIPDatasets()
+	if fromSettings {
+		if r.FormValue("dataset") != "" {
+			datasetID = r.FormValue("dataset")
+		}
+	} else {
+		datasetID = ""
+		for _, selected := range selectedDatasets {
+			if !selected.Online {
+				datasetID = selected.ID
+				break
+			}
+		}
+		if datasetID == "" && len(selectedDatasets) > 0 {
+			datasetID = selectedDatasets[0].ID
+		}
+	}
+	var dataset *config.GeoIPDataset
+	for _, selected := range selectedDatasets {
+		if selected.ID == datasetID {
+			copy := selected
+			dataset = &copy
+			break
+		}
+	}
+	if dataset == nil {
+		s.redirectWithError(w, r, target, translate(adminLanguage(r), "err_geoip_dataset_unselected"))
+		return
+	}
+	if dataset.Online {
+		if err := s.testOnlineGeoIP(r, *dataset); err != nil {
+			s.redirectWithError(w, r, target, translate(adminLanguage(r), "err_geoip_test_failed")+err.Error())
+			return
+		}
+		if fromSettings {
+			s.redirect(w, r, "/admin/settings?saved=geoip-current#geoip", http.StatusSeeOther)
+		} else {
+			s.redirect(w, r, "/admin?saved=geoip-current", http.StatusSeeOther)
+		}
+		return
+	}
+	cfg.GeoIPProvider = dataset.Provider
+	cfg.GeoIPPath = dataset.Path
+	cfg.GeoIPUpdateURL = dataset.UpdateURL
+	cfg.GeoIPChecksumURL = dataset.ChecksumURL
+	if fromSettings || cfg.GeoIPUpdate == "disabled" {
+		cfg.GeoIPUpdate = "automatic"
+	}
 	runner := geoipupdate.New(cfg, s.Store, s.logger)
+	runner.OperationName = dataset.Operation
 	runner.Activate = func(path string) error {
-		resolver, err := geoip.OpenWithProvider(cfg.GeoIPProvider, path)
+		resolver, err := geoip.OpenWithProvider(dataset.Provider, path)
 		if err != nil {
 			return err
 		}
-		s.SetGeoIP(resolver)
+		switch dataset.ID {
+		case "primary":
+			s.SetGeoIP(resolver)
+		case "foreign":
+			s.SetGeoIPForeign(resolver)
+		default:
+			s.SetGeoIPBackup(dataset.Provider, resolver)
+		}
 		return nil
 	}
 	force := fromSettings && r.FormValue("force") == "1"
@@ -165,6 +220,47 @@ func (s *Server) runGeoIPUpdate(w http.ResponseWriter, r *http.Request, fromSett
 		return
 	}
 	s.redirect(w, r, "/admin?saved="+value, http.StatusSeeOther)
+}
+
+func (s *Server) testOnlineGeoIP(r *http.Request, dataset config.GeoIPDataset) error {
+	if !s.geoProbeMu.TryLock() {
+		return fmt.Errorf("%s", translate(adminLanguage(r), "err_geoip_probe_busy"))
+	}
+	defer s.geoProbeMu.Unlock()
+	service := s.Config.OnlineServices[dataset.Provider]
+	credential := service.Key
+	if service.SK != "" {
+		credential += ":" + service.SK
+	}
+	client, err := geoiponline.New(dataset.Provider, credential, 3*time.Second)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	if err := s.Store.StartOperation(r.Context(), dataset.Operation, now); err != nil {
+		return err
+	}
+	location, lookupErr := client.Lookup(r.Context(), netip.MustParseAddr("114.114.114.114"))
+	if lookupErr == nil && location.CountryCode == "" && location.City == "" {
+		lookupErr = fmt.Errorf("service returned no location")
+	}
+	summary := fmt.Sprintf("country=%s city=%s coordinates=%t", location.CountryCode, location.City, location.Latitude != nil && location.Longitude != nil)
+	if lookupErr != nil {
+		summary = lookupErr.Error()
+		for _, secret := range []string{service.Key, service.SK} {
+			if secret != "" {
+				summary = strings.ReplaceAll(summary, secret, "[redacted]")
+				summary = strings.ReplaceAll(summary, url.QueryEscape(secret), "[redacted]")
+			}
+		}
+	}
+	if err := s.Store.FinishOperation(r.Context(), dataset.Operation, time.Now().UTC(), lookupErr == nil, summary); err != nil {
+		return err
+	}
+	if lookupErr != nil {
+		return fmt.Errorf("%s", summary)
+	}
+	return nil
 }
 
 func (s *Server) authorizeOperation(w http.ResponseWriter, r *http.Request) bool {

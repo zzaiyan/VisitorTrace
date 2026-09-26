@@ -40,6 +40,7 @@ func runGeoIPUpdate(args []string) int {
 	fs.SetOutput(os.Stderr)
 	configPath := fs.String("config", config.DefaultConfigPath(), "protected config path")
 	force := fs.Bool("force", false, "download even when the current database is fresh")
+	datasetID := fs.String("dataset", "", "selected offline dataset ID to update (default: all selected offline datasets)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -48,9 +49,31 @@ func runGeoIPUpdate(args []string) int {
 		fmt.Fprintf(os.Stderr, "geoip update: %v\n", err)
 		return 1
 	}
-	if cfg.GeoIPUpdate == "disabled" {
-		fmt.Fprintln(os.Stderr, "geoip update: updates are disabled in configuration")
+	if cfg.GeoIPUpdate == "disabled" && !*force {
+		fmt.Fprintln(os.Stderr, "geoip update: manual-only mode requires --force")
 		return 1
+	}
+	var datasets []config.GeoIPDataset
+	for _, selected := range cfg.SelectedGeoIPDatasets() {
+		if *datasetID != "" && selected.ID != *datasetID {
+			continue
+		}
+		if selected.Online {
+			if *datasetID != "" {
+				fmt.Fprintf(os.Stderr, "geoip update: %s is an online service; test it in Administrator Settings\n", selected.ID)
+				return 1
+			}
+			continue
+		}
+		datasets = append(datasets, selected)
+	}
+	if len(datasets) == 0 {
+		if *datasetID != "" {
+			fmt.Fprintf(os.Stderr, "geoip update: no selected offline dataset named %q\n", *datasetID)
+			return 1
+		}
+		fmt.Println("No offline GeoIP dataset is selected")
+		return 0
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
@@ -64,17 +87,39 @@ func runGeoIPUpdate(args []string) int {
 		fmt.Fprintf(os.Stderr, "geoip update: migrate database: %v\n", err)
 		return 1
 	}
-	runner := geoipupdate.New(cfg, st, slog.New(slog.NewJSONHandler(os.Stderr, nil)))
-	result, err := runner.RunOnce(ctx, *force)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "geoip update: %v\n", err)
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	failed := false
+	updated := false
+	for _, dataset := range datasets {
+		current := cfg
+		current.GeoIPProvider = dataset.Provider
+		current.GeoIPPath = dataset.Path
+		current.GeoIPUpdateURL = dataset.UpdateURL
+		current.GeoIPChecksumURL = dataset.ChecksumURL
+		if *force {
+			current.GeoIPUpdate = "automatic"
+		}
+		runner := geoipupdate.New(current, st, logger)
+		runner.OperationName = dataset.Operation
+		result, err := runner.RunOnce(ctx, *force)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "geoip update %s: %v\n", dataset.ID, err)
+			failed = true
+			continue
+		}
+		if result.Updated {
+			fmt.Printf("GeoIP dataset %s updated (sha256: %s)\n", dataset.ID, result.SHA256)
+			updated = true
+		} else {
+			fmt.Printf("GeoIP dataset %s is current\n", dataset.ID)
+		}
+	}
+	if updated {
+		fmt.Println("Restart VisitorTrace if it is currently running")
+	}
+	if failed {
 		return 1
 	}
-	if !result.Updated {
-		fmt.Println("GeoIP database is current")
-		return 0
-	}
-	fmt.Printf("GeoIP database updated\nsource: %s\nsha256: %s\nrestart VisitorTrace if it is currently running\n", result.Source, result.SHA256)
 	return 0
 }
 
@@ -108,12 +153,17 @@ func runGeoIPQuery(args []string) int {
 	fs := flag.NewFlagSet("geoip query", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	configPath := fs.String("config", config.DefaultConfigPath(), "protected config path")
-	mmdbPath := fs.String("mmdb", "", "GeoIP MMDB path; defaults to geoip_path from config")
+	mmdbPath := fs.String("mmdb", "", "GeoIP MMDB path; defaults to the first selected local MMDB")
+	datasetID := fs.String("dataset", "", "selected local MMDB dataset ID")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if fs.NArg() != 1 {
-		fmt.Fprintln(os.Stderr, "usage: visitortrace geoip query [--config PATH] [--mmdb PATH] IP")
+		fmt.Fprintln(os.Stderr, "usage: visitortrace geoip query [--config PATH] [--dataset ID | --mmdb PATH] IP")
+		return 2
+	}
+	if *datasetID != "" && *mmdbPath != "" {
+		fmt.Fprintln(os.Stderr, "geoip query: --dataset and --mmdb cannot be used together")
 		return 2
 	}
 	address, err := netip.ParseAddr(strings.TrimSpace(fs.Arg(0)))
@@ -129,7 +179,24 @@ func runGeoIPQuery(args []string) int {
 			fmt.Fprintf(os.Stderr, "geoip query: %v\n", err)
 			return 1
 		}
-		databasePath = cfg.GeoIPPath
+		for _, dataset := range cfg.SelectedGeoIPDatasets() {
+			if *datasetID != "" && dataset.ID != *datasetID {
+				continue
+			}
+			if dataset.Online || dataset.Provider == "ip2region" {
+				if *datasetID != "" {
+					fmt.Fprintf(os.Stderr, "geoip query: dataset %q is not a local MMDB\n", *datasetID)
+					return 1
+				}
+				continue
+			}
+			databasePath = dataset.Path
+			break
+		}
+		if databasePath == "" {
+			fmt.Fprintln(os.Stderr, "geoip query: no matching local MMDB is selected; use --mmdb for another file")
+			return 1
+		}
 	}
 
 	reader, err := maxminddb.Open(databasePath)

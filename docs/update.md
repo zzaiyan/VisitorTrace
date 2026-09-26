@@ -8,6 +8,13 @@ This file records user-facing changes for each published VisitorTrace release.
 
 - No unreleased changes.
 
+## 0.4.0 - 2026-09-26
+
+- GeoIP offers Basic, Recommended, and Precise presets that can combine local databases and online services. Recommended selects one primary for each domestic and foreign branch; Precise selects two per branch plus ordered backups. Because ip2region has no coordinates, it cannot be the sole primary in Basic or Recommended.
+- The GeoIP status page shows each selected source's online or offline type, credentials, file, and update state. Each source has its own download settings and maintenance actions or online test. Configuration edits are saved together with one supervised restart.
+- The Admin overview reports available and selected GeoIP source counts, and `doctor` checks the selected sources. `geoip update` processes all selected local datasets by default and can target one dataset; `--force` permits a manual download in Manual only mode.
+- Amap lookup results can supply coordinates, and maps show attribution for selected local sources. SQLite Schema remains at 12.
+
 ## 0.3.0 - 2026-09-24
 
 - Replaced the per-action administrator password prompts with step-up verification. A password check opens a five-minute window on the session, and login itself starts one, so sensitive actions normally proceed without a password; once the window lapses, the request is challenged and the AJAX navigator answers with one shared verification dialog and replays the submission, while forms rendered without JavaScript still include the password field.

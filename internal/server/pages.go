@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"crypto/subtle"
 	"embed"
@@ -38,15 +39,15 @@ var pageAssetRevision = func() string {
 }()
 
 type pageLayout struct {
-	Title         string
-	Admin         bool
-	CSRF          string
-	Flash         string
-	Error         string
-	Active        string
-	CurrentPath   string
-	Lang          string
-	StepUpActive  bool
+	Title        string
+	Admin        bool
+	CSRF         string
+	Flash        string
+	Error        string
+	Active       string
+	CurrentPath  string
+	Lang         string
+	StepUpActive bool
 }
 
 func (p pageLayout) PageLanguage() string { return p.Lang }
@@ -118,10 +119,6 @@ type adminSettingsData struct {
 	EffectiveBaseURL       string
 	GeoIPProvider          string
 	GeoIPUpdate            string
-	GeoIPUpdateURL         string
-	GeoIPChecksumURL       string
-	GeoIPOfficialSource    bool
-	GeoIPOfficialURL       string
 	GeoIPPreset            string
 	GeoIPBasicProvider     string
 	GeoIPDomesticOffline   string
@@ -129,18 +126,14 @@ type adminSettingsData struct {
 	GeoIPForeignOffline    string
 	GeoIPForeignOnline     string
 	OnlineServiceKeys      map[string]bool
-	GeoIPBackupDBIP        bool
-	GeoIPBackupBigDC       bool
-	GeoIPBackupAmap        bool
+	GeoIPBackups           []string
 	IP2RegionOfficialURL   string
 	DBIPOfficialURL        string
 	MaxMindOfficialURL     string
 	IP2LocationOfficialURL string
 	MaxMindConfigured      bool
-	MaxMindHasCredentials  bool
 	IP2LocationConfigured  bool
-	GeoIPFile              operations.FileStatus
-	GeoIPTask              *operations.TaskStatus
+	GeoIPDatasets          []geoIPDatasetStatus
 	Backups                []backupservice.Archive
 }
 
@@ -183,7 +176,7 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string,
 		"operationWarning": func(value string) string { return operationWarning(value, lang) },
 		"operationLabel":   func(value string) string { return operationLabel(value, lang) },
 		"operationState":   func(value string) string { return operationState(value, lang) },
-		"geoAttribution":   func() geoip.Attribution { return geoip.AttributionForProvider(s.Config.GeoIPProvider) },
+		"geoAttributions":  s.geoIPAttributions,
 		"presetJSON": func(options maprender.Options) string {
 			value, err := maprender.PresetJSON(options)
 			if err != nil {
@@ -205,10 +198,14 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string,
 		http.Error(w, "template unavailable", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := templates.ExecuteTemplate(w, "layout", data); err != nil {
+	var output bytes.Buffer
+	if err := templates.ExecuteTemplate(&output, "layout", data); err != nil {
 		s.logger.Error("render page failed", "page", page, "error", err)
+		http.Error(w, "page unavailable", http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = output.WriteTo(w)
 }
 
 func (s *Server) adminLayout(r *http.Request, session store.AdministratorSession, title, active string) pageLayout {
@@ -268,7 +265,6 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	manager := selfupdate.New(s.Config, s.ConfigPath, s.Store)
-	profile, _ := geoip.UpdateProfileForProvider(s.Config.GeoIPProvider)
 	dbipProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderDBIP))
 	maxMindProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderMaxMind))
 	ip2LocationProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderIP2Location))
@@ -286,18 +282,19 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		UpdatePlatform: manager.Platform,
 		BaseURL:        s.Config.BaseURL, EffectiveBaseURL: s.externalBaseURL(r),
 		GeoIPProvider: s.Config.GeoIPProvider, GeoIPUpdate: s.Config.GeoIPUpdate,
-		GeoIPUpdateURL: s.Config.GeoIPUpdateURL, GeoIPChecksumURL: s.Config.GeoIPChecksumURL,
-		GeoIPOfficialSource: s.Config.GeoIPUpdateURL == profile.URL, GeoIPOfficialURL: profile.URL,
 		GeoIPPreset: s.Config.GeoIPPreset,
 		GeoIPBasicProvider: func() string {
-			if s.Config.GeoIPDomesticOffline != "" {
-				return s.Config.GeoIPDomesticOffline
+			if s.Config.GeoIPBasicBackend != "" {
+				return s.Config.GeoIPBasicBackend
 			}
-			return "dbip"
+			return s.Config.GeoIPProvider
 		}(),
 		GeoIPDomesticOffline: func() string {
 			if s.Config.GeoIPDomesticOffline != "" {
 				return s.Config.GeoIPDomesticOffline
+			}
+			if s.Config.GeoIPPreset == "recommended" {
+				return "ipinfo"
 			}
 			return "ip2region"
 		}(),
@@ -309,9 +306,7 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 			return "ip2location"
 		}(),
 		GeoIPForeignOnline: s.Config.GeoIPForeignOnline,
-		GeoIPBackupDBIP:  s.Config.GeoIPBackupDBIP,
-		GeoIPBackupBigDC: s.Config.GeoIPBackupBigDC,
-		GeoIPBackupAmap:  s.Config.GeoIPBackupAmap,
+		GeoIPBackups:       s.Config.GeoIPBackups,
 		OnlineServiceKeys: func() map[string]bool {
 			result := make(map[string]bool)
 			for name, svc := range s.Config.OnlineServices {
@@ -322,18 +317,11 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 			return result
 		}(),
 		DBIPOfficialURL: dbipProfile.URL, MaxMindOfficialURL: maxMindProfile.URL, IP2LocationOfficialURL: ip2LocationProfile.URL,
-		IP2RegionOfficialURL: ip2RegionProfile.URL,
+		IP2RegionOfficialURL:  ip2RegionProfile.URL,
 		MaxMindConfigured:     s.Config.MaxMindAccountID != "" && s.Config.MaxMindLicenseKey != "",
-		MaxMindHasCredentials: s.Config.MaxMindAccountID != "" || s.Config.MaxMindLicenseKey != "",
-		IP2LocationConfigured: s.Config.IP2LocationToken != "", GeoIPFile: operationSnapshot.GeoIP, Backups: backups,
+		IP2LocationConfigured: s.Config.IP2LocationToken != "", Backups: backups,
 	}
-	for _, task := range operationSnapshot.Tasks {
-		if task.Operation == "geoip_update" {
-			item := task
-			data.GeoIPTask = &item
-			break
-		}
-	}
+	data.GeoIPDatasets = s.geoIPDatasetStatuses(operationSnapshot.Tasks, time.Now(), data.Lang)
 	data.Flash = adminFlash(r)
 	data.Error = r.URL.Query().Get("error")
 	s.renderPage(w, r, "settings", data)
@@ -1064,25 +1052,35 @@ func formatUTCValue(input any) string {
 
 func operationWarning(value, lang string) string {
 	labels := map[string]string{
-		"disk_low": "可用磁盘空间不足", "geoip_missing": "GeoIP 数据库不可用", "geoip_stale": "GeoIP 数据库超过 35 天未更新",
+		"disk_low": "可用磁盘空间不足", "geoip_missing": "部分 GeoIP 数据源缺少文件或凭据", "geoip_stale": "有 GeoIP 数据库超过 35 天未更新",
 		"backup_missing": "尚未创建备份", "backup_stale": "最近备份超过 48 小时", "cleanup_stale": "自动清理超过 2 小时未成功完成",
 		"backup_failed": "最近备份失败", "cleanup_failed": "最近清理失败", "geoip_update_failed": "最近 GeoIP 更新失败", "self_update_failed": "最近自更新失败",
 	}
 	if lang == "ja" {
 		labels = map[string]string{
-			"disk_low": "空きディスク容量が少なくなっています", "geoip_missing": "GeoIP データベースを利用できません", "geoip_stale": "GeoIP データベースが35日以上更新されていません",
+			"disk_low": "空きディスク容量が少なくなっています", "geoip_missing": "一部の GeoIP データソースにファイルまたは認証情報がありません", "geoip_stale": "35日以上更新されていない GeoIP データベースがあります",
 			"backup_missing": "バックアップが作成されていません", "backup_stale": "最新バックアップが48時間以上前です", "cleanup_stale": "クリーンアップが2時間以上成功していません",
 			"backup_failed": "最新バックアップに失敗しました", "cleanup_failed": "最新クリーンアップに失敗しました", "geoip_update_failed": "最新 GeoIP 更新に失敗しました", "self_update_failed": "最新の自動更新に失敗しました",
 		}
 	} else if lang == "en" {
 		labels = map[string]string{
-			"disk_low": "Available disk space is low", "geoip_missing": "GeoIP database is unavailable", "geoip_stale": "GeoIP database is over 35 days old",
+			"disk_low": "Available disk space is low", "geoip_missing": "Some GeoIP sources lack a file or credential", "geoip_stale": "A GeoIP database is over 35 days old",
 			"backup_missing": "No backup has been created", "backup_stale": "Latest backup is over 48 hours old", "cleanup_stale": "Cleanup has not succeeded for over 2 hours",
 			"backup_failed": "Latest backup failed", "cleanup_failed": "Latest cleanup failed", "geoip_update_failed": "Latest GeoIP update failed", "self_update_failed": "Latest self-update failed",
 		}
 	}
 	if label := labels[value]; label != "" {
 		return label
+	}
+	if strings.HasPrefix(value, "geoip_") && strings.HasSuffix(value, "_failed") {
+		switch lang {
+		case "en":
+			return "A GeoIP data source update or test failed"
+		case "ja":
+			return "GeoIP データソースの更新またはテストに失敗しました"
+		default:
+			return "有 GeoIP 数据源更新或测试失败"
+		}
 	}
 	return value
 }
@@ -1096,6 +1094,26 @@ func operationLabel(value, lang string) string {
 	}
 	if label := labels[value]; label != "" {
 		return label
+	}
+	if strings.HasPrefix(value, "geoip_online_") {
+		switch lang {
+		case "en":
+			return "GeoIP service test"
+		case "ja":
+			return "GeoIP サービステスト"
+		default:
+			return "GeoIP 服务测试"
+		}
+	}
+	if strings.HasPrefix(value, "geoip_") {
+		switch lang {
+		case "en":
+			return "GeoIP dataset update"
+		case "ja":
+			return "GeoIP データ更新"
+		default:
+			return "GeoIP 数据更新"
+		}
 	}
 	return value
 }

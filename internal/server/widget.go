@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
@@ -92,14 +91,17 @@ func (s *Server) widgetFrame(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) renderWidgetFrame(configuredSite store.Site, width, height int, svgBody []byte, language string) ([]byte, error) {
-	attribution := geoip.AttributionForProvider(s.Config.GeoIPProvider)
+	var attributionLabels []string
+	for _, attribution := range s.geoIPAttributions() {
+		attributionLabels = append(attributionLabels, attribution.Label)
+	}
 	// maprender escapes every dynamic label before producing the SVG.
 	inlineSVG := template.HTML(strings.TrimPrefix(string(svgBody), svgXMLDeclaration))
 	data := widgetFrameData{
 		Language:       language,
 		Title:          configuredSite.Name + " " + translate(language, "visitor_map"),
 		AnalyticsURL:   s.appPath("/public/" + configuredSite.ID + "/analytics"),
-		Attribution:    attribution.Label,
+		Attribution:    strings.Join(attributionLabels, " · "),
 		PageviewsLabel: translate(language, "pageviews"),
 		VisitorsLabel:  translate(language, "unique_visitors"),
 		Width:          width,

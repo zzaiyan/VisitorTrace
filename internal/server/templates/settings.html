@@ -12,8 +12,9 @@
 
 <section class="section-block settings-configuration" id="configuration" data-geoip-settings>
   <div class="section-heading"><div><p class="eyebrow">Configuration</p><h2>{{t "service_configuration"}}</h2><p class="subhead">{{t "service_configuration_help"}}</p></div><span class="status paused">{{t "managed_restart"}}</span></div>
-  <form method="post" action="{{appPath "/admin/settings/configuration"}}" class="configuration-form">
+  <form id="geoip-configuration-form" method="post" action="{{appPath "/admin/settings/configuration"}}" class="configuration-form">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input type="hidden" name="geoip_provider" value="{{.GeoIPProvider}}" data-selected-provider>
 
     <div class="configuration-group">
       <div class="configuration-group-heading"><p class="eyebrow">Public access</p><h3>{{t "public_access"}}</h3><p>{{t "base_url_help"}}</p></div>
@@ -23,121 +24,132 @@
     </div>
 
     <div class="configuration-group">
+      <div class="configuration-group-heading"><p class="eyebrow">Database updates</p><h3>{{t "update_mode"}}</h3></div>
+      <div class="configuration-fields">
+        <label class="field"><span>{{t "update_mode"}}</span>
+          <select name="geoip_update">
+            <option value="automatic" {{if eq .GeoIPUpdate "automatic"}}selected{{end}}>{{t "automatic_updates"}}</option>
+            <option value="disabled" {{if eq .GeoIPUpdate "disabled"}}selected{{end}}>{{t "manual_only"}}</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="configuration-group">
       <div class="configuration-group-heading"><p class="eyebrow">Geolocation</p><h3>{{t "geoip_preset"}}</h3></div>
       <div class="configuration-fields geoip-config" data-geoip-config>
         <div class="preset-cards" role="radiogroup" aria-label="{{t "geoip_preset"}}">
-          <label class="preset-card"><input type="radio" name="geoip_preset" value="basic" {{if eq .GeoIPPreset "basic"}}checked{{end}}><strong>{{t "preset_basic"}}</strong><small>{{t "preset_basic_help"}}</small></label>
-          <label class="preset-card"><input type="radio" name="geoip_preset" value="recommended" {{if or (eq .GeoIPPreset "recommended") (eq .GeoIPPreset "")}}checked{{end}}><strong>{{t "preset_recommended"}}</strong><small>{{t "preset_recommended_help"}}</small></label>
+          <label class="preset-card"><input type="radio" name="geoip_preset" value="basic" {{if or (eq .GeoIPPreset "basic") (eq .GeoIPPreset "")}}checked{{end}}><strong>{{t "preset_basic"}}</strong><small>{{t "preset_basic_help"}}</small></label>
+          <label class="preset-card"><input type="radio" name="geoip_preset" value="recommended" {{if eq .GeoIPPreset "recommended"}}checked{{end}}><strong>{{t "preset_recommended"}}</strong><small>{{t "preset_recommended_help"}}</small></label>
           <label class="preset-card"><input type="radio" name="geoip_preset" value="precise" {{if eq .GeoIPPreset "precise"}}checked{{end}}><strong>{{t "preset_precise"}}</strong><small>{{t "preset_precise_help"}}</small></label>
         </div>
 
         <div data-preset="basic" hidden>
-          <label class="field"><span>数据库</span>
+          <label class="field"><span>{{t "geoip_database_choice"}}</span>
             <select name="geoip_basic_provider" class="backend-select">
-              <option value="dbip" data-coords="true" {{if eq .GeoIPBasicProvider "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
-              <option value="ip2region" data-coords="false" {{if eq .GeoIPBasicProvider "ip2region"}}selected{{end}}>ip2region（中文城市）</option>
-              <option value="ip2location" data-coords="true" {{if eq .GeoIPBasicProvider "ip2location"}}selected{{end}}>IP2Location LITE 📍</option>
-              <option value="maxmind" data-coords="true" {{if eq .GeoIPBasicProvider "maxmind"}}selected{{end}}>MaxMind GeoLite2 📍</option>
-            </select>
+                <option value="ipinfo" {{if eq .GeoIPBasicProvider "ipinfo"}}selected{{end}}>IPinfo</option>
+                <option value="ip2location" {{if eq .GeoIPBasicProvider "ip2location"}}selected{{end}}>IP2Location LITE</option>
+                <option value="tencent" {{if eq .GeoIPBasicProvider "tencent"}}selected{{end}}>{{t "geoip_provider_tencent"}}</option>
+                <option value="amap" {{if eq .GeoIPBasicProvider "amap"}}selected{{end}}>{{t "geoip_provider_amap"}}</option>
+                <option value="dbip" {{if eq .GeoIPBasicProvider "dbip"}}selected{{end}}>DB-IP City Lite</option>
+                <option value="bigdatacloud" {{if eq .GeoIPBasicProvider "bigdatacloud"}}selected{{end}}>BigDataCloud</option>
+                <option value="maxmind" {{if eq .GeoIPBasicProvider "maxmind"}}selected{{end}}>MaxMind GeoLite2</option>
+              </select>
           </label>
-          <div class="cred-panel"></div>
         </div>
 
         <div data-preset="recommended" hidden>
           <div class="field-grid two">
-            <div><label class="field"><span>国内 · 主库</span>
+            <div><label class="field"><span>{{t "geoip_domestic_primary"}}</span>
               <select name="geoip_domestic_offline" class="backend-select">
-                <option value="ip2region" {{if eq .GeoIPDomesticOffline "ip2region"}}selected{{end}}>ip2region（推荐）</option>
-                <option value="dbip" {{if eq .GeoIPDomesticOffline "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
-                <option value="ip2location" {{if eq .GeoIPDomesticOffline "ip2location"}}selected{{end}}>IP2Location LITE 📍</option>
+                <option value="ipinfo" {{if eq .GeoIPDomesticOffline "ipinfo"}}selected{{end}}>IPinfo</option>
+                <option value="tencent" {{if eq .GeoIPDomesticOffline "tencent"}}selected{{end}}>{{t "geoip_provider_tencent"}}</option>
+                <option value="amap" {{if eq .GeoIPDomesticOffline "amap"}}selected{{end}}>{{t "geoip_provider_amap"}}</option>
+                <option value="ip2location" {{if eq .GeoIPDomesticOffline "ip2location"}}selected{{end}}>IP2Location LITE</option>
+                <option value="dbip" {{if eq .GeoIPDomesticOffline "dbip"}}selected{{end}}>DB-IP City Lite</option>
+                <option value="bigdatacloud" {{if eq .GeoIPDomesticOffline "bigdatacloud"}}selected{{end}}>BigDataCloud</option>
+                <option value="maxmind" {{if eq .GeoIPDomesticOffline "maxmind"}}selected{{end}}>MaxMind GeoLite2</option>
               </select>
-            </label><div class="cred-panel"></div></div>
-            <div><label class="field"><span>国外 · 主库</span>
+            </label></div>
+            <div><label class="field"><span>{{t "geoip_foreign_primary"}}</span>
               <select name="geoip_foreign_offline" class="backend-select">
-                <option value="ip2location" {{if eq .GeoIPForeignOffline "ip2location"}}selected{{end}}>IP2Location LITE（推荐）📍</option>
-                <option value="dbip" {{if eq .GeoIPForeignOffline "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
-                <option value="maxmind" {{if eq .GeoIPForeignOffline "maxmind"}}selected{{end}}>MaxMind GeoLite2 📍</option>
+                <option value="ip2location" {{if eq .GeoIPForeignOffline "ip2location"}}selected{{end}}>IP2Location LITE</option>
+                <option value="ipinfo" {{if eq .GeoIPForeignOffline "ipinfo"}}selected{{end}}>IPinfo</option>
+                <option value="bigdatacloud" {{if eq .GeoIPForeignOffline "bigdatacloud"}}selected{{end}}>BigDataCloud</option>
+                <option value="dbip" {{if eq .GeoIPForeignOffline "dbip"}}selected{{end}}>DB-IP City Lite</option>
+                <option value="maxmind" {{if eq .GeoIPForeignOffline "maxmind"}}selected{{end}}>MaxMind GeoLite2</option>
               </select>
-            </label><div class="cred-panel"></div></div>
+            </label></div>
           </div>
         </div>
 
         <div data-preset="precise" hidden>
-          <p class="muted" style="font-size:12px;margin:0">每分支选两个主库（交叉验证，📍=有坐标，至少一个有坐标）；冲突时启用备用库投票。</p>
+          <p class="muted" style="font-size:12px;margin:0">{{t "geoip_precise_selection_help"}}</p>
           <div class="field-grid two">
             <div class="branch-group">
-              <h4>国内分支</h4>
-              <label class="field"><span>主库 A</span>
+              <h4>{{t "geoip_domestic_branch"}}</h4>
+              <label class="field"><span>{{t "geoip_primary_a"}}</span>
                 <select name="geoip_domestic_offline" class="backend-select">
-                  <option value="ip2region" {{if eq .GeoIPDomesticOffline "ip2region"}}selected{{end}}>ip2region（推荐）</option>
-                  <option value="dbip" {{if eq .GeoIPDomesticOffline "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
-                  <option value="tencent" {{if eq .GeoIPDomesticOffline "tencent"}}selected{{end}}>腾讯位置服务 📍</option>
-                  <option value="ipinfo" {{if eq .GeoIPDomesticOffline "ipinfo"}}selected{{end}}>IPinfo 📍</option>
-                </select>
+                <option value="ip2region" {{if eq .GeoIPDomesticOffline "ip2region"}}selected{{end}}>ip2region</option>
+                <option value="ipinfo" {{if eq .GeoIPDomesticOffline "ipinfo"}}selected{{end}}>IPinfo</option>
+                <option value="tencent" {{if eq .GeoIPDomesticOffline "tencent"}}selected{{end}}>{{t "geoip_provider_tencent"}}</option>
+                <option value="amap" {{if eq .GeoIPDomesticOffline "amap"}}selected{{end}}>{{t "geoip_provider_amap"}}</option>
+                <option value="ip2location" {{if eq .GeoIPDomesticOffline "ip2location"}}selected{{end}}>IP2Location LITE</option>
+                <option value="dbip" {{if eq .GeoIPDomesticOffline "dbip"}}selected{{end}}>DB-IP City Lite</option>
+                <option value="bigdatacloud" {{if eq .GeoIPDomesticOffline "bigdatacloud"}}selected{{end}}>BigDataCloud</option>
+                <option value="maxmind" {{if eq .GeoIPDomesticOffline "maxmind"}}selected{{end}}>MaxMind GeoLite2</option>
+              </select>
               </label>
-              <div class="cred-panel"></div>
-              <label class="field"><span>主库 B</span>
+              <label class="field"><span>{{t "geoip_primary_b"}}</span>
                 <select name="geoip_domestic_online" class="backend-select">
-                  <option value="">不启用</option>
-                  <option value="tencent" {{if eq .GeoIPDomesticOnline "tencent"}}selected{{end}}>腾讯位置服务（推荐）📍</option>
-                  <option value="ipinfo" {{if eq .GeoIPDomesticOnline "ipinfo"}}selected{{end}}>IPinfo 📍</option>
-                  <option value="ip2region" {{if eq .GeoIPDomesticOnline "ip2region"}}selected{{end}}>ip2region</option>
-                </select>
+                <option value="tencent" {{if eq .GeoIPDomesticOnline "tencent"}}selected{{end}}>{{t "geoip_provider_tencent"}}</option>
+                <option value="ipinfo" {{if eq .GeoIPDomesticOnline "ipinfo"}}selected{{end}}>IPinfo</option>
+                <option value="amap" {{if eq .GeoIPDomesticOnline "amap"}}selected{{end}}>{{t "geoip_provider_amap"}}</option>
+                <option value="ip2location" {{if eq .GeoIPDomesticOnline "ip2location"}}selected{{end}}>IP2Location LITE</option>
+                <option value="dbip" {{if eq .GeoIPDomesticOnline "dbip"}}selected{{end}}>DB-IP City Lite</option>
+                <option value="bigdatacloud" {{if eq .GeoIPDomesticOnline "bigdatacloud"}}selected{{end}}>BigDataCloud</option>
+                <option value="maxmind" {{if eq .GeoIPDomesticOnline "maxmind"}}selected{{end}}>MaxMind GeoLite2</option>
+                <option value="ip2region" {{if eq .GeoIPDomesticOnline "ip2region"}}selected{{end}}>ip2region</option>
+              </select>
               </label>
-              <div class="cred-panel"></div>
             </div>
             <div class="branch-group">
-              <h4>国外分支</h4>
-              <label class="field"><span>主库 A</span>
+              <h4>{{t "geoip_foreign_branch"}}</h4>
+              <label class="field"><span>{{t "geoip_primary_a"}}</span>
                 <select name="geoip_foreign_offline" class="backend-select">
-                  <option value="ip2location" {{if eq .GeoIPForeignOffline "ip2location"}}selected{{end}}>IP2Location LITE（推荐）📍</option>
-                  <option value="dbip" {{if eq .GeoIPForeignOffline "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
-                  <option value="maxmind" {{if eq .GeoIPForeignOffline "maxmind"}}selected{{end}}>MaxMind GeoLite2 📍</option>
-                </select>
+                <option value="ip2location" {{if eq .GeoIPForeignOffline "ip2location"}}selected{{end}}>IP2Location LITE</option>
+                <option value="ipinfo" {{if eq .GeoIPForeignOffline "ipinfo"}}selected{{end}}>IPinfo</option>
+                <option value="bigdatacloud" {{if eq .GeoIPForeignOffline "bigdatacloud"}}selected{{end}}>BigDataCloud</option>
+                <option value="dbip" {{if eq .GeoIPForeignOffline "dbip"}}selected{{end}}>DB-IP City Lite</option>
+                <option value="maxmind" {{if eq .GeoIPForeignOffline "maxmind"}}selected{{end}}>MaxMind GeoLite2</option>
+                <option value="ip2region" {{if eq .GeoIPForeignOffline "ip2region"}}selected{{end}}>ip2region</option>
+              </select>
               </label>
-              <div class="cred-panel"></div>
-              <label class="field"><span>主库 B</span>
+              <label class="field"><span>{{t "geoip_primary_b"}}</span>
                 <select name="geoip_foreign_online" class="backend-select">
-                  <option value="">不启用</option>
-                  <option value="ipinfo" {{if eq .GeoIPForeignOnline "ipinfo"}}selected{{end}}>IPinfo（推荐）📍</option>
-                  <option value="bigdatacloud" {{if eq .GeoIPForeignOnline "bigdatacloud"}}selected{{end}}>BigDataCloud 📍</option>
-                </select>
+                <option value="ipinfo" {{if eq .GeoIPForeignOnline "ipinfo"}}selected{{end}}>IPinfo</option>
+                <option value="ip2location" {{if eq .GeoIPForeignOnline "ip2location"}}selected{{end}}>IP2Location LITE</option>
+                <option value="bigdatacloud" {{if eq .GeoIPForeignOnline "bigdatacloud"}}selected{{end}}>BigDataCloud</option>
+                <option value="dbip" {{if eq .GeoIPForeignOnline "dbip"}}selected{{end}}>DB-IP City Lite</option>
+                <option value="maxmind" {{if eq .GeoIPForeignOnline "maxmind"}}selected{{end}}>MaxMind GeoLite2</option>
+                <option value="ip2region" {{if eq .GeoIPForeignOnline "ip2region"}}selected{{end}}>ip2region</option>
+              </select>
               </label>
-              <div class="cred-panel"></div>
             </div>
           </div>
-          <fieldset class="check-group"><legend>备用库（冲突时投票，可选）</legend>
-            <div class="field-grid two">
-              <div><label class="field"><span>备用 1</span>
-                <select name="geoip_backup_1" class="backend-select">
-                  <option value="">不启用</option>
-                  <option value="dbip" {{if eq .GeoIPBackup1 "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
-                  <option value="bigdatacloud" {{if eq .GeoIPBackup1 "bigdatacloud"}}selected{{end}}>BigDataCloud 📍</option>
-                  <option value="amap" {{if eq .GeoIPBackup1 "amap"}}selected{{end}}>高德（仅国内）</option>
-                  <option value="tencent" {{if eq .GeoIPBackup1 "tencent"}}selected{{end}}>腾讯位置服务 📍</option>
-                  <option value="ipinfo" {{if eq .GeoIPBackup1 "ipinfo"}}selected{{end}}>IPinfo 📍</option>
-                </select>
-              </label><div class="cred-panel"></div></div>
-              <div><label class="field"><span>备用 2</span>
-                <select name="geoip_backup_2" class="backend-select">
-                  <option value="">不启用</option>
-                  <option value="dbip" {{if eq .GeoIPBackup2 "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
-                  <option value="bigdatacloud" {{if eq .GeoIPBackup2 "bigdatacloud"}}selected{{end}}>BigDataCloud 📍</option>
-                  <option value="amap" {{if eq .GeoIPBackup2 "amap"}}selected{{end}}>高德（仅国内）</option>
-                  <option value="tencent" {{if eq .GeoIPBackup2 "tencent"}}selected{{end}}>腾讯位置服务 📍</option>
-                  <option value="ipinfo" {{if eq .GeoIPBackup2 "ipinfo"}}selected{{end}}>IPinfo 📍</option>
-                </select>
-              </label><div class="cred-panel"></div></div>
-            </div>
+          <fieldset class="check-group backup-group"><legend>{{t "geoip_backup_group"}}</legend>
+            <div class="backup-list" data-backup-list>{{range .GeoIPBackups}}<input type="hidden" name="geoip_backups" value="{{.}}" data-initial-backup>{{end}}</div>
+            <button class="button ghost backup-add" type="button" data-add-backup>{{t "geoip_add_backup"}}</button>
+            <small data-backup-help>{{t "geoip_backup_selection_help"}}</small>
           </fieldset>
-          <small>{{t "online_privacy_warning"}}</small>
         </div>
+        <small>{{t "online_privacy_warning"}}</small>
       </div>
     </div>
 
 
     <div class="configuration-actions">
-      <div class="configuration-action-copy"><strong>{{t "apply_configuration"}}</strong><span>{{t "apply_configuration_help"}}</span></div>
+      <div class="configuration-action-copy"><strong>{{t "apply_configuration"}}</strong><span>{{t "geoip_card_config_hint"}}</span></div>
       {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>{{end}}
       <button class="button primary" type="submit">{{t "save_configuration"}}</button>
     </div>
@@ -145,21 +157,36 @@
 </section>
 
 <section class="section-block" id="geoip">
-  <div class="section-heading"><div><p class="eyebrow">GeoIP</p><h2>{{t "geoip_database_status"}}</h2><p class="subhead">{{t "geoip_status_help"}}</p></div><span class="status live">{{.GeoIPProvider}}</span></div>
-  <div class="update-status geoip-status">
-    <div><span>{{t "database_file"}}</span><strong>{{if .GeoIPFile.Exists}}{{formatBytes .GeoIPFile.Size}}{{else}}{{t "unavailable"}}{{end}}</strong><small>{{if .GeoIPFile.Exists}}{{t "last_modified"}} {{formatUTC .GeoIPFile.ModifiedAt}}{{else}}{{t "awaiting_download"}}{{end}}</small></div>
-    <div><span>{{t "update_mode"}}</span><strong>{{if eq .GeoIPUpdate "automatic"}}{{t "automatic_updates"}}{{else}}{{t "manual_only"}}{{end}}</strong><small>{{.GeoIPProvider}}</small></div>
-    <div><span>{{t "last_update"}}</span>{{if .GeoIPTask}}<strong><span class="status {{.GeoIPTask.State}}">{{operationState .GeoIPTask.State}}</span></strong><small>{{if .GeoIPTask.CompletedAt}}{{formatUTC .GeoIPTask.CompletedAt}}{{else}}{{t "running"}}{{end}}</small>{{else}}<strong>{{t "never_updated"}}</strong><small>{{t "no_task_runs"}}</small>{{end}}</div>
+  <div class="section-heading"><div><p class="eyebrow">GeoIP</p><h2>{{t "geoip_database_status"}}</h2><p class="subhead">{{t "geoip_status_help"}}</p></div><span class="status paused">{{if eq .GeoIPUpdate "automatic"}}{{t "automatic_updates"}}{{else}}{{t "manual_only"}}{{end}}</span></div>
+  <p class="notice" data-unsaved-geoip hidden>{{t "geoip_unsaved_maintenance"}}</p>
+  <div class="geoip-dataset-grid" data-geoip-grid>
+    {{range .GeoIPDatasets}}
+    <article class="geoip-dataset" data-geoip-dataset="{{.ID}}" data-provider="{{.Provider}}" data-online="{{if .Online}}true{{else}}false{{end}}" data-label="{{.Label}}" data-role-label="{{.RoleLabel}}" data-source-mode="{{.SourceMode}}" data-update-url="{{.UpdateURL}}" data-checksum-url="{{.ChecksumURL}}" data-official-url="{{.OfficialURL}}">
+      <header class="geoip-dataset-head">
+        <div><p class="eyebrow">{{.RoleLabel}}</p><h3>{{.Label}}</h3><small>{{if .Online}}{{t "geoip_online"}}{{else}}{{t "geoip_local"}}{{end}}</small></div>
+        {{if .Online}}<span class="status {{if .Configured}}live{{else}}paused{{end}}">{{if .Configured}}{{t "configured"}}{{else}}{{t "not_configured"}}{{end}}</span>
+        {{else}}<span class="status {{if .Loaded}}live{{else}}paused{{end}}">{{if .Loaded}}{{t "geoip_loaded"}}{{else}}{{t "geoip_not_loaded"}}{{end}}</span>{{end}}
+      </header>
+      {{if .Online}}
+        <div class="geoip-dataset-detail"><span>{{t "geoip_last_probe"}}</span>{{if .Task}}<strong><span class="status {{.Task.State}}">{{operationState .Task.State}}</span></strong><small>{{if .Task.CompletedAt}}{{formatUTC .Task.CompletedAt}}{{else}}{{t "running"}}{{end}}</small>{{else}}<strong>{{t "never_updated"}}</strong>{{end}}</div>
+      {{else}}
+        <div class="geoip-dataset-detail"><span>{{t "database_file"}}</span><strong>{{if .File.Exists}}{{formatBytes .File.Size}}{{else}}{{t "unavailable"}}{{end}}</strong><small>{{if .File.Exists}}{{t "last_modified"}} {{formatUTC .File.ModifiedAt}}{{if .File.Stale}} · {{t "geoip_stale"}}{{end}}{{else}}{{t "awaiting_download"}}{{end}}</small><code title="{{.Path}}">{{.Path}}</code></div>
+        <div class="geoip-dataset-detail"><span>{{t "last_update"}}</span>{{if .Task}}<strong><span class="status {{.Task.State}}">{{operationState .Task.State}}</span></strong><small>{{if .Task.CompletedAt}}{{formatUTC .Task.CompletedAt}}{{else}}{{t "running"}}{{end}}</small>{{else}}<strong>{{t "never_updated"}}</strong>{{end}}</div>
+      {{end}}
+      {{if .Task}}{{if .Task.Summary}}<div class="geoip-dataset-summary" role="status"><span>{{t "summary"}}</span><code>{{.Task.Summary}}</code></div>{{end}}{{end}}
+      <details class="geoip-dataset-editor" data-backend-config><summary>{{t "geoip_edit_backend"}}</summary><div data-editor-fields></div></details>
+      <div class="geoip-dataset-actions">
+        {{if .Online}}
+          <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-vt-nav><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><button class="button ghost" type="submit" {{if not .Configured}}disabled{{end}}>{{t "geoip_test_service"}}</button></form>
+        {{else}}
+          <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-vt-nav><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><input type="hidden" name="force" value="0"><button class="button ghost" type="submit">{{t "check_now"}}</button></form>
+          <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-vt-nav><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><input type="hidden" name="force" value="1"><button class="button primary" type="submit">{{t "force_download"}}</button></form>
+        {{end}}
+      </div>
+    </article>
+    {{end}}
   </div>
-  {{if .GeoIPTask}}<div class="task-summary" role="status"><span>{{t "summary"}}</span><code>{{.GeoIPTask.Summary}}</code></div>{{end}}
-  <div class="geoip-manual">
-    <div><h3>{{t "manual_update"}}</h3><p>{{t "manual_update_help"}}</p></div>
-    <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" class="inline-actions" data-vt-nav>
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <button class="button ghost" type="submit" name="force" value="0">{{t "check_now"}}</button>
-      <button class="button primary" type="submit" name="force" value="1">{{t "force_download"}}</button>
-    </form>
-  </div>
+  <div class="geoip-config-save"><span>{{t "geoip_card_config_hint"}}</span><button class="button primary" type="submit" form="geoip-configuration-form">{{t "save_configuration"}}</button></div>
 </section>
 
 <section class="section-block" id="backup">
@@ -223,25 +250,6 @@
   </div>
 </section>
 <script>
-(() => {
-  const root = document.querySelector("[data-geoip-settings]");
-  if (!root) return;
-  const provider = root.querySelector("[data-provider-select]");
-  const officialURL = root.querySelector("[data-official-url-display]");
-  const customSource = root.querySelector("[data-custom-source]");
-  const sourceInputs = root.querySelectorAll('input[name="geoip_source"]');
-  const sync = () => {
-    const selected = provider.selectedOptions[0];
-    officialURL.textContent = selected ? decodeURIComponent(selected.dataset.sourceUrl) : "";
-    const official = root.querySelector('input[name="geoip_source"][value="official"]').checked;
-    customSource.hidden = official;
-  };
-  provider.addEventListener("change", sync);
-  sourceInputs.forEach((input) => input.addEventListener("change", sync));
-  sync();
-})();
-</script>
-<script>
 (function () {
   var CRED = {
     dbip: null, ip2region: null,
@@ -249,49 +257,402 @@
     maxmind: [["maxmind_account_id", "Account ID"], ["maxmind_license_key", "License Key"]],
     tencent: [["online_tencent_key", "Key"], ["online_tencent_sk", "SK"]],
     amap: [["online_amap_key", "Key"], ["online_amap_sk", "SK"]],
-    ipinfo: [["online_ipinfo_key", "Key"]],
+    ipinfo: [["online_ipinfo_key", "Token"]],
     bigdatacloud: [["online_bigdatacloud_key", "Key"]]
   };
   var root = document.querySelector("[data-geoip-config]");
   if (!root) return;
+  var form = root.closest("form");
+  var grid = document.querySelector("[data-geoip-grid]");
   var sections = root.querySelectorAll("[data-preset]");
-  function syncPreset() {
-    var c = root.querySelector('input[name="geoip_preset"]:checked');
-    var v = c ? c.value : "";
-    sections.forEach(function (s) { s.hidden = s.dataset.preset !== v; });
-    root.querySelectorAll(".backend-select").forEach(syncCred);
+  var backupList = root.querySelector("[data-backup-list]");
+  var addBackupButton = root.querySelector("[data-add-backup]");
+  var BACKENDS = [
+    ["amap", "{{t "geoip_provider_amap"}}"], ["dbip", "DB-IP City Lite"],
+    ["maxmind", "MaxMind GeoLite2"], ["bigdatacloud", "BigDataCloud"],
+    ["ip2region", "ip2region"], ["ip2location", "IP2Location LITE"],
+    ["tencent", "{{t "geoip_provider_tencent"}}"], ["ipinfo", "IPinfo"]
+  ];
+  var enteredCredentials = new Map();
+  var enteredSources = new Map();
+  var ONLINE = new Set(["tencent", "amap", "ipinfo", "bigdatacloud"]);
+  var LABELS = Object.fromEntries(BACKENDS.map(function (entry) { return [entry[0], entry[1]]; }));
+  var ROLE = {
+    basic: "{{t "geoip_primary_role"}}", domestic_a: "{{t "geoip_domestic_a_role"}}",
+    domestic_b: "{{t "geoip_domestic_b_role"}}", foreign_a: "{{t "geoip_foreign_a_role"}}",
+    foreign_b: "{{t "geoip_foreign_b_role"}}", backup: "{{t "geoip_backup_role"}}"
+  };
+  var COPY = {
+    edit: "{{t "geoip_edit_backend"}}", pending: "{{t "geoip_pending_add"}}",
+    remove: "{{t "geoip_pending_remove"}}", shared: "{{t "geoip_shared_credentials"}}",
+    none: "{{t "geoip_no_credentials"}}", credentials: "{{t "provider_credentials"}}",
+    saved: "{{t "saved_credential"}}", source: "{{t "download_source"}}",
+    official: "{{t "official_source"}}", custom: "{{t "custom_mirror"}}",
+    url: "{{t "custom_download_url"}}", checksum: "{{t "checksum_url"}}",
+    invalidURL: "{{t "geoip_source_url_invalid"}}",
+    offline: "{{t "geoip_local"}}", online: "{{t "geoip_online"}}"
+  };
+  var SAVED = {
+    ip2location: {{if .IP2LocationConfigured}}true{{else}}false{{end}},
+    maxmind: {{if .MaxMindConfigured}}true{{else}}false{{end}},
+    tencent: {{if index .OnlineServiceKeys "tencent"}}true{{else}}false{{end}},
+    amap: {{if index .OnlineServiceKeys "amap"}}true{{else}}false{{end}},
+    ipinfo: {{if index .OnlineServiceKeys "ipinfo"}}true{{else}}false{{end}},
+    bigdatacloud: {{if index .OnlineServiceKeys "bigdatacloud"}}true{{else}}false{{end}}
+  };
+  var OFFICIAL = {
+    dbip: "{{.DBIPOfficialURL}}", ip2location: "{{.IP2LocationOfficialURL}}",
+    maxmind: "{{.MaxMindOfficialURL}}", ip2region: "{{.IP2RegionOfficialURL}}"
+  };
+  function backupRows() { return Array.from(backupList.querySelectorAll("[data-backup-row]")); }
+  function primaryNames() {
+    return new Set(Array.from(root.querySelectorAll('[data-preset="precise"] select.backend-select'))
+      .filter(function (select) { return select.name !== "geoip_backups" && select.value; })
+      .map(function (select) { return select.value; }));
   }
-  function syncCred(sel) {
-    if (!sel.value) { return; }
-    var panel = sel.parentElement.querySelector(".cred-panel") || sel.closest("div").querySelector(".cred-panel");
-    if (!panel) return;
-    var fields = CRED[sel.value];
-    panel.innerHTML = "";
-    if (!fields) {
-      panel.innerHTML = '<span class="cred-none">✓ 无需凭证</span>';
-      return;
+  function availableBackends(except) {
+    var used = primaryNames();
+    backupRows().forEach(function (row) {
+      var select = row.querySelector("select");
+      if (select !== except) used.add(select.value);
+    });
+    return BACKENDS.filter(function (entry) { return !used.has(entry[0]); });
+  }
+  function refreshBackupChoices() {
+    var primary = primaryNames();
+    var seen = new Set();
+    backupRows().forEach(function (row) {
+      var selected = row.querySelector("select").value;
+      if (primary.has(selected) || seen.has(selected)) row.remove();
+      else seen.add(selected);
+    });
+    backupRows().forEach(function (row) {
+      var select = row.querySelector("select");
+      var selected = select.value;
+      select.replaceChildren();
+      availableBackends(select).forEach(function (entry) {
+        var option = document.createElement("option");
+        option.value = entry[0];
+        option.textContent = entry[1];
+        select.appendChild(option);
+      });
+      select.value = selected;
+    });
+    var rows = backupRows();
+    rows.forEach(function (row) { row.querySelector("button").disabled = rows.length <= 1; });
+    addBackupButton.disabled = availableBackends(null).length === 0;
+  }
+  function addBackup(name) {
+    var choices = availableBackends(null);
+    if (!choices.length || (name && !choices.some(function (entry) { return entry[0] === name; }))) return;
+    var row = document.createElement("div");
+    row.className = "backup-item";
+    row.dataset.backupRow = "";
+    var label = document.createElement("label");
+    label.className = "field";
+    var caption = document.createElement("span");
+    caption.textContent = "{{t "geoip_backup_field"}}";
+    var select = document.createElement("select");
+    select.name = "geoip_backups";
+    select.className = "backend-select";
+    choices.forEach(function (entry) {
+      var option = document.createElement("option");
+      option.value = entry[0];
+      option.textContent = entry[1];
+      select.appendChild(option);
+    });
+    select.value = name || choices[0][0];
+    select.addEventListener("change", syncPreset);
+    label.append(caption, select);
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "button ghost";
+    remove.textContent = "{{t "geoip_remove_backup"}}";
+    remove.addEventListener("click", function () { row.remove(); syncPreset(); });
+    row.append(label, remove);
+    backupList.appendChild(row);
+    refreshBackupChoices();
+  }
+  var savedBackups = Array.from(backupList.querySelectorAll("[data-initial-backup]"))
+    .map(function (input) { return input.value; });
+  backupList.replaceChildren();
+  savedBackups.forEach(addBackup);
+  addBackupButton.addEventListener("click", function () { addBackup(""); syncPreset(); });
+  function desiredDatasets() {
+    var preset = root.querySelector('input[name="geoip_preset"]:checked').value;
+    var wanted = [];
+    function value(name) {
+      var select = root.querySelector('[data-preset="' + preset + '"] select[name="' + name + '"]');
+      return select ? select.value : "";
     }
-    panel.innerHTML = '<span class="cred-title">' + sel.selectedOptions[0].text.replace(/[📍()].*$/, "").trim() + '</span>';
-    fields.forEach(function (f) {
-      var input = document.createElement("input");
-      input.type = "password";
-      input.name = f[0];
-      input.placeholder = f[1];
-      input.autocomplete = "new-password";
-      input.maxLength = 512;
-      var wrap = document.createElement("label");
-      wrap.className = "cred-field";
-      wrap.appendChild(input);
-      panel.appendChild(wrap);
+    function add(role, id, provider) {
+      if (!provider) return;
+      var online = ONLINE.has(provider);
+      if (online) id = "online_" + provider;
+      var existing = wanted.find(function (item) { return item.id === id && item.provider === provider; });
+      if (existing) { existing.roles.push(ROLE[role]); return; }
+      wanted.push({id: id, provider: provider, online: online, roles: [ROLE[role]]});
+    }
+    if (preset === "basic") {
+      add("basic", "primary", value("geoip_basic_provider"));
+    } else {
+      add("domestic_a", "primary", value("geoip_domestic_offline"));
+      if (preset === "precise") add("domestic_b", "domestic_b", value("geoip_domestic_online"));
+      add("foreign_a", "foreign", value("geoip_foreign_offline"));
+      if (preset === "precise") {
+        add("foreign_b", "foreign_b", value("geoip_foreign_online"));
+        backupRows().forEach(function (row) {
+          var provider = row.querySelector("select").value;
+          add("backup", "backup_" + provider, provider);
+        });
+      }
+    }
+    return wanted;
+  }
+  function sourceKey(card) { return card.dataset.geoipDataset + "|" + card.dataset.provider; }
+  function captureEditors() {
+    grid.querySelectorAll("[data-geoip-dataset]").forEach(function (card) {
+      card.querySelectorAll('input[type="password"][form]').forEach(function (input) {
+        enteredCredentials.set(input.name, input.value);
+      });
+      var source = card.querySelector("[data-source-select]");
+      if (source) enteredSources.set(sourceKey(card), {
+        mode: source.value,
+        url: card.querySelector("[data-source-url]").value,
+        checksum: card.querySelector("[data-checksum-url]").value
+      });
+    });
+  }
+  function editorField(name, caption, type, value) {
+    var label = document.createElement("label");
+    label.className = "field";
+    var span = document.createElement("span");
+    span.textContent = caption;
+    var input = document.createElement("input");
+    input.type = type;
+    input.name = name;
+    input.setAttribute("form", form.id);
+    input.value = value || "";
+    input.maxLength = type === "password" ? 512 : 4096;
+    label.append(span, input);
+    return [label, input];
+  }
+  function updateEditorRequirements(card) {
+    var provider = card.dataset.provider;
+    var source = card.querySelector("[data-source-select]");
+    var automatic = form.querySelector('select[name="geoip_update"]').value === "automatic";
+    var official = source && source.value === "official";
+    card.querySelectorAll('input[type="password"][form]').forEach(function (input) {
+      input.required = !SAVED[provider] && (card.dataset.online === "true" ? input.name.endsWith("_key") : automatic && official);
+    });
+    var customURL = card.querySelector("[data-source-url]");
+    if (customURL) {
+      customURL.required = source.value === "custom";
+      customURL.disabled = source.value !== "custom";
+    }
+  }
+  function validateSourceURL(input) {
+    if (!input.value || input.disabled) { input.setCustomValidity(""); return; }
+    try {
+      var parsed = new URL(input.value);
+      var local = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
+      input.setCustomValidity((parsed.protocol === "https:" || (parsed.protocol === "http:" && local)) && !parsed.username && !parsed.password ? "" : COPY.invalidURL);
+    } catch (_) {
+      input.setCustomValidity(COPY.invalidURL);
+    }
+  }
+  function renderEditor(card, credentialOwner) {
+    var panel = card.querySelector("[data-editor-fields]");
+    panel.replaceChildren();
+    var provider = card.dataset.provider;
+    var fields = CRED[provider];
+    if (fields && credentialOwner) {
+      var credentials = document.createElement("div");
+      credentials.className = "geoip-editor-fields";
+      var heading = document.createElement("strong");
+      heading.textContent = COPY.credentials;
+      credentials.appendChild(heading);
+      fields.forEach(function (field) {
+        var pair = editorField(field[0], field[1], "password", enteredCredentials.get(field[0]));
+        pair[1].placeholder = SAVED[provider] ? COPY.saved : field[1];
+        pair[1].autocomplete = "new-password";
+        pair[1].addEventListener("input", function () { enteredCredentials.set(field[0], pair[1].value); });
+        credentials.appendChild(pair[0]);
+      });
+      panel.appendChild(credentials);
+    } else {
+      var note = document.createElement("small");
+      note.textContent = fields ? COPY.shared : COPY.none;
+      panel.appendChild(note);
+    }
+    if (card.dataset.online === "true") { updateEditorRequirements(card); return; }
+    var state = enteredSources.get(sourceKey(card)) || {
+      mode: card.dataset.sourceMode || "official",
+      url: card.dataset.sourceMode === "custom" ? card.dataset.updateUrl : "",
+      checksum: card.dataset.checksumUrl || ""
+    };
+    var sourceLabel = document.createElement("label");
+    sourceLabel.className = "field";
+    var caption = document.createElement("span");
+    caption.textContent = COPY.source;
+    var select = document.createElement("select");
+    select.name = "geoip_source_" + card.dataset.geoipDataset;
+    select.setAttribute("form", form.id);
+    select.dataset.sourceSelect = "";
+    [["official", COPY.official], ["custom", COPY.custom]].forEach(function (entry) {
+      var option = document.createElement("option");
+      option.value = entry[0]; option.textContent = entry[1]; select.appendChild(option);
+    });
+    select.value = state.mode;
+    sourceLabel.append(caption, select);
+    panel.appendChild(sourceLabel);
+    var custom = editorField("geoip_update_url_" + card.dataset.geoipDataset, COPY.url, "url", state.url);
+    custom[1].dataset.sourceUrl = "";
+    custom[0].hidden = select.value !== "custom";
+    panel.appendChild(custom[0]);
+    var checksum = editorField("geoip_checksum_url_" + card.dataset.geoipDataset, COPY.checksum, "url", state.checksum);
+    checksum[1].dataset.checksumUrl = "";
+    panel.appendChild(checksum[0]);
+    [custom[1], checksum[1]].forEach(function (input) {
+      input.addEventListener("input", function () { validateSourceURL(input); });
+      validateSourceURL(input);
+    });
+    var official = document.createElement("small");
+    official.className = "geoip-official-url";
+    official.textContent = COPY.official + ": " + card.dataset.officialUrl;
+    panel.appendChild(official);
+    select.addEventListener("change", function () {
+      custom[0].hidden = select.value !== "custom";
+      updateEditorRequirements(card);
+      validateSourceURL(custom[1]);
+      captureEditors();
+    });
+    updateEditorRequirements(card);
+  }
+  function createDraft(item) {
+    var card = document.createElement("article");
+    card.className = "geoip-dataset geoip-dataset-draft";
+    card.dataset.geoipDataset = item.id;
+    card.dataset.provider = item.provider;
+    card.dataset.online = String(item.online);
+    card.dataset.geoipDraft = "";
+    card.dataset.sourceMode = "official";
+    card.dataset.updateUrl = OFFICIAL[item.provider] || "";
+    card.dataset.officialUrl = OFFICIAL[item.provider] || "";
+    card.dataset.checksumUrl = "";
+    var head = document.createElement("header");
+    head.className = "geoip-dataset-head";
+    var title = document.createElement("div");
+    var role = document.createElement("p"); role.className = "eyebrow"; role.textContent = item.roles.join(" · ");
+    var name = document.createElement("h3"); name.textContent = LABELS[item.provider] || item.provider;
+    var kind = document.createElement("small"); kind.textContent = item.online ? COPY.online : COPY.offline;
+    title.append(role, name, kind);
+    var badge = document.createElement("span"); badge.className = "status paused"; badge.textContent = COPY.pending;
+    head.append(title, badge);
+    var details = document.createElement("details"); details.className = "geoip-dataset-editor"; details.dataset.backendConfig = ""; details.open = true;
+    var summary = document.createElement("summary"); summary.textContent = COPY.edit;
+    var fields = document.createElement("div"); fields.dataset.editorFields = "";
+    details.append(summary, fields);
+    card.append(head, details);
+    grid.appendChild(card);
+    return card;
+  }
+  function syncCards() {
+    captureEditors();
+    var wanted = desiredDatasets();
+    grid.querySelectorAll("[data-geoip-draft]").forEach(function (card) {
+      if (!wanted.some(function (item) { return item.id === card.dataset.geoipDataset && item.provider === card.dataset.provider; })) card.remove();
+    });
+    grid.querySelectorAll("[data-geoip-dataset]:not([data-geoip-draft])").forEach(function (card) {
+      var selected = wanted.some(function (item) { return item.id === card.dataset.geoipDataset && item.provider === card.dataset.provider; });
+      card.classList.toggle("geoip-dataset-removing", !selected);
+      card.querySelector("[data-backend-config]").hidden = !selected;
+      if (!selected) card.querySelector("[data-editor-fields]").replaceChildren();
+      var badge = card.querySelector("[data-pending-badge]");
+      if (!selected && !badge) {
+        badge = document.createElement("span"); badge.className = "status paused"; badge.dataset.pendingBadge = "";
+        card.querySelector(".geoip-dataset-head").appendChild(badge);
+      }
+      if (badge) { badge.textContent = COPY.remove; badge.hidden = selected; }
+    });
+    var credentialOwners = new Set();
+    wanted.forEach(function (item) {
+      var card = Array.from(grid.querySelectorAll("[data-geoip-dataset]")).find(function (candidate) {
+        return candidate.dataset.geoipDataset === item.id && candidate.dataset.provider === item.provider;
+      }) || createDraft(item);
+      card.querySelector(".eyebrow").textContent = item.roles.join(" · ");
+      var owner = !credentialOwners.has(item.provider);
+      credentialOwners.add(item.provider);
+      renderEditor(card, owner);
+    });
+  }
+  function syncPrimaries(preset) {
+    var selected = new Set();
+    root.querySelectorAll('[data-preset="' + preset + '"] select.backend-select').forEach(function (select) {
+      var current = select.value;
+      Array.from(select.options).forEach(function (option) { option.disabled = selected.has(option.value); });
+      if (selected.has(current)) {
+        var next = Array.from(select.options).find(function (option) { return !option.disabled; });
+        if (next) select.value = next.value;
+      }
+      selected.add(select.value);
+    });
+  }
+  function syncPreset() {
+    var checked = root.querySelector('input[name="geoip_preset"]:checked');
+    var preset = checked ? checked.value : "basic";
+    sections.forEach(function (section) {
+      var active = section.dataset.preset === preset;
+      section.hidden = !active;
+      section.querySelectorAll("select, input").forEach(function (control) { control.disabled = !active; });
+    });
+    var basic = root.querySelector('select[name="geoip_basic_provider"]');
+    var primary = root.querySelector('[data-preset="' + preset + '"] select[name="geoip_domestic_offline"]');
+    var provider = preset === "basic" ? basic.value : (primary ? primary.value : "dbip");
+    if (ONLINE.has(provider)) provider = "dbip";
+    form.querySelector("[data-selected-provider]").value = provider;
+    if (preset !== "basic") syncPrimaries(preset);
+    refreshBackupChoices();
+    if (preset === "precise" && backupRows().length === 0) {
+      addBackup(availableBackends(null).some(function (entry) { return entry[0] === "amap"; }) ? "amap" : "");
+    }
+    syncCards();
+    if (initialSignature !== null) updateDirty();
+  }
+  var initialSignature = null;
+  var unsavedNotice = document.querySelector("[data-unsaved-geoip]");
+  function configurationSignature() {
+    var params = new URLSearchParams();
+    new FormData(form).forEach(function (value, name) {
+      if (name !== "csrf" && name !== "password" && typeof value === "string") params.append(name, value);
+    });
+    return params.toString();
+  }
+  function updateDirty() {
+    var dirty = configurationSignature() !== initialSignature;
+    unsavedNotice.hidden = !dirty;
+    grid.querySelectorAll(".geoip-dataset-actions button").forEach(function (button) {
+      if (!button.dataset.initialDisabled) button.dataset.initialDisabled = button.disabled ? "1" : "0";
+      button.disabled = dirty || button.dataset.initialDisabled === "1";
     });
   }
   root.querySelectorAll('input[name="geoip_preset"]').forEach(function (r) {
     r.addEventListener("change", syncPreset);
   });
   root.querySelectorAll(".backend-select").forEach(function (s) {
-    s.addEventListener("change", function () { syncCred(s); });
+    s.addEventListener("change", syncPreset);
   });
+  form.addEventListener("input", updateDirty);
+  form.addEventListener("change", updateDirty);
+  form.querySelector('select[name="geoip_update"]').addEventListener("change", syncCards);
+  grid.addEventListener("input", updateDirty);
+  grid.addEventListener("change", updateDirty);
+  grid.addEventListener("invalid", function (event) {
+    var details = event.target.closest("[data-backend-config]");
+    if (details) details.open = true;
+  }, true);
   syncPreset();
+  initialSignature = configurationSignature();
 })();
 </script>
 {{end}}

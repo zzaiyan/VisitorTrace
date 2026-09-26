@@ -26,6 +26,12 @@ type OnlineServiceConfig struct {
 	SK  string `json:"sk,omitempty"`
 }
 
+type GeoIPDatasetSource struct {
+	Provider    string `json:"provider"`
+	URL         string `json:"url,omitempty"`
+	ChecksumURL string `json:"checksum_url,omitempty"`
+}
+
 // GeoIPPresetFromProvider derives the preset name from a legacy provider
 // configuration so existing installs migrate transparently.
 func GeoIPPresetFromProvider(provider string) string {
@@ -38,32 +44,32 @@ func GeoIPPresetFromProvider(provider string) string {
 }
 
 type Config struct {
-	Version           int      `json:"version"`
-	DataDir           string   `json:"data_dir"`
-	DatabasePath      string   `json:"database_path"`
-	GeoIPPath         string   `json:"geoip_path"`
-	GeoIPPreset       string   `json:"geoip_preset,omitempty"`
-	GeoIPProvider     string   `json:"geoip_provider,omitempty"`
-	GeoIPDomesticOffline string `json:"geoip_domestic_offline,omitempty"`
-	GeoIPDomesticOnline  string `json:"geoip_domestic_online,omitempty"`
-	GeoIPForeignOffline  string `json:"geoip_foreign_offline,omitempty"`
-	GeoIPForeignOnline   string `json:"geoip_foreign_online,omitempty"`
-	GeoIPBackupDBIP      bool   `json:"geoip_backup_dbip,omitempty"`
-	GeoIPBackupBigDC     bool   `json:"geoip_backup_bigdatacloud,omitempty"`
-	GeoIPBackupAmap      bool   `json:"geoip_backup_amap,omitempty"`
-	GeoIPUpdate       string   `json:"geoip_update,omitempty"`
-	GeoIPUpdateURL    string   `json:"geoip_update_url,omitempty"`
-	GeoIPChecksumURL  string   `json:"geoip_checksum_url,omitempty"`
-	MaxMindAccountID  string   `json:"maxmind_account_id,omitempty"`
-	MaxMindLicenseKey string   `json:"maxmind_license_key,omitempty"`
-	IP2LocationToken  string   `json:"ip2location_download_token,omitempty"`
-	OnlineServices  map[string]OnlineServiceConfig `json:"online_services,omitempty"`
-	GeoIPForeignPath  string   `json:"geoip_foreign_path,omitempty"`
-	BackupDir         string   `json:"backup_dir,omitempty"`
-	UpdateManifestURL string   `json:"update_manifest_url,omitempty"`
-	Listen            string   `json:"listen"`
-	BaseURL           string   `json:"base_url,omitempty"`
-	TrustedProxies    []string `json:"trusted_proxies,omitempty"`
+	Version              int                            `json:"version"`
+	DataDir              string                         `json:"data_dir"`
+	DatabasePath         string                         `json:"database_path"`
+	GeoIPPath            string                         `json:"geoip_path"`
+	GeoIPPreset          string                         `json:"geoip_preset,omitempty"`
+	GeoIPProvider        string                         `json:"geoip_provider,omitempty"`
+	GeoIPBasicBackend    string                         `json:"geoip_basic_backend,omitempty"`
+	GeoIPDomesticOffline string                         `json:"geoip_domestic_offline,omitempty"`
+	GeoIPDomesticOnline  string                         `json:"geoip_domestic_online,omitempty"`
+	GeoIPForeignOffline  string                         `json:"geoip_foreign_offline,omitempty"`
+	GeoIPForeignOnline   string                         `json:"geoip_foreign_online,omitempty"`
+	GeoIPBackups         []string                       `json:"geoip_backups,omitempty"`
+	GeoIPUpdate          string                         `json:"geoip_update,omitempty"`
+	GeoIPUpdateURL       string                         `json:"geoip_update_url,omitempty"`
+	GeoIPChecksumURL     string                         `json:"geoip_checksum_url,omitempty"`
+	GeoIPDatasetSources  map[string]GeoIPDatasetSource  `json:"geoip_dataset_sources,omitempty"`
+	MaxMindAccountID     string                         `json:"maxmind_account_id,omitempty"`
+	MaxMindLicenseKey    string                         `json:"maxmind_license_key,omitempty"`
+	IP2LocationToken     string                         `json:"ip2location_download_token,omitempty"`
+	OnlineServices       map[string]OnlineServiceConfig `json:"online_services,omitempty"`
+	GeoIPForeignPath     string                         `json:"geoip_foreign_path,omitempty"`
+	BackupDir            string                         `json:"backup_dir,omitempty"`
+	UpdateManifestURL    string                         `json:"update_manifest_url,omitempty"`
+	Listen               string                         `json:"listen"`
+	BaseURL              string                         `json:"base_url,omitempty"`
+	TrustedProxies       []string                       `json:"trusted_proxies,omitempty"`
 }
 
 func DefaultConfigPath() string {
@@ -218,25 +224,6 @@ func (c Config) Validate() error {
 	if c.GeoIPUpdate != "automatic" && c.GeoIPUpdate != "disabled" {
 		return fmt.Errorf("geoip_update must be automatic or disabled")
 	}
-	if c.GeoIPUpdate == "automatic" && strings.TrimSpace(c.GeoIPUpdateURL) == "" {
-		return errors.New("geoip_update_url is required when GeoIP updates are enabled")
-	}
-	profile, err := geoip.UpdateProfileForProvider(c.GeoIPProvider)
-	if err != nil {
-		return err
-	}
-	if c.GeoIPUpdate == "automatic" && c.GeoIPUpdateURL == profile.URL {
-		switch geoip.Provider(c.GeoIPProvider) {
-		case geoip.ProviderMaxMind:
-			if c.MaxMindAccountID == "" || c.MaxMindLicenseKey == "" {
-				return errors.New("maxmind_account_id and maxmind_license_key are required for the official MaxMind update source")
-			}
-		case geoip.ProviderIP2Location:
-			if c.IP2LocationToken == "" {
-				return errors.New("ip2location_download_token is required for the official IP2Location update source")
-			}
-		}
-	}
 	if c.GeoIPPreset == "" {
 		c.GeoIPPreset = GeoIPPresetFromProvider(c.GeoIPProvider)
 	}
@@ -247,19 +234,150 @@ func (c Config) Validate() error {
 	default:
 		return fmt.Errorf("geoip_preset must be basic, recommended, or precise (got %q)", c.GeoIPPreset)
 	}
-	if c.GeoIPPreset == "precise" {
-		if len(c.OnlineServices) == 0 {
-			return errors.New("at least one online service key is required when the GeoIP preset is precise")
+	validateBackend := func(role, name string) error {
+		if _, err := geoip.NormalizeProvider(name); err == nil {
+			return nil
 		}
-		for name := range c.OnlineServices {
-			if _, err := geoiponline.NormalizeProvider(name); err != nil {
+		if _, err := geoiponline.NormalizeProvider(name); err != nil {
+			return fmt.Errorf("%s: %w", role, err)
+		}
+		if c.OnlineServices[name].Key == "" {
+			return fmt.Errorf("online service %s needs a key", name)
+		}
+		return nil
+	}
+	if c.GeoIPPreset == "basic" {
+		basic := c.GeoIPBasicBackend
+		if basic == "" {
+			basic = c.GeoIPProvider
+		}
+		if basic == "ip2region" {
+			return errors.New("ip2region cannot be the only GeoIP database because it has no coordinates")
+		}
+		if err := validateBackend("basic primary", basic); err != nil {
+			return err
+		}
+	}
+	if c.GeoIPPreset == "recommended" {
+		domestic := c.GeoIPDomesticOffline
+		if domestic == "" {
+			domestic = "ipinfo"
+		}
+		if domestic == "ip2region" {
+			return errors.New("ip2region cannot be the sole domestic GeoIP primary because it has no coordinates")
+		}
+		foreign := c.GeoIPForeignOffline
+		if foreign == "" {
+			foreign = "ip2location"
+		}
+		if foreign == "ip2region" {
+			return errors.New("ip2region cannot be the sole foreign GeoIP primary because it has no coordinates")
+		}
+		if domestic == foreign {
+			return errors.New("domestic and foreign primaries must use different GeoIP backends")
+		}
+		for role, name := range map[string]string{"domestic primary": domestic, "foreign primary": foreign} {
+			if err := validateBackend(role, name); err != nil {
 				return err
 			}
 		}
 	}
+	if c.GeoIPPreset == "precise" {
+		if c.GeoIPDomesticOnline == "" || c.GeoIPForeignOnline == "" {
+			return errors.New("precise GeoIP requires two primary databases in each branch")
+		}
+		if len(c.GeoIPBackups) == 0 {
+			return errors.New("precise GeoIP requires at least one backup database")
+		}
+		domestic := c.GeoIPDomesticOffline
+		if domestic == "" {
+			domestic = "ip2region"
+		}
+		foreign := c.GeoIPForeignOffline
+		if foreign == "" {
+			foreign = "ip2location"
+		}
+		if domestic == c.GeoIPDomesticOnline || foreign == c.GeoIPForeignOnline {
+			return errors.New("each GeoIP branch needs two different primary backends")
+		}
+		primaries := map[string]bool{}
+		for role, name := range map[string]string{"domestic primary A": domestic, "domestic primary B": c.GeoIPDomesticOnline, "foreign primary A": foreign, "foreign primary B": c.GeoIPForeignOnline} {
+			_, offlineErr := geoip.NormalizeProvider(name)
+			if primaries[name] && offlineErr == nil {
+				return fmt.Errorf("GeoIP primary %s is selected more than once", name)
+			}
+			primaries[name] = true
+			if err := validateBackend(role, name); err != nil {
+				return err
+			}
+		}
+	}
+	primaries := map[string]bool{}
+	if c.GeoIPPreset == "precise" {
+		domestic := c.GeoIPDomesticOffline
+		if domestic == "" {
+			domestic = "ip2region"
+		}
+		foreign := c.GeoIPForeignOffline
+		if foreign == "" {
+			foreign = "ip2location"
+		}
+		for _, name := range []string{domestic, c.GeoIPDomesticOnline, foreign, c.GeoIPForeignOnline} {
+			if name != "" {
+				primaries[name] = true
+			}
+		}
+	}
+	backups := map[string]bool{}
+	for _, name := range c.GeoIPBackups {
+		switch name {
+		case "dbip", "maxmind", "ip2location", "ip2region", "bigdatacloud", "amap", "tencent", "ipinfo":
+		default:
+			return fmt.Errorf("invalid GeoIP backup %q", name)
+		}
+		if backups[name] || primaries[name] {
+			return fmt.Errorf("GeoIP backup %q is duplicated or already selected as a primary", name)
+		}
+		backups[name] = true
+	}
 	for name, svc := range c.OnlineServices {
 		if strings.ContainsAny(svc.Key, "\r\n") || strings.ContainsAny(svc.SK, "\r\n") {
 			return fmt.Errorf("online_services[%s] must not contain line breaks", name)
+		}
+	}
+	for id, source := range c.GeoIPDatasetSources {
+		if id != "foreign" && id != "domestic_b" && id != "foreign_b" && id != "backup_"+source.Provider {
+			return fmt.Errorf("invalid GeoIP dataset source %q", id)
+		}
+		if _, err := geoip.NormalizeProvider(source.Provider); err != nil {
+			return fmt.Errorf("invalid GeoIP dataset source %q: %w", id, err)
+		}
+	}
+	for _, dataset := range c.SelectedGeoIPDatasets() {
+		if dataset.Online {
+			if c.OnlineServices[dataset.Provider].Key == "" {
+				return fmt.Errorf("online service %s needs a key", dataset.Provider)
+			}
+			continue
+		}
+		if c.GeoIPUpdate == "automatic" {
+			if strings.TrimSpace(dataset.UpdateURL) == "" {
+				return fmt.Errorf("update URL is required for %s", dataset.Provider)
+			}
+			profile, _ := geoip.UpdateProfileForProvider(dataset.Provider)
+			if dataset.UpdateURL != profile.URL {
+				continue
+			}
+			switch dataset.Provider {
+			case "maxmind":
+				if c.MaxMindAccountID == "" || c.MaxMindLicenseKey == "" {
+					return errors.New("maxmind_account_id and maxmind_license_key are required for the official MaxMind update source")
+				}
+			case "ip2location":
+				if c.IP2LocationToken == "" {
+					return errors.New("ip2location_download_token is required for the official IP2Location update source")
+				}
+			}
 		}
 	}
 	for name, value := range map[string]string{"maxmind_account_id": c.MaxMindAccountID, "maxmind_license_key": c.MaxMindLicenseKey, "ip2location_download_token": c.IP2LocationToken} {
@@ -282,6 +400,22 @@ func (c Config) Validate() error {
 		loopback := host == "localhost" || host == "127.0.0.1" || host == "::1"
 		if parsed.Scheme != "https" && !(parsed.Scheme == "http" && loopback) {
 			return fmt.Errorf("%s must use HTTPS except on loopback", name)
+		}
+	}
+	for id, source := range c.GeoIPDatasetSources {
+		for field, value := range map[string]string{"url": source.URL, "checksum_url": source.ChecksumURL} {
+			if value == "" {
+				continue
+			}
+			parsed, err := url.Parse(value)
+			if err != nil || parsed.Host == "" || parsed.User != nil {
+				return fmt.Errorf("geoip_dataset_sources[%s].%s must be an absolute URL without credentials", id, field)
+			}
+			host := strings.ToLower(parsed.Hostname())
+			loopback := host == "localhost" || host == "127.0.0.1" || host == "::1"
+			if parsed.Scheme != "https" && !(parsed.Scheme == "http" && loopback) {
+				return fmt.Errorf("geoip_dataset_sources[%s].%s must use HTTPS except on loopback", id, field)
+			}
 		}
 	}
 	return nil
@@ -347,8 +481,44 @@ func (c *Config) normalize() error {
 }
 
 func (c *Config) applyDefaults() {
+	if c.GeoIPPreset == "" {
+		c.GeoIPPreset = GeoIPPresetFromProvider(c.GeoIPProvider)
+	}
 	if strings.TrimSpace(c.GeoIPProvider) == "" {
 		c.GeoIPProvider = string(geoip.ProviderDBIP)
+	}
+	if c.GeoIPPreset == "basic" && c.GeoIPBasicBackend == "" {
+		c.GeoIPBasicBackend = c.GeoIPProvider
+	}
+	if c.GeoIPPreset == "basic" {
+		if basic, err := geoip.NormalizeProvider(c.GeoIPBasicBackend); err == nil {
+			c.GeoIPProvider = basic
+			if basic == string(geoip.ProviderIP2Region) && c.GeoIPPath == filepath.Join(c.DataDir, "geoip.mmdb") {
+				c.GeoIPPath = filepath.Join(c.DataDir, "geoip.xdb")
+			} else if basic != string(geoip.ProviderIP2Region) && c.GeoIPPath == filepath.Join(c.DataDir, "geoip.xdb") {
+				c.GeoIPPath = filepath.Join(c.DataDir, "geoip.mmdb")
+			}
+		}
+	}
+	if c.GeoIPPreset == "recommended" || c.GeoIPPreset == "precise" {
+		if c.GeoIPDomesticOffline == "" {
+			if c.GeoIPPreset == "recommended" {
+				c.GeoIPDomesticOffline = "ipinfo"
+			} else {
+				c.GeoIPDomesticOffline = string(geoip.ProviderIP2Region)
+			}
+		}
+		if c.GeoIPForeignOffline == "" {
+			c.GeoIPForeignOffline = string(geoip.ProviderIP2Location)
+		}
+		if domestic, err := geoip.NormalizeProvider(c.GeoIPDomesticOffline); err == nil {
+			c.GeoIPProvider = domestic
+			if domestic == string(geoip.ProviderIP2Region) && c.GeoIPPath == filepath.Join(c.DataDir, "geoip.mmdb") {
+				c.GeoIPPath = filepath.Join(c.DataDir, "geoip.xdb")
+			} else if domestic != string(geoip.ProviderIP2Region) && c.GeoIPPath == filepath.Join(c.DataDir, "geoip.xdb") {
+				c.GeoIPPath = filepath.Join(c.DataDir, "geoip.mmdb")
+			}
+		}
 	}
 	if c.BackupDir == "" && c.DataDir != "" {
 		c.BackupDir = filepath.Join(c.DataDir, "backups")

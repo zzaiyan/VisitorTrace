@@ -17,6 +17,50 @@ func (s stubOnline) Lookup(_ context.Context, address netip.Addr) (Location, err
 	return Location{}, nil
 }
 
+type countingOnline struct{ calls int }
+
+func (s *countingOnline) Lookup(_ context.Context, _ netip.Addr) (Location, error) {
+	s.calls++
+	return Location{CountryCode: "JP", City: "Osaka"}, nil
+}
+
+type stubOfflineDB struct{ location Location }
+
+func (s stubOfflineDB) lookup(netip.Addr) Location { return s.location }
+func (s stubOfflineDB) close() error               { return nil }
+func (s stubOfflineDB) verify() error              { return nil }
+
+func TestRecommendedPairUsesDomesticCoordinateBearingPrimary(t *testing.T) {
+	latitude, longitude := 30.59, 114.30
+	chain := NewChain([]*ChainBackend{
+		{Name: "ipinfo", Online: stubOnline{"58.48.27.139": {CountryCode: "CN", City: "Wuhan", Latitude: &latitude, Longitude: &longitude}}, DomesticWeight: 1.2},
+		{Name: "ip2location", Offline: &Resolver{backend: stubOfflineDB{Location{CountryCode: "CN", City: "Other city"}}}, DomesticWeight: 1.0},
+	}, "ipinfo", "ip2location", true)
+	chain.SetCross("", "")
+	location := chain.Lookup(context.Background(), netip.MustParseAddr("58.48.27.139"))
+	if NormalizeCityEN(location.City) != "Wuhan" || location.Latitude == nil || location.Longitude == nil || *location.Latitude != latitude || *location.Longitude != longitude {
+		t.Fatalf("recommended domestic result = %+v", location)
+	}
+}
+
+func TestRecommendedForeignPrimaryIsNotOverriddenByDomesticIPinfo(t *testing.T) {
+	latitude, longitude := 35.68, 139.69
+	address := netip.MustParseAddr("50.7.158.235")
+	ipinfo := &countingOnline{}
+	chain := NewChain([]*ChainBackend{
+		{Name: "ipinfo", Online: ipinfo, ForeignWeight: 1.2},
+		{Name: "ip2location", Online: stubOnline{address.String(): {CountryCode: "JP", City: "Tokyo", Latitude: &latitude, Longitude: &longitude}}, ForeignWeight: 1.0},
+	}, "ipinfo", "ip2location", true)
+	chain.SetCross("", "")
+	location := chain.Lookup(context.Background(), address)
+	if location.City != "Tokyo" || location.Latitude == nil || *location.Latitude != latitude {
+		t.Fatalf("recommended foreign result = %+v", location)
+	}
+	if ipinfo.calls != 0 {
+		t.Fatalf("foreign lookup unnecessarily used IPinfo %d times", ipinfo.calls)
+	}
+}
+
 func TestChainDomesticConsensusRoutesToDomestic(t *testing.T) {
 	// Both offline primaries agree on CN; the online cross-validator also
 	// agrees on the city, so the result is accepted directly.
@@ -28,6 +72,35 @@ func TestChainDomesticConsensusRoutesToDomestic(t *testing.T) {
 	location := chain.Lookup(context.Background(), netip.MustParseAddr("58.48.27.139"))
 	if NormalizeCityEN(location.City) != "Wuhan" || location.CountryCode != "CN" {
 		t.Fatalf("Lookup = %+v", location)
+	}
+}
+
+func TestChainUsesCrossCoordinatesWhenPrimaryHasNone(t *testing.T) {
+	latitude, longitude := 30.59, 114.30
+	address := netip.MustParseAddr("58.48.27.139")
+	chain := NewChain([]*ChainBackend{
+		{Name: "ip2region", Online: stubOnline{address.String(): {CountryCode: "CN", City: "武汉"}}},
+		{Name: "ip2location", Online: stubOnline{address.String(): {CountryCode: "CN", City: "武汉"}}},
+		{Name: "tencent", Online: stubOnline{address.String(): {CountryCode: "CN", City: "武汉市", Latitude: &latitude, Longitude: &longitude}}},
+	}, "ip2region", "ip2location", true)
+	chain.SetCross("tencent", "")
+	location := chain.Lookup(context.Background(), address)
+	if location.Latitude == nil || location.Longitude == nil || *location.Latitude != latitude || *location.Longitude != longitude {
+		t.Fatalf("cross coordinates missing from %+v", location)
+	}
+}
+
+func TestChainUsesSelectedCrossBackendBeforeBackups(t *testing.T) {
+	address := netip.MustParseAddr("58.48.27.139")
+	chain := NewChain([]*ChainBackend{
+		{Name: "domestic", Online: stubOnline{address.String(): {CountryCode: "CN", City: "Wuhan"}}},
+		{Name: "foreign", Online: stubOnline{address.String(): {CountryCode: "CN", City: "Wuhan"}}},
+		{Name: "backup", Online: stubOnline{address.String(): {CountryCode: "CN", City: "Guangzhou"}}, DomesticWeight: 5},
+		{Name: "selected", Online: stubOnline{address.String(): {CountryCode: "CN", City: "Wuhan"}}, DomesticWeight: 1},
+	}, "domestic", "foreign", true)
+	chain.SetCross("selected", "")
+	if got := chain.Lookup(context.Background(), address).City; got != "Wuhan" {
+		t.Fatalf("selected cross-check was ignored: got %q", got)
 	}
 }
 

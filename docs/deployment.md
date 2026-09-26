@@ -18,7 +18,7 @@ Only ports 80 and 443 need to be public. Do not expose the VisitorTrace port to 
 Set the release version and architecture, then download the matching executable and checksum file:
 
 ```sh
-VERSION=0.3.0
+VERSION=0.4.0
 ARCH=amd64
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/visitortrace-${VERSION}-linux-${ARCH}"
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/checksums.txt"
@@ -47,7 +47,7 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
 
 The default configuration listens on `127.0.0.1:8790`, stores SQLite and GeoIP data under `/var/lib/visitortrace`, and uses DB-IP City Lite as its automatically updated provider. MaxMind GeoLite2 City and IP2Location LITE DB11 have equivalent automatic-update support but require account credentials. Add `--geoip-provider maxmind --maxmind-account-id ACCOUNT_ID --maxmind-license-key LICENSE_KEY` or `--geoip-provider ip2location --ip2location-token DOWNLOAD_TOKEN` to the initialization command. Keep the configuration at mode `0600`; backups include these credentials and require the same access control.
 
-After installation, the provider, credentials, source, and update policy can be changed under **Administrator Settings > GeoIP database**. The form atomically updates the same protected configuration and requests a systemd-supervised restart, so the unit must retain `Restart=always` and write access to `/etc/visitortrace` as shown below.
+After installation, choose a GeoIP preset and its providers under **Administrator Settings > Service configuration**; configure credentials and download sources in the selected cards under **GeoIP data**. The form atomically updates the same protected configuration and requests a systemd-supervised restart, so the unit must retain `Restart=always` and write access to `/etc/visitortrace` as shown below.
 
 Before placing a reverse proxy in front of the service, add its loopback addresses to `trusted_proxies` in `/etc/visitortrace/config.json`:
 
@@ -94,7 +94,7 @@ If the new release binary and `checksums.txt` are already on the server, update 
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.3.0-linux-amd64 \
+  --binary ./visitortrace-0.4.0-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 
@@ -316,7 +316,7 @@ sudo -u visitortrace /var/lib/visitortrace/releases/current/visitortrace geoip u
 sudo systemctl restart visitortrace
 ```
 
-A command-line GeoIP update runs outside the serving process, so restart the service after a successful manual update. If automatic updates are disabled or unavailable, obtain a valid MMDB for the configured provider through a trusted network or mirror, place it at the configured `geoip_path` with owner `visitortrace`, mode `0600`, and restart the service. Disabling automatic updates does not remove the requirement for a valid local MMDB.
+A command-line GeoIP update processes all selected local datasets and runs outside the serving process, so restart the service after a successful manual update. Use `--dataset ID` to update one source. In **Manual only** mode, add `--force`. If a selected local database cannot be downloaded, place a valid file for that provider at the path shown on its GeoIP status card, with owner `visitortrace` and mode `0600`, then restart. An online-only preset does not require a local MMDB.
 
 For a root deployment, `https://stats.example.com/` redirects to `/admin`; the Administrator entry point is `https://stats.example.com/admin/login`, and a public Site uses `/public/<SITE-ID>/analytics`. For a subpath deployment, use the same paths below the configured prefix. If desired, add an exact Nginx location to redirect the bare domain directly to the login page:
 
