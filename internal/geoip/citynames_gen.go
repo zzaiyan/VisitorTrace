@@ -1,0 +1,87 @@
+package geoip
+
+import "strings"
+
+// cityNamesEN maps Chinese administrative names (prefecture-level cities and
+// provinces, generated from GeoNames alternate names) to their common
+// English names so cross-backend comparisons aggregate on one spelling.
+var cityNamesEN = map[string]string{
+	"上海": "Shanghai", "上海市": "Shanghai", "东莞": "Dongguan",
+	"中山": "Zhongshan", "丹东": "Dandong", "乌鲁木齐": "Urumqi",
+	"乐山": "Leshan", "云南": "Yunnan", "云南省": "Yunnan",
+	"佛山": "Foshan", "六安": "Lu'an", "兰州": "Lanzhou",
+	"内蒙古": "Inner Mongolia", "内蒙古自治区": "Inner Mongolia", "北京": "Beijing",
+	"北京市": "Beijing", "南京": "Nanjing", "南充": "Nanchong",
+	"南宁": "Nanning", "南昌": "Nanchang", "博尔塔拉蒙古自治州": "Bortala",
+	"厦门": "Xiamen", "台中": "Taichung", "台湾": "Taiwan",
+	"台湾省": "Taiwan", "合肥": "Hefei", "吉林": "Jilin",
+	"咸阳": "Xianyang", "哈尔滨": "Harbin", "喀什": "Kashgar",
+	"喀什地区": "Kashgar", "四川": "Sichuan", "四川省": "Sichuan",
+	"大庆": "Daqing", "天津": "Tianjin", "天津市": "Tianjin",
+	"太原": "Taiyuan", "娄底": "Loudi", "宁夏": "Ningxia",
+	"宁夏回族自治区": "Ningxia", "宁波": "Ningbo", "安徽": "Anhui",
+	"安徽省": "Anhui", "安阳": "Anyang", "宜宾": "Yibin",
+	"山东": "Shandong", "山东省": "Shandong", "山西": "Shanxi",
+	"山西省": "Shanxi", "常州": "Changzhou", "常德": "Changde",
+	"广东": "Guangdong", "广东省": "Guangdong", "广州": "Guangzhou",
+	"广西": "Guangxi", "广西壮族自治区": "Guangxi", "德州": "Dezhou",
+	"惠州": "Huizhou", "成都": "Chengdu", "扬州": "Yangzhou",
+	"抚顺": "Fushun", "新界": "New Territories", "新疆": "Xinjiang",
+	"新疆维吾尔自治区": "Xinjiang", "无锡": "Wuxi", "昆明": "Kunming",
+	"曲靖": "Qujing", "杭州": "Hangzhou", "株洲": "Zhuzhou",
+	"桂林": "Guilin", "武汉": "Wuhan", "江苏": "Jiangsu",
+	"江苏省": "Jiangsu", "江西": "Jiangxi", "江西省": "Jiangxi",
+	"沈阳": "Shenyang", "河北": "Hebei", "河北省": "Hebei",
+	"河南": "Henan", "河南省": "Henan", "济南": "Jinan",
+	"浙江": "Zhejiang", "浙江省": "Zhejiang", "淄博": "Zibo",
+	"深圳": "Shenzhen", "湖北": "Hubei", "湖北省": "Hubei",
+	"湖南": "Hunan", "湖南省": "Hunan", "潍坊": "Weifang",
+	"澳门": "Macau", "澳门特别行政区": "Macau", "烟台": "Yantai",
+	"珠海": "Zhuhai", "甘南": "Gannan", "甘南藏族自治州": "Gannan",
+	"甘肃": "Gansu", "甘肃省": "Gansu", "盐城": "Yancheng",
+	"福建": "Fujian", "福建省": "Fujian", "秦皇岛": "Qinhuangdao",
+	"绍兴": "Shaoxing", "聊城": "Liaocheng", "肇庆": "Zhaoqing",
+	"舟山": "Zhoushan", "苏州": "Suzhou", "荆州": "Jingzhou",
+	"荆门": "Jingmen", "衡阳": "Hengyang", "西安": "Xian",
+	"西藏": "Tibet", "西藏自治区": "Tibet", "辽宁": "Liaoning",
+	"辽宁省": "Liaoning", "郑州": "Zhengzhou", "重庆": "Chongqing",
+	"重庆市": "Chongqing", "金华": "Jinhua", "镇江": "Zhenjiang",
+	"长沙": "Changsha", "阜阳": "Fuyang", "陕西": "Shaanxi",
+	"陕西省": "Shaanxi", "青海": "Qinghai", "青海省": "Qinghai",
+	"香港": "Hong Kong", "香港特别行政区": "Hong Kong", "驻马店": "Zhumadian",
+	"黑龙江": "Heilongjiang", "黑龙江省": "Heilongjiang",
+}
+
+// citySuffixes are stripped before the second lookup when a full name
+// (such as "武汉市" or "喀什地区") is not present verbatim.
+var citySuffixes = []string{"特别行政区", "维吾尔自治区", "壮族自治区", "回族自治区", "自治区", "自治州", "地区", "盟", "省级", "市", "省"}
+
+// NormalizeCityEN returns the common English name for a Chinese city or
+// province label, or the label unchanged when it is already Latin or
+// unrecognized.
+func NormalizeCityEN(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || !containsHan(value) {
+		return value
+	}
+	if name, ok := cityNamesEN[value]; ok {
+		return name
+	}
+	for _, suffix := range citySuffixes {
+		if strings.HasSuffix(value, suffix) && len(value) > len(suffix) {
+			if name, ok := cityNamesEN[strings.TrimSuffix(value, suffix)]; ok {
+				return name
+			}
+		}
+	}
+	return value
+}
+
+func containsHan(value string) bool {
+	for _, r := range value {
+		if r >= 0x4E00 && r <= 0x9FFF {
+			return true
+		}
+	}
+	return false
+}
