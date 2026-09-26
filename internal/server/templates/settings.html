@@ -32,87 +32,108 @@
         </div>
 
         <div data-preset="basic" hidden>
-          <label class="field"><span>离线数据库</span>
-            <select name="geoip_basic_provider">
-              <option value="dbip" {{if eq .GeoIPBasicProvider "dbip"}}selected{{end}}>DB-IP City Lite</option>
-              <option value="ip2region" {{if eq .GeoIPBasicProvider "ip2region"}}selected{{end}}>ip2region</option>
-              <option value="ip2location" {{if eq .GeoIPBasicProvider "ip2location"}}selected{{end}}>IP2Location LITE</option>
-              <option value="maxmind" {{if eq .GeoIPBasicProvider "maxmind"}}selected{{end}}>MaxMind GeoLite2</option>
+          <label class="field"><span>数据库</span>
+            <select name="geoip_basic_provider" class="backend-select">
+              <option value="dbip" data-coords="true" {{if eq .GeoIPBasicProvider "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
+              <option value="ip2region" data-coords="false" {{if eq .GeoIPBasicProvider "ip2region"}}selected{{end}}>ip2region（中文城市）</option>
+              <option value="ip2location" data-coords="true" {{if eq .GeoIPBasicProvider "ip2location"}}selected{{end}}>IP2Location LITE 📍</option>
+              <option value="maxmind" data-coords="true" {{if eq .GeoIPBasicProvider "maxmind"}}selected{{end}}>MaxMind GeoLite2 📍</option>
             </select>
           </label>
+          <div class="cred-panel"></div>
         </div>
 
         <div data-preset="recommended" hidden>
           <div class="field-grid two">
-            <label class="field"><span>国内离线库</span>
-              <select name="geoip_domestic_offline"><option value="ip2region" {{if eq .GeoIPDomesticOffline "ip2region"}}selected{{end}}>ip2region（推荐）</option><option value="dbip" {{if eq .GeoIPDomesticOffline "dbip"}}selected{{end}}>DB-IP</option></select>
-            </label>
-            <label class="field"><span>国外离线库</span>
-              <select name="geoip_foreign_offline"><option value="ip2location" {{if eq .GeoIPForeignOffline "ip2location"}}selected{{end}}>IP2Location（推荐）</option><option value="dbip" {{if eq .GeoIPForeignOffline "dbip"}}selected{{end}}>DB-IP</option><option value="maxmind" {{if eq .GeoIPForeignOffline "maxmind"}}selected{{end}}>MaxMind</option></select>
-            </label>
+            <div><label class="field"><span>国内 · 主库</span>
+              <select name="geoip_domestic_offline" class="backend-select">
+                <option value="ip2region" {{if eq .GeoIPDomesticOffline "ip2region"}}selected{{end}}>ip2region（推荐）</option>
+                <option value="dbip" {{if eq .GeoIPDomesticOffline "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
+                <option value="ip2location" {{if eq .GeoIPDomesticOffline "ip2location"}}selected{{end}}>IP2Location LITE 📍</option>
+              </select>
+            </label><div class="cred-panel"></div></div>
+            <div><label class="field"><span>国外 · 主库</span>
+              <select name="geoip_foreign_offline" class="backend-select">
+                <option value="ip2location" {{if eq .GeoIPForeignOffline "ip2location"}}selected{{end}}>IP2Location LITE（推荐）📍</option>
+                <option value="dbip" {{if eq .GeoIPForeignOffline "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
+                <option value="maxmind" {{if eq .GeoIPForeignOffline "maxmind"}}selected{{end}}>MaxMind GeoLite2 📍</option>
+              </select>
+            </label><div class="cred-panel"></div></div>
           </div>
         </div>
 
         <div data-preset="precise" hidden>
-          <p class="muted" style="font-size:12px;margin:0">每个分支各选一个离线主库 + 一个在线主库（交叉验证）；冲突时启用下方勾选的备用库投票。</p>
+          <p class="muted" style="font-size:12px;margin:0">每分支选两个主库（交叉验证，📍=有坐标，至少一个有坐标）；冲突时启用备用库投票。</p>
           <div class="field-grid two">
-            <label class="field"><span>国内 · 离线主库</span>
-              <select name="geoip_domestic_offline"><option value="ip2region" {{if eq .GeoIPDomesticOffline "ip2region"}}selected{{end}}>ip2region（推荐）</option><option value="dbip" {{if eq .GeoIPDomesticOffline "dbip"}}selected{{end}}>DB-IP</option></select>
-            </label>
-            <label class="field"><span>国内 · 在线主库</span>
-              <select name="geoip_domestic_online"><option value="">不启用</option><option value="tencent" {{if eq .GeoIPDomesticOnline "tencent"}}selected{{end}}>腾讯（推荐）</option><option value="ipinfo" {{if eq .GeoIPDomesticOnline "ipinfo"}}selected{{end}}>IPinfo</option></select>
-            </label>
+            <div class="branch-group">
+              <h4>国内分支</h4>
+              <label class="field"><span>主库 A</span>
+                <select name="geoip_domestic_offline" class="backend-select">
+                  <option value="ip2region" {{if eq .GeoIPDomesticOffline "ip2region"}}selected{{end}}>ip2region（推荐）</option>
+                  <option value="dbip" {{if eq .GeoIPDomesticOffline "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
+                  <option value="tencent" {{if eq .GeoIPDomesticOffline "tencent"}}selected{{end}}>腾讯位置服务 📍</option>
+                  <option value="ipinfo" {{if eq .GeoIPDomesticOffline "ipinfo"}}selected{{end}}>IPinfo 📍</option>
+                </select>
+              </label>
+              <div class="cred-panel"></div>
+              <label class="field"><span>主库 B</span>
+                <select name="geoip_domestic_online" class="backend-select">
+                  <option value="">不启用</option>
+                  <option value="tencent" {{if eq .GeoIPDomesticOnline "tencent"}}selected{{end}}>腾讯位置服务（推荐）📍</option>
+                  <option value="ipinfo" {{if eq .GeoIPDomesticOnline "ipinfo"}}selected{{end}}>IPinfo 📍</option>
+                  <option value="ip2region" {{if eq .GeoIPDomesticOnline "ip2region"}}selected{{end}}>ip2region</option>
+                </select>
+              </label>
+              <div class="cred-panel"></div>
+            </div>
+            <div class="branch-group">
+              <h4>国外分支</h4>
+              <label class="field"><span>主库 A</span>
+                <select name="geoip_foreign_offline" class="backend-select">
+                  <option value="ip2location" {{if eq .GeoIPForeignOffline "ip2location"}}selected{{end}}>IP2Location LITE（推荐）📍</option>
+                  <option value="dbip" {{if eq .GeoIPForeignOffline "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
+                  <option value="maxmind" {{if eq .GeoIPForeignOffline "maxmind"}}selected{{end}}>MaxMind GeoLite2 📍</option>
+                </select>
+              </label>
+              <div class="cred-panel"></div>
+              <label class="field"><span>主库 B</span>
+                <select name="geoip_foreign_online" class="backend-select">
+                  <option value="">不启用</option>
+                  <option value="ipinfo" {{if eq .GeoIPForeignOnline "ipinfo"}}selected{{end}}>IPinfo（推荐）📍</option>
+                  <option value="bigdatacloud" {{if eq .GeoIPForeignOnline "bigdatacloud"}}selected{{end}}>BigDataCloud 📍</option>
+                </select>
+              </label>
+              <div class="cred-panel"></div>
+            </div>
           </div>
-          <div class="field-grid two">
-            <label class="field"><span>国外 · 离线主库</span>
-              <select name="geoip_foreign_offline"><option value="ip2location" {{if eq .GeoIPForeignOffline "ip2location"}}selected{{end}}>IP2Location（推荐）</option><option value="dbip" {{if eq .GeoIPForeignOffline "dbip"}}selected{{end}}>DB-IP</option></select>
-            </label>
-            <label class="field"><span>国外 · 在线主库</span>
-              <select name="geoip_foreign_online"><option value="">不启用</option><option value="ipinfo" {{if eq .GeoIPForeignOnline "ipinfo"}}selected{{end}}>IPinfo（推荐）</option><option value="bigdatacloud" {{if eq .GeoIPForeignOnline "bigdatacloud"}}selected{{end}}>BigDataCloud</option></select>
-            </label>
-          </div>
-          <fieldset class="check-group"><legend>备用库（冲突时投票）</legend>
-            <label><input type="checkbox" name="geoip_backup_dbip" value="1" {{if .GeoIPBackupDBIP}}checked{{end}}> DB-IP</label>
-            <label><input type="checkbox" name="geoip_backup_bigdatacloud" value="1" {{if .GeoIPBackupBigDC}}checked{{end}}> BigDataCloud</label>
-            <label><input type="checkbox" name="geoip_backup_amap" value="1" {{if .GeoIPBackupAmap}}checked{{end}}> 高德</label>
+          <fieldset class="check-group"><legend>备用库（冲突时投票，可选）</legend>
+            <div class="field-grid two">
+              <div><label class="field"><span>备用 1</span>
+                <select name="geoip_backup_1" class="backend-select">
+                  <option value="">不启用</option>
+                  <option value="dbip" {{if eq .GeoIPBackup1 "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
+                  <option value="bigdatacloud" {{if eq .GeoIPBackup1 "bigdatacloud"}}selected{{end}}>BigDataCloud 📍</option>
+                  <option value="amap" {{if eq .GeoIPBackup1 "amap"}}selected{{end}}>高德（仅国内）</option>
+                  <option value="tencent" {{if eq .GeoIPBackup1 "tencent"}}selected{{end}}>腾讯位置服务 📍</option>
+                  <option value="ipinfo" {{if eq .GeoIPBackup1 "ipinfo"}}selected{{end}}>IPinfo 📍</option>
+                </select>
+              </label><div class="cred-panel"></div></div>
+              <div><label class="field"><span>备用 2</span>
+                <select name="geoip_backup_2" class="backend-select">
+                  <option value="">不启用</option>
+                  <option value="dbip" {{if eq .GeoIPBackup2 "dbip"}}selected{{end}}>DB-IP City Lite 📍</option>
+                  <option value="bigdatacloud" {{if eq .GeoIPBackup2 "bigdatacloud"}}selected{{end}}>BigDataCloud 📍</option>
+                  <option value="amap" {{if eq .GeoIPBackup2 "amap"}}selected{{end}}>高德（仅国内）</option>
+                  <option value="tencent" {{if eq .GeoIPBackup2 "tencent"}}selected{{end}}>腾讯位置服务 📍</option>
+                  <option value="ipinfo" {{if eq .GeoIPBackup2 "ipinfo"}}selected{{end}}>IPinfo 📍</option>
+                </select>
+              </label><div class="cred-panel"></div></div>
+            </div>
           </fieldset>
+          <small>{{t "online_privacy_warning"}}</small>
         </div>
-
-        <details style="margin-top:8px"><summary style="font-size:12px;color:var(--muted);cursor:pointer">凭证（按需填写）</summary>
-          <div class="field-grid two" style="margin-top:10px">
-            <label class="field"><span>IP2Location Token</span><input type="password" name="ip2location_token" autocomplete="new-password" maxlength="512" placeholder="{{if .IP2LocationConfigured}}已保存{{else}}免费注册获取{{end}}"></label>
-            <label class="field"><span>MaxMind Account ID</span><input type="text" name="maxmind_account_id" autocomplete="off" maxlength="512" placeholder="{{if .MaxMindConfigured}}已保存{{else}}选填{{end}}"></label>
-          </div>
-          <label class="field"><span>MaxMind License Key</span><input type="password" name="maxmind_license_key" autocomplete="new-password" maxlength="512"></label>
-          <div class="field-grid two">
-            <label class="field"><span>腾讯 Key</span><input type="password" name="online_tencent_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.tencent}}已保存{{else}}选填{{end}}"></label>
-            <label class="field"><span>腾讯 SK</span><input type="password" name="online_tencent_sk" autocomplete="new-password" maxlength="512"></label>
-          </div>
-          <div class="field-grid two">
-            <label class="field"><span>IPinfo Key</span><input type="password" name="online_ipinfo_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.ipinfo}}已保存{{else}}选填{{end}}"></label>
-            <label class="field"><span>BigDataCloud Key</span><input type="password" name="online_bigdatacloud_key" autocomplete="new-password" maxlength="512" placeholder="{{if .OnlineServiceKeys.bigdatacloud}}已保存{{else}}选填{{end}}"></label>
-          </div>
-          <div class="field-grid two">
-            <label class="field"><span>高德 Key</span><input type="password" name="online_amap_key" autocomplete="new-password" maxlength="512"></label>
-            <label class="field"><span>高德 SK</span><input type="password" name="online_amap_sk" autocomplete="new-password" maxlength="512"></label>
-          </div>
-        </details>
       </div>
     </div>
-    <script>
-    (function () {
-      var root = document.querySelector("[data-geoip-config]");
-      if (!root) return;
-      var sections = root.querySelectorAll("[data-preset]");
-      function sync() {
-        var checked = root.querySelector('input[name="geoip_preset"]:checked');
-        var value = checked ? checked.value : "";
-        sections.forEach(function (s) { s.hidden = s.dataset.preset !== value; });
-      }
-      root.querySelectorAll('input[name="geoip_preset"]').forEach(function (r) { r.addEventListener("change", sync); });
-      sync();
-    })();
-    </script>
 
 
     <div class="configuration-actions">
@@ -218,6 +239,59 @@
   provider.addEventListener("change", sync);
   sourceInputs.forEach((input) => input.addEventListener("change", sync));
   sync();
+})();
+</script>
+<script>
+(function () {
+  var CRED = {
+    dbip: null, ip2region: null,
+    ip2location: [["ip2location_token", "Token"]],
+    maxmind: [["maxmind_account_id", "Account ID"], ["maxmind_license_key", "License Key"]],
+    tencent: [["online_tencent_key", "Key"], ["online_tencent_sk", "SK"]],
+    amap: [["online_amap_key", "Key"], ["online_amap_sk", "SK"]],
+    ipinfo: [["online_ipinfo_key", "Key"]],
+    bigdatacloud: [["online_bigdatacloud_key", "Key"]]
+  };
+  var root = document.querySelector("[data-geoip-config]");
+  if (!root) return;
+  var sections = root.querySelectorAll("[data-preset]");
+  function syncPreset() {
+    var c = root.querySelector('input[name="geoip_preset"]:checked');
+    var v = c ? c.value : "";
+    sections.forEach(function (s) { s.hidden = s.dataset.preset !== v; });
+    root.querySelectorAll(".backend-select").forEach(syncCred);
+  }
+  function syncCred(sel) {
+    if (!sel.value) { return; }
+    var panel = sel.parentElement.querySelector(".cred-panel") || sel.closest("div").querySelector(".cred-panel");
+    if (!panel) return;
+    var fields = CRED[sel.value];
+    panel.innerHTML = "";
+    if (!fields) {
+      panel.innerHTML = '<span class="cred-none">✓ 无需凭证</span>';
+      return;
+    }
+    panel.innerHTML = '<span class="cred-title">' + sel.selectedOptions[0].text.replace(/[📍()].*$/, "").trim() + '</span>';
+    fields.forEach(function (f) {
+      var input = document.createElement("input");
+      input.type = "password";
+      input.name = f[0];
+      input.placeholder = f[1];
+      input.autocomplete = "new-password";
+      input.maxLength = 512;
+      var wrap = document.createElement("label");
+      wrap.className = "cred-field";
+      wrap.appendChild(input);
+      panel.appendChild(wrap);
+    });
+  }
+  root.querySelectorAll('input[name="geoip_preset"]').forEach(function (r) {
+    r.addEventListener("change", syncPreset);
+  });
+  root.querySelectorAll(".backend-select").forEach(function (s) {
+    s.addEventListener("change", function () { syncCred(s); });
+  });
+  syncPreset();
 })();
 </script>
 {{end}}
