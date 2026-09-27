@@ -371,14 +371,13 @@ func NormalizeCountryCode(value string) string {
 	return strings.ToUpper(value)
 }
 
-// PostprocessLocation unifies numeric codes and Hong Kong, Macau, and
-// Taiwan onto CN. The original region and city labels are preserved for
-// finer-grained views.
+// PostprocessLocation unifies country and city labels before they are stored.
 func PostprocessLocation(location Location) Location {
 	location.CountryCode = NormalizeCountryCode(location.CountryCode)
 	switch location.CountryCode {
 	case "HK", "TW", "MO":
 		location.CountryCode = "CN"
 	}
+	location.City = NormalizeCityEN(location.City)
 	return location
 }

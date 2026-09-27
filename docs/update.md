@@ -4,6 +4,11 @@
 
 This file records user-facing changes for each published VisitorTrace release.
 
+## Unreleased
+
+- New Pageviews and historical geography refreshes use consistent English city names; Chinese and common English Hong Kong labels resolve to Hong Kong.
+- Historical geography refreshes run in the background with progress for lookup, record updates, and aggregate rebuilding. Each distinct IP is queried once, and new Pageviews can be collected during online lookups.
+
 ## 0.4.1 - 2026-09-27
 
 - Amap service tests now use a public Chinese address it can locate, avoiding a false "no location" result for a working service.

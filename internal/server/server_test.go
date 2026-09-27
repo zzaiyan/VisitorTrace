@@ -5,11 +5,13 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -20,10 +22,29 @@ import (
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/config"
+	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 	"github.com/zzaiyan/VisitorTrace/internal/maprender"
 	"github.com/zzaiyan/VisitorTrace/internal/password"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
+
+type blockingGeoIPLookup struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (b blockingGeoIPLookup) Lookup(ctx context.Context, _ netip.Addr) (geoip.Location, error) {
+	select {
+	case b.entered <- struct{}{}:
+	default:
+	}
+	select {
+	case <-b.release:
+		return geoip.Location{CountryCode: "CN", City: "香港特别行政区"}, nil
+	case <-ctx.Done():
+		return geoip.Location{}, ctx.Err()
+	}
+}
 
 func TestHealthEndpoints(t *testing.T) {
 	dir := t.TempDir()
@@ -999,6 +1020,88 @@ func TestAdminSiteGeoIPRefreshRequiresAvailableDatabase(t *testing.T) {
 	app.Handler().ServeHTTP(response, request)
 	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") || !strings.HasSuffix(response.Header().Get("Location"), "#records") {
 		t.Fatalf("unavailable GeoIP refresh = status %d location %q", response.Code, response.Header().Get("Location"))
+	}
+}
+
+func TestAdminSiteGeoIPRefreshReturnsImmediatelyAndReportsProgress(t *testing.T) {
+	app, st, site := testAdminServer(t)
+	cookie, csrf := loginAdmin(t, app)
+	_, err := st.RecordPageview(context.Background(), store.PageviewObservation{
+		SiteID: site.ID, Hostname: "example.com", Path: "/", OriginalIP: "8.8.8.8",
+		VisitorDigest: bytes.Repeat([]byte{1}, 32), CountryCode: "US", City: "Old city",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lookup := blockingGeoIPLookup{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	app.geoSingleOnline = lookup
+	form := url.Values{"csrf": {csrf}}
+	request := httptest.NewRequest(http.MethodPost, "/admin/sites/"+site.ID+"/records/geoip", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusSeeOther || !strings.HasSuffix(response.Header().Get("Location"), "#records") {
+		t.Fatalf("refresh start = %d, %q", response.Code, response.Header().Get("Location"))
+	}
+	select {
+	case <-lookup.entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("GeoIP lookup did not start")
+	}
+	pageRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID, nil)
+	pageRequest.AddCookie(cookie)
+	pageResponse := httptest.NewRecorder()
+	app.Handler().ServeHTTP(pageResponse, pageRequest)
+	if pageResponse.Code != http.StatusOK || !strings.Contains(pageResponse.Body.String(), "data-record-geoip-progress") || !strings.Contains(pageResponse.Body.String(), "<progress") {
+		t.Fatalf("running refresh page = %d, progress visible = %t", pageResponse.Code, strings.Contains(pageResponse.Body.String(), "data-record-geoip-progress"))
+	}
+	statusPath := "/admin/sites/" + site.ID + "/records/geoip/status"
+	unauthorized := httptest.NewRecorder()
+	app.Handler().ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, statusPath, nil))
+	if unauthorized.Code != http.StatusSeeOther {
+		t.Fatalf("unauthorized refresh status = %d", unauthorized.Code)
+	}
+	readStatus := func() recordGeoIPTask {
+		t.Helper()
+		statusRequest := httptest.NewRequest(http.MethodGet, statusPath, nil)
+		statusRequest.AddCookie(cookie)
+		statusResponse := httptest.NewRecorder()
+		app.Handler().ServeHTTP(statusResponse, statusRequest)
+		if statusResponse.Code != http.StatusOK {
+			t.Fatalf("refresh status = %d", statusResponse.Code)
+		}
+		var task recordGeoIPTask
+		if err := json.Unmarshal(statusResponse.Body.Bytes(), &task); err != nil {
+			t.Fatal(err)
+		}
+		return task
+	}
+	if status := readStatus(); status.State != "running" || status.Progress.Stage != "locating" || status.Progress.Total != 1 {
+		t.Fatalf("running refresh = %#v", status)
+	}
+	close(lookup.release)
+	deadline := time.After(3 * time.Second)
+	for {
+		status := readStatus()
+		if status.State == "success" {
+			if status.Result.Processed != 1 || !strings.Contains(status.Redirect, "saved=record-geoip") {
+				t.Fatalf("completed refresh = %#v", status)
+			}
+			break
+		}
+		if status.State == "failed" {
+			t.Fatalf("refresh failed: %s", status.Error)
+		}
+		select {
+		case <-deadline:
+			t.Fatal("refresh did not complete")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	page, err := st.PageviewRecords(context.Background(), store.PageviewFilters{SiteID: site.ID}, nil, "older", 10)
+	if err != nil || len(page.Records) != 1 || page.Records[0].City != "Hong Kong" {
+		t.Fatalf("refreshed record = %#v, %v", page.Records, err)
 	}
 }
 

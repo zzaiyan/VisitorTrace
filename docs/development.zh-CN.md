@@ -72,7 +72,7 @@ JavaScript 采集请求先从已经通过 `Allowed Origin` 校验的 `Origin` �
 
 `site_deduplication_rules` 以 Site 本地日期保存计数规则历史。修改周期时，事务会在下一本地日期 upsert 新规则；Pageview 按其本地日期选择最近已生效规则，并从该规则的生效日计算新窗口锚点。已有 `visitor_registrations.window_end` 保持原值，仅可能延后临时登记的清理，不会改变新规则下的计数。
 
-手动刷新明细地理信息时，Store 会持有写锁，并在一个 SQLite 事务中分批读取保留期内的 Pageview。操作先更新逐条记录，再仅重建仍至少包含一条明细的 Site 本地日期上的国家、地区和城市聚合；UV 按每条记录日期当时生效的合并规则和已保存的 hostname 作用域重算。没有保留明细的日期及所有非地理聚合保持不变。已有访客登记不会删除，同时会补充仍处于有效窗口内、由明细重建出的地理访客登记，避免后续采集重复计数。格式无效的已保存 IP 保留旧地理信息；有效但当前未命中的地址会清空地理信息。HTTP 层在 `geoMu` 下固定使用同一个 Resolver，阻止并发刷新，并且仅在事务提交后清除该 Site 的地图缓存。
+手动刷新明细地理信息作为后台任务运行。Store 先读取保留期内的唯一 IP 并完成定位，此时不持有写锁，在线服务较慢也不会阻止新 Pageview 采集。定位完成后，在一个 SQLite 事务中分批更新记录，并重建仍至少包含一条明细的 Site 本地日期上的国家、地区和城市聚合；定位期间新增的记录也会在事务开始前纳入。UV 按每条记录日期当时生效的合并规则和已保存的 hostname 作用域重算。没有保留明细的日期及所有非地理聚合保持不变。已有访客登记不会删除，同时会补充仍处于有效窗口内、由明细重建出的地理访客登记，避免后续采集重复计数。格式无效的已保存 IP 保留旧地理信息；有效但当前未命中的地址会清空地理信息。HTTP 层通过管理员状态接口报告内存中的任务进度，阻止并发刷新，并且仅在事务提交后清除该 Site 的地图缓存。
 
 公开和后台聚合查询共用 Site 本地日期边界。公开查询必须先检查发布状态，且不读取 Path 维度；后台查询要求管理员认证，可在 Site 未公开时读取 Path 聚合。Site 详情页通过 `AdminMapData` 读取全部历史地图，不依赖公开状态，并且只向浏览器发送地图点位与标签。分析前端可分别初始化趋势图和地图，因此该仅地图视图与 Public Analytics 复用同一套 ECharts 实现。前端 JSON 只来自服务端已经完成授权的数据，不包含逐条记录、原始 IP 或 Visitor Digest。
 
@@ -88,7 +88,7 @@ GeoIP Resolver 每次只打开配置中的一个后端。`provider_dbip.go`、`p
 
 更新器在启动时和每 24 小时运行。provider profile 为 DB-IP/IP2Location 选择按自然月判断，为 MaxMind 选择 72 小时新鲜度。MaxMind 官方请求使用 Basic Authentication，IP2Location 通过查询参数接收 Download Token；认证与官方主机绑定，不会发送给自定义镜像。更新器按内容识别原始 MMDB、gzip MMDB、tar.gz 和 ZIP，归档中必须且只能包含一个 MMDB。`{YYYY-MM}` 使用 UTC 月份展开。下载输入限制为 1 GiB，展开后的 MMDB 限制为 2 GiB。配置 SHA-256 sidecar 时先校验下载容器，随后始终执行 MMDB 完整验证。候选文件与目标位于同一文件系统，通过重命名激活，上一版保留为 `.previous`。服务通过互斥保护的 Resolver 热交换，避免关闭仍在查询的旧句柄。
 
-DB-IP City Lite 的 `city.names` 可能同时包含城市和区、街道等限定词，而 Lite Schema 不提供可用于选择行政层级的 feature code。`normalizeDBIPCity` 是 `provider_dbip.go` 的私有逻辑：它清理中国地名中的下级限定词，并对北京、上海、天津、重庆使用上级直辖市名称。通用 Resolver 不执行这项清理，因此 MaxMind 和 IP2Location 的城市名称在结构映射后保持原值。
+DB-IP City Lite 的 `city.names` 可能同时包含城市和区、街道等限定词，而 Lite Schema 不提供可用于选择行政层级的 feature code。`normalizeDBIPCity` 是 `provider_dbip.go` 的私有逻辑：它清理中国地名中的下级限定词，并对北京、上海、天津、重庆使用上级直辖市名称。统一结果层随后将已知中文城市名和香港常见别名归一为英文；Store 在采集和历史刷新入库时也执行相同的城市归一化。
 
 Pageview Record 列表使用 `(occurred_at, id)` 复合游标，查询顺序由服务端固定，游标携带规范化筛选指纹，不能跨筛选复用。每页最多 200 条。明细和聚合导出直接遍历 SQLite Rows 并写入 `encoding/csv`，不生成临时导出文件；敏感导出只挂载在管理员认证路由并设置 `Cache-Control: no-store`。
 

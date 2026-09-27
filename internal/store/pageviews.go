@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 )
 
 var ErrCollectionDisabled = errors.New("Pageview collection is disabled for this Site")
@@ -67,6 +69,7 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 	if !ValidCollectionMethod(observation.CollectionMethod) {
 		return RecordPageviewResult{}, fmt.Errorf("unsupported collection method %q", observation.CollectionMethod)
 	}
+	observation.City = geoip.NormalizeCityEN(observation.City)
 
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()

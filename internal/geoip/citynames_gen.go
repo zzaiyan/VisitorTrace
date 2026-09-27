@@ -61,6 +61,10 @@ var citySuffixes = []string{"特别行政区", "维吾尔自治区", "壮族自�
 // unrecognized.
 func NormalizeCityEN(value string) string {
 	value = strings.TrimSpace(value)
+	switch strings.ToLower(value) {
+	case "hong kong sar", "hong kong special administrative region", "hong kong sar china":
+		return "Hong Kong"
+	}
 	if value == "" || !containsHan(value) {
 		return value
 	}

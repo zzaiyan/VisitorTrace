@@ -45,29 +45,31 @@ type pageviewPayload struct {
 }
 
 type Server struct {
-	Config          config.Config
-	ConfigPath      string
-	Store           *store.Store
-	Started         time.Time
-	clientIP        *clientip.Resolver
-	ipLimit         *ratelimit.Limiter
-	siteLimit       *ratelimit.Limiter
-	logger          *slog.Logger
-	geoMu           sync.RWMutex
-	geoIP           *geoip.Resolver
-	geoForeign      *geoip.Resolver
-	geoChain        *geoip.Chain
-	geoSingleOnline geoip.OnlineLookup
-	geoBackups      map[string]*geoip.Resolver
-	geoProbeMu      sync.Mutex
-	mapCache        *mapCache
-	loginLimit      *ratelimit.Limiter
-	recordGeoIPMu   sync.Mutex
-	restoreMu       sync.Mutex
-	restoreActive   bool
-	basePath        string
-	restartOnce     sync.Once
-	restart         chan struct{}
+	Config            config.Config
+	ConfigPath        string
+	Store             *store.Store
+	Started           time.Time
+	clientIP          *clientip.Resolver
+	ipLimit           *ratelimit.Limiter
+	siteLimit         *ratelimit.Limiter
+	logger            *slog.Logger
+	geoMu             sync.RWMutex
+	geoIP             *geoip.Resolver
+	geoForeign        *geoip.Resolver
+	geoChain          *geoip.Chain
+	geoSingleOnline   geoip.OnlineLookup
+	geoBackups        map[string]*geoip.Resolver
+	geoProbeMu        sync.Mutex
+	mapCache          *mapCache
+	loginLimit        *ratelimit.Limiter
+	recordGeoIPMu     sync.Mutex
+	recordGeoIPTaskMu sync.RWMutex
+	recordGeoIPTasks  map[string]*recordGeoIPTask
+	restoreMu         sync.Mutex
+	restoreActive     bool
+	basePath          string
+	restartOnce       sync.Once
+	restart           chan struct{}
 }
 
 func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
@@ -77,17 +79,18 @@ func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
 		logger = loggers[0]
 	}
 	server := &Server{
-		Config:     cfg,
-		Store:      st,
-		Started:    time.Now().UTC(),
-		clientIP:   resolver,
-		ipLimit:    ratelimit.New(120, 30),
-		siteLimit:  ratelimit.New(3000, 500),
-		logger:     logger,
-		mapCache:   newMapCache(),
-		loginLimit: ratelimit.New(10, 5),
-		basePath:   config.BasePath(cfg.BaseURL),
-		restart:    make(chan struct{}),
+		Config:           cfg,
+		Store:            st,
+		Started:          time.Now().UTC(),
+		clientIP:         resolver,
+		ipLimit:          ratelimit.New(120, 30),
+		siteLimit:        ratelimit.New(3000, 500),
+		logger:           logger,
+		mapCache:         newMapCache(),
+		recordGeoIPTasks: make(map[string]*recordGeoIPTask),
+		loginLimit:       ratelimit.New(10, 5),
+		basePath:         config.BasePath(cfg.BaseURL),
+		restart:          make(chan struct{}),
 	}
 	if cfg.GeoIPPreset == "basic" {
 		basic := cfg.GeoIPBasicBackend
@@ -221,6 +224,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /admin/sites/{siteID}/settings", s.adminUpdateSite)
 	mux.HandleFunc("POST /admin/sites/{siteID}/preset", s.adminUpdatePreset)
 	mux.HandleFunc("POST /admin/sites/{siteID}/records/geoip", s.adminRefreshSiteRecordGeoIP)
+	mux.HandleFunc("GET /admin/sites/{siteID}/records/geoip/status", s.adminRecordGeoIPStatus)
 	mux.HandleFunc("POST /admin/sites/{siteID}/reset", s.adminResetSite)
 	mux.HandleFunc("POST /admin/sites/{siteID}/delete", s.adminDeleteSite)
 	mux.HandleFunc("GET /admin/sites/{siteID}/preset-preview", s.adminPresetWidgetPreview)

@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 )
 
 const pageviewGeoIPBatchSize = 500
@@ -27,6 +29,12 @@ type PageviewGeoIPRefreshResult struct {
 	Unmatched      int64
 	InvalidIP      int64
 	AggregateDates int64
+}
+
+type PageviewGeoIPRefreshProgress struct {
+	Stage string `json:"stage"`
+	Done  int64  `json:"done"`
+	Total int64  `json:"total"`
 }
 
 type geoRefreshRule struct {
@@ -76,15 +84,72 @@ type geoRefreshRegistration struct {
 // RefreshPageviewGeoIP replaces retained Pageview geography and rebuilds the
 // geographic aggregates for dates that still have detailed records.
 func (s *Store) RefreshPageviewGeoIP(ctx context.Context, siteID string, lookup func(netip.Addr) PageviewGeography) (PageviewGeoIPRefreshResult, error) {
+	return s.RefreshPageviewGeoIPWithProgress(ctx, siteID, lookup, nil)
+}
+
+// RefreshPageviewGeoIPWithProgress resolves distinct addresses before taking
+// the write lock. Slow online services therefore do not block new Pageviews.
+func (s *Store) RefreshPageviewGeoIPWithProgress(ctx context.Context, siteID string, lookup func(netip.Addr) PageviewGeography, report func(PageviewGeoIPRefreshProgress)) (PageviewGeoIPRefreshResult, error) {
 	if strings.TrimSpace(siteID) == "" {
 		return PageviewGeoIPRefreshResult{}, fmt.Errorf("Site ID is required")
 	}
 	if lookup == nil {
 		return PageviewGeoIPRefreshResult{}, fmt.Errorf("GeoIP lookup is required")
 	}
+	if report == nil {
+		report = func(PageviewGeoIPRefreshProgress) {}
+	}
+	report(PageviewGeoIPRefreshProgress{Stage: "preparing"})
+	var maxID, totalRecords int64
+	if err := s.DB.QueryRowContext(ctx, `SELECT COALESCE(MAX(id), 0), COUNT(*) FROM pageviews WHERE site_id = ?`, siteID).Scan(&maxID, &totalRecords); err != nil {
+		return PageviewGeoIPRefreshResult{}, fmt.Errorf("count Pageview GeoIP records: %w", err)
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT DISTINCT original_ip FROM pageviews WHERE site_id = ? AND id <= ?`, siteID, maxID)
+	if err != nil {
+		return PageviewGeoIPRefreshResult{}, fmt.Errorf("read Pageview GeoIP addresses: %w", err)
+	}
+	addresses := make([]netip.Addr, 0)
+	seen := make(map[netip.Addr]struct{})
+	for rows.Next() {
+		var originalIP string
+		if err := rows.Scan(&originalIP); err != nil {
+			rows.Close()
+			return PageviewGeoIPRefreshResult{}, fmt.Errorf("scan Pageview GeoIP address: %w", err)
+		}
+		address, err := netip.ParseAddr(strings.TrimSpace(originalIP))
+		if err != nil {
+			continue
+		}
+		address = address.Unmap()
+		if _, ok := seen[address]; !ok {
+			seen[address] = struct{}{}
+			addresses = append(addresses, address)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return PageviewGeoIPRefreshResult{}, fmt.Errorf("iterate Pageview GeoIP addresses: %w", err)
+	}
+	rows.Close()
+	resolved := make(map[netip.Addr]PageviewGeography, len(addresses))
+	report(PageviewGeoIPRefreshProgress{Stage: "locating", Total: int64(len(addresses))})
+	for index, address := range addresses {
+		if err := ctx.Err(); err != nil {
+			return PageviewGeoIPRefreshResult{}, err
+		}
+		resolved[address] = normalizedPageviewGeography(lookup(address))
+		report(PageviewGeoIPRefreshProgress{Stage: "locating", Done: int64(index + 1), Total: int64(len(addresses))})
+	}
+	report(PageviewGeoIPRefreshProgress{Stage: "updating", Total: totalRecords})
 
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
+	// Include Pageviews collected while the network lookups ran. Only those
+	// late addresses may need a lookup with the write lock held.
+	if err := s.DB.QueryRowContext(ctx, `SELECT COALESCE(MAX(id), 0), COUNT(*) FROM pageviews WHERE site_id = ?`, siteID).Scan(&maxID, &totalRecords); err != nil {
+		return PageviewGeoIPRefreshResult{}, fmt.Errorf("recount Pageview GeoIP records: %w", err)
+	}
+	report(PageviewGeoIPRefreshProgress{Stage: "updating", Total: totalRecords})
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return PageviewGeoIPRefreshResult{}, fmt.Errorf("begin Pageview GeoIP refresh: %w", err)
@@ -115,9 +180,10 @@ func (s *Store) RefreshPageviewGeoIP(ctx context.Context, siteID string, lookup 
 	coveredDates := make(map[string]struct{})
 	result := PageviewGeoIPRefreshResult{}
 	lastID := int64(0)
+	var applied int64
 
 	for {
-		records, err := readGeoRefreshBatch(ctx, tx, siteID, lastID)
+		records, err := readGeoRefreshBatch(ctx, tx, siteID, lastID, maxID)
 		if err != nil {
 			return PageviewGeoIPRefreshResult{}, err
 		}
@@ -131,7 +197,12 @@ func (s *Store) RefreshPageviewGeoIP(ctx context.Context, siteID string, lookup 
 			if parseErr != nil {
 				result.InvalidIP++
 			} else {
-				geography = normalizedPageviewGeography(lookup(address.Unmap()))
+				var found bool
+				geography, found = resolved[address.Unmap()]
+				if !found {
+					geography = normalizedPageviewGeography(lookup(address.Unmap()))
+					resolved[address.Unmap()] = geography
+				}
 				result.Processed++
 				if pageviewGeographyLocated(geography) {
 					result.Located++
@@ -183,7 +254,10 @@ func (s *Store) RefreshPageviewGeoIP(ctx context.Context, siteID string, lookup 
 				locations[value] = geography
 			}
 		}
+		applied += int64(len(records))
+		report(PageviewGeoIPRefreshProgress{Stage: "updating", Done: applied, Total: totalRecords})
 	}
+	report(PageviewGeoIPRefreshProgress{Stage: "aggregating"})
 
 	if len(coveredDates) > 0 {
 		if _, err := tx.ExecContext(ctx, `
@@ -238,15 +312,15 @@ func readGeoRefreshRules(ctx context.Context, tx *sql.Tx, siteID string) ([]geoR
 	return rules, nil
 }
 
-func readGeoRefreshBatch(ctx context.Context, tx *sql.Tx, siteID string, afterID int64) ([]geoRefreshRecord, error) {
+func readGeoRefreshBatch(ctx context.Context, tx *sql.Tx, siteID string, afterID, maxID int64) ([]geoRefreshRecord, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT id, local_date, hostname, country_code, region_code, city, latitude, longitude,
 		       visitor_digest, original_ip, occurred_at
 		FROM pageviews
-		WHERE site_id = ? AND id > ?
+		WHERE site_id = ? AND id > ? AND id <= ?
 		ORDER BY id
 		LIMIT ?
-	`, siteID, afterID, pageviewGeoIPBatchSize)
+	`, siteID, afterID, maxID, pageviewGeoIPBatchSize)
 	if err != nil {
 		return nil, fmt.Errorf("read Pageview GeoIP batch: %w", err)
 	}
@@ -308,7 +382,7 @@ func geographicAggregateDimensions(geography PageviewGeography) []aggregateDimen
 func normalizedPageviewGeography(value PageviewGeography) PageviewGeography {
 	value.CountryCode = strings.TrimSpace(value.CountryCode)
 	value.RegionCode = strings.TrimSpace(value.RegionCode)
-	value.City = strings.TrimSpace(value.City)
+	value.City = geoip.NormalizeCityEN(value.City)
 	return value
 }
 

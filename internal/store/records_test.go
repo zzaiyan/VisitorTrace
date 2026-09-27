@@ -9,6 +9,89 @@ import (
 	"time"
 )
 
+func TestRefreshPageviewGeoIPReportsProgressWithoutBlockingCollection(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	site, err := st.CreateSite(ctx, CreateSiteParams{Name: "Refresh", AllowedOrigins: []string{"https://example.com"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeObservation := func(ip string, digest byte) PageviewObservation {
+		return PageviewObservation{SiteID: site.ID, Hostname: "example.com", Path: "/", CountryCode: "CN", City: "上海", OriginalIP: ip, VisitorDigest: bytes.Repeat([]byte{digest}, 32)}
+	}
+	for index := 0; index < 2; index++ {
+		if _, err := st.RecordPageview(ctx, makeObservation("8.8.8.8", byte(index+1))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var initialCity string
+	if err := st.DB.QueryRowContext(ctx, `SELECT city FROM pageviews WHERE site_id = ? ORDER BY id LIMIT 1`, site.ID).Scan(&initialCity); err != nil || initialCity != "Shanghai" {
+		t.Fatalf("new Pageview city = %q, %v", initialCity, err)
+	}
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	finished := make(chan error, 1)
+	var calls int
+	var stages []string
+	go func() {
+		_, err := st.RefreshPageviewGeoIPWithProgress(ctx, site.ID, func(netip.Addr) PageviewGeography {
+			calls++
+			if calls == 1 {
+				close(entered)
+				<-release
+			}
+			return PageviewGeography{CountryCode: "CN", City: "香港特别行政区"}
+		}, func(progress PageviewGeoIPRefreshProgress) { stages = append(stages, progress.Stage) })
+		finished <- err
+	}()
+	<-entered
+	writeFinished := make(chan error, 1)
+	go func() {
+		_, err := st.RecordPageview(ctx, makeObservation("1.1.1.1", 3))
+		writeFinished <- err
+	}()
+	select {
+	case err := <-writeFinished:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		close(release)
+		t.Fatal("Pageview collection blocked during online GeoIP lookup")
+	}
+	close(release)
+	if err := <-finished; err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("unique address lookups = %d, want 2", calls)
+	}
+	if len(stages) < 4 || stages[0] != "preparing" || stages[len(stages)-1] != "aggregating" {
+		t.Fatalf("refresh stages = %v", stages)
+	}
+	page, err := st.PageviewRecords(ctx, PageviewFilters{SiteID: site.ID}, nil, "older", 10)
+	if err != nil || len(page.Records) != 3 {
+		t.Fatalf("refreshed records = %d, %v", len(page.Records), err)
+	}
+	for _, record := range page.Records {
+		if record.City != "Hong Kong" {
+			t.Fatalf("record city = %q, want Hong Kong", record.City)
+		}
+	}
+	var cityRows, cityPageviews int
+	if err := st.DB.QueryRowContext(ctx, `
+		SELECT COUNT(*), COALESCE(SUM(pageviews), 0) FROM daily_aggregates
+		WHERE site_id = ? AND local_date = ? AND dimension_kind = 'city' AND dimension_value = 'CN||Hong Kong'
+	`, site.ID, page.Records[0].LocalDate).Scan(&cityRows, &cityPageviews); err != nil || cityRows != 1 || cityPageviews != 3 {
+		t.Fatalf("normalized city aggregate = rows %d PV %d, %v", cityRows, cityPageviews, err)
+	}
+}
+
 func TestRefreshPageviewGeoIPRebuildsRetainedGeography(t *testing.T) {
 	ctx := context.Background()
 	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")

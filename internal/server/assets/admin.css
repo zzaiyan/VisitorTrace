@@ -300,6 +300,11 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); background: white; }
 .records-heading-actions { display: flex; align-items: center; gap: 14px; }
 .records-heading-actions form { margin: 0; }
+.record-geoip-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; margin: -4px 0 18px; padding: 13px 16px; border: 1px solid var(--line); border-radius: 6px; background: #f0f6f3; font-size: 13px; }
+.record-geoip-progress strong { font-size: 13px; }
+.record-geoip-progress progress { grid-column: 1 / -1; width: 100%; height: 10px; accent-color: var(--green); }
+.record-geoip-progress small { grid-column: 2; grid-row: 1; font-variant-numeric: tabular-nums; }
+.record-geoip-progress.failed { border-color: var(--danger); background: #fff5f2; color: var(--danger); }
 .site-recent-records { max-height: 320px; overflow: auto; }
 .site-recent-records thead th { position: sticky; z-index: 1; top: 0; background: white; }
 .site-recent-records .recent-page { min-width: 190px; }

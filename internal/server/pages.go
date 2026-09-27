@@ -96,6 +96,7 @@ type adminSiteData struct {
 	BaseURL          string
 	Saved            string
 	GeoIPAvailable   bool
+	RecordGeoIPTask  *recordGeoIPTask
 }
 
 type newSiteData struct {
@@ -450,7 +451,8 @@ func (s *Server) adminSite(w http.ResponseWriter, r *http.Request) {
 		pageLayout: s.adminLayout(r, session, site.Name, "sites"), Site: site, Overview: overview,
 		Preset: preset, DefaultPreset: maprender.DefaultOptions(), ChartJSON: chartJSON, Recent: recent, OriginsText: strings.Join(site.AllowedOrigins, "\n"),
 		MapPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview.svg"), WidgetPreviewURL: s.appPath("/admin/sites/" + site.ID + "/preset-preview"), MapAspect: maprender.MapAspect, BaseURL: s.externalBaseURL(r), Saved: adminFlash(r),
-		GeoIPAvailable: s.geoIPAvailable(),
+		GeoIPAvailable:  s.geoIPAvailable(),
+		RecordGeoIPTask: s.recordGeoIPTaskForSite(siteID),
 	}
 	if flash := recordGeoIPFlash(r, data.Lang); flash != "" {
 		data.Saved = flash

@@ -176,12 +176,23 @@
     <div><p class="eyebrow">Records</p><h2>{{t "recent_records"}}</h2></div>
     <div class="records-heading-actions">
       <a class="button ghost" href="{{appPath (printf "/admin/records?site_id=%s" .Site.ID)}}">{{t "view_site_records"}}</a>
-      <form method="post" action="{{appPath (printf "/admin/sites/%s/records/geoip" .Site.ID)}}" data-confirm-message="{{t "refresh_record_geoip_confirm"}}">
+      <form method="post" action="{{appPath (printf "/admin/sites/%s/records/geoip" .Site.ID)}}" data-confirm-message="{{t "refresh_record_geoip_confirm"}}" data-record-geoip-form>
         <input type="hidden" name="csrf" value="{{.CSRF}}">
-        <button class="button ghost" type="submit" {{if not .GeoIPAvailable}}disabled title="{{t "geoip_unavailable"}}"{{else}}title="{{t "refresh_record_geoip"}}"{{end}}>{{t "refresh_record_geoip"}}</button>
+        <button class="button ghost" type="submit" {{if not .GeoIPAvailable}}disabled title="{{t "geoip_unavailable"}}"{{else if .RecordGeoIPTask}}{{if eq .RecordGeoIPTask.State "running"}}disabled aria-busy="true"{{end}}{{end}} title="{{t "refresh_record_geoip"}}">{{t "refresh_record_geoip"}}</button>
       </form>
     </div>
   </div>
+  {{if .RecordGeoIPTask}}{{if eq .RecordGeoIPTask.State "running"}}
+  <div class="record-geoip-progress" role="status" aria-live="polite" data-record-geoip-progress
+       data-status-url="{{appPath (printf "/admin/sites/%s/records/geoip/status" .Site.ID)}}"
+       data-preparing="{{t "geoip_refresh_preparing"}}" data-locating="{{t "geoip_refresh_locating"}}"
+       data-updating="{{t "geoip_refresh_updating"}}" data-aggregating="{{t "geoip_refresh_aggregating"}}"
+       data-interrupted="{{t "geoip_refresh_interrupted"}}" data-failed="{{t "err_geoip_refresh_failed"}}">
+    <strong data-progress-stage>{{t "geoip_refresh_preparing"}}</strong>
+    <progress data-progress-bar aria-label="{{t "refresh_record_geoip"}}" {{if gt .RecordGeoIPTask.Progress.Total 0}}max="{{.RecordGeoIPTask.Progress.Total}}" value="{{.RecordGeoIPTask.Progress.Done}}"{{end}}></progress>
+    <small data-progress-count></small>
+  </div>
+  {{else if eq .RecordGeoIPTask.State "failed"}}<p class="notice danger" role="alert">{{t "err_geoip_refresh_failed"}}{{.RecordGeoIPTask.Error}}</p>{{end}}{{end}}
   <div class="table-wrap site-recent-records">
     <table><thead><tr><th>{{t "time"}}</th><th>{{t "collection_method"}}</th><th>{{t "visited_page"}}</th><th>{{t "location"}}</th><th>{{t "client"}}</th><th>{{t "original_ip"}}</th></tr></thead>
       <tbody>{{range .Recent}}<tr><td><time datetime="{{formatUTC .OccurredAt}}">{{formatTime .OccurredAt}}</time></td><td><span class="method-badge {{if eq .CollectionMethod "image"}}image{{else}}js{{end}}">{{if eq .CollectionMethod "image"}}Image{{else}}JS{{end}}</span></td><td class="recent-page"><code>{{.Hostname}}</code><small><code>{{.Path}}</code></small></td><td>{{if .City}}{{.City}}{{else if .CountryCode}}{{.CountryCode}}{{else}}Unknown{{end}}</td><td class="recent-client"><span>{{if .OperatingSystem}}{{.OperatingSystem}}{{else}}-{{end}}</span><small>{{if .Browser}}{{.Browser}}{{else}}-{{end}}</small></td><td><code>{{.OriginalIP}}</code></td></tr>{{else}}<tr><td colspan="6" class="empty-cell">{{t "no_pageview_records"}}</td></tr>{{end}}</tbody>
@@ -390,6 +401,52 @@
       if (!window.confirm(form.dataset.confirmMessage)) event.preventDefault();
     });
   });
+}());
+</script>
+<script>
+(function () {
+  var panel = document.querySelector("[data-record-geoip-progress]");
+  if (!panel || !window.fetch) return;
+  var stage = panel.querySelector("[data-progress-stage]");
+  var bar = panel.querySelector("[data-progress-bar]");
+  var count = panel.querySelector("[data-progress-count]");
+  var timer;
+  function stop() { if (timer) window.clearInterval(timer); timer = null; }
+  function poll() {
+    window.fetch(panel.dataset.statusUrl, { credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json" } })
+      .then(function (response) {
+        if (response.redirected && response.url.indexOf("/admin/login") !== -1) { window.location.href = response.url; throw new Error("sign in required"); }
+        if (!response.ok || !(response.headers.get("Content-Type") || "").includes("application/json")) throw new Error("status unavailable");
+        return response.json();
+      })
+      .then(function (task) {
+        if (!panel.isConnected) { stop(); return; }
+        if (task.state === "success") { stop(); window.location.replace(task.redirect); return; }
+        if (task.state === "failed" || task.state === "idle") {
+          stop();
+          panel.classList.add("failed");
+          stage.textContent = task.state === "failed" ? panel.dataset.failed + task.error : panel.dataset.interrupted;
+          bar.hidden = true;
+          count.textContent = "";
+          var retryButton = document.querySelector("[data-record-geoip-form] button");
+          if (retryButton) { retryButton.disabled = false; retryButton.removeAttribute("aria-busy"); }
+          return;
+        }
+        var progress = task.progress || {};
+        stage.textContent = panel.dataset[progress.stage] || panel.dataset.preparing;
+        if (progress.total > 0) {
+          bar.max = progress.total;
+          bar.value = Math.min(progress.done || 0, progress.total);
+          count.textContent = (progress.done || 0) + " / " + progress.total;
+        } else {
+          bar.removeAttribute("value");
+          count.textContent = "";
+        }
+      }).catch(function () { /* Retry while the service is reachable again. */ });
+  }
+  poll();
+  timer = window.setInterval(poll, 1500);
+  document.addEventListener("vt:before-swap", stop, { once: true });
 }());
 </script>
 <script>

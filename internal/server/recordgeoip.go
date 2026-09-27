@@ -1,14 +1,37 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
+
+type recordGeoIPTask struct {
+	SiteID   string                             `json:"-"`
+	State    string                             `json:"state"`
+	Progress store.PageviewGeoIPRefreshProgress `json:"progress"`
+	Result   store.PageviewGeoIPRefreshResult   `json:"result"`
+	Error    string                             `json:"error,omitempty"`
+	Redirect string                             `json:"redirect,omitempty"`
+}
+
+func (s *Server) recordGeoIPTaskForSite(siteID string) *recordGeoIPTask {
+	s.recordGeoIPTaskMu.RLock()
+	defer s.recordGeoIPTaskMu.RUnlock()
+	task := s.recordGeoIPTasks[siteID]
+	if task == nil {
+		return nil
+	}
+	copy := *task
+	return &copy
+}
 
 func (s *Server) adminRefreshSiteRecordGeoIP(w http.ResponseWriter, r *http.Request) {
 	session, ok := s.requireAdmin(w, r)
@@ -29,24 +52,63 @@ func (s *Server) adminRefreshSiteRecordGeoIP(w http.ResponseWriter, r *http.Requ
 		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", translate(adminLanguage(r), "err_geoip_refresh_busy"))
 		return
 	}
-	defer s.recordGeoIPMu.Unlock()
 
 	if !s.geoIPAvailable() {
+		s.recordGeoIPMu.Unlock()
 		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", translate(adminLanguage(r), "err_geoip_unavailable"))
 		return
 	}
-	result, err := s.Store.RefreshPageviewGeoIP(r.Context(), siteID, func(address netip.Addr) store.PageviewGeography {
-		location := s.locate(r.Context(), address)
+	s.recordGeoIPTaskMu.Lock()
+	s.recordGeoIPTasks[siteID] = &recordGeoIPTask{SiteID: siteID, State: "running", Progress: store.PageviewGeoIPRefreshProgress{Stage: "preparing"}}
+	s.recordGeoIPTaskMu.Unlock()
+	go s.runRecordGeoIPRefresh(siteID)
+	s.redirect(w, r, "/admin/sites/"+siteID+"#records", http.StatusSeeOther)
+}
+
+func (s *Server) runRecordGeoIPRefresh(siteID string) {
+	defer s.recordGeoIPMu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+	defer cancel()
+	result, err := s.Store.RefreshPageviewGeoIPWithProgress(ctx, siteID, func(address netip.Addr) store.PageviewGeography {
+		location := s.locate(ctx, address)
 		return store.PageviewGeography{
 			CountryCode: location.CountryCode, RegionCode: location.RegionCode, City: location.City,
 			Latitude: location.Latitude, Longitude: location.Longitude,
 		}
+	}, func(progress store.PageviewGeoIPRefreshProgress) {
+		s.recordGeoIPTaskMu.Lock()
+		s.recordGeoIPTasks[siteID].Progress = progress
+		s.recordGeoIPTaskMu.Unlock()
 	})
+	s.recordGeoIPTaskMu.Lock()
+	defer s.recordGeoIPTaskMu.Unlock()
+	task := s.recordGeoIPTasks[siteID]
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#records", translate(adminLanguage(r), "err_geoip_refresh_failed")+err.Error())
+		task.State = "failed"
+		task.Error = err.Error()
+		s.logger.Error("refresh Pageview geography failed", "site_id", siteID, "error", err)
 		return
 	}
 	s.mapCache.deleteSite(siteID)
+	task.State = "success"
+	task.Result = result
+	task.Redirect = s.appPath("/admin/sites/"+siteID) + "?" + recordGeoIPResultQuery(result).Encode() + "#records"
+}
+
+func (s *Server) adminRecordGeoIPStatus(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	task := s.recordGeoIPTaskForSite(r.PathValue("siteID"))
+	if task == nil {
+		task = &recordGeoIPTask{State: "idle"}
+	}
+	_ = json.NewEncoder(w).Encode(task)
+}
+
+func recordGeoIPResultQuery(result store.PageviewGeoIPRefreshResult) url.Values {
 	query := url.Values{
 		"saved":     {"record-geoip"},
 		"processed": {strconv.FormatInt(result.Processed, 10)},
@@ -56,7 +118,7 @@ func (s *Server) adminRefreshSiteRecordGeoIP(w http.ResponseWriter, r *http.Requ
 		"invalid":   {strconv.FormatInt(result.InvalidIP, 10)},
 		"dates":     {strconv.FormatInt(result.AggregateDates, 10)},
 	}
-	s.redirect(w, r, "/admin/sites/"+siteID+"?"+query.Encode()+"#records", http.StatusSeeOther)
+	return query
 }
 
 func (s *Server) geoIPAvailable() bool {
