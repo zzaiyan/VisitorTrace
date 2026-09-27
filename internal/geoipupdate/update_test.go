@@ -73,6 +73,26 @@ func TestRunOnceDownloadsVerifiesAndActivates(t *testing.T) {
 	}
 }
 
+func TestRunOnceRecordsCancellationAfterStart(t *testing.T) {
+	compressed := gzipBytes(t, []byte("candidate"))
+	server := geoIPServer(compressed, fmt.Sprintf("%x", sha256.Sum256(compressed)))
+	defer server.Close()
+	runner, st, _ := testRunner(t, server.URL)
+	defer st.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	runner.Validate = func(string) error {
+		cancel()
+		return context.Canceled
+	}
+	if _, err := runner.RunOnce(ctx, true); err == nil {
+		t.Fatal("canceled update returned no error")
+	}
+	statuses, err := st.OperationStatuses(context.Background())
+	if err != nil || len(statuses) != 1 || statuses[0].Succeeded == nil || *statuses[0].Succeeded || statuses[0].CompletedAt == nil {
+		t.Fatalf("canceled update status = %#v, %v", statuses, err)
+	}
+}
+
 func TestRunOnceRejectsChecksumMismatch(t *testing.T) {
 	server := geoIPServer(gzipBytes(t, []byte("candidate")), strings.Repeat("0", 64))
 	defer server.Close()

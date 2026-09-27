@@ -240,7 +240,12 @@ func (s *Server) testOnlineGeoIP(r *http.Request, dataset config.GeoIPDataset) e
 	if err := s.Store.StartOperation(r.Context(), dataset.Operation, now); err != nil {
 		return err
 	}
-	location, lookupErr := client.Lookup(r.Context(), netip.MustParseAddr("114.114.114.114"))
+	probeIP := "114.114.114.114"
+	if dataset.Provider == "amap" {
+		// Amap does not locate the public DNS address used for other services.
+		probeIP = "220.181.38.148"
+	}
+	location, lookupErr := client.Lookup(r.Context(), netip.MustParseAddr(probeIP))
 	if lookupErr == nil && location.CountryCode == "" && location.City == "" {
 		lookupErr = fmt.Errorf("service returned no location")
 	}

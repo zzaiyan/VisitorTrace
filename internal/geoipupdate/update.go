@@ -134,7 +134,12 @@ func (r *Runner) RunOnce(ctx context.Context, force bool) (Result, error) {
 	if runErr != nil {
 		summary = "error=" + runErr.Error()
 	}
-	if err := r.Store.FinishOperation(ctx, operation, r.Now().UTC(), runErr == nil, summary); err != nil && runErr == nil {
+	// A browser navigation can cancel the request after the operation starts.
+	// Record its final state with an independent bounded context so the status
+	// card does not remain stuck in "running".
+	finishCtx, finishCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer finishCancel()
+	if err := r.Store.FinishOperation(finishCtx, operation, r.Now().UTC(), runErr == nil, summary); err != nil && runErr == nil {
 		runErr = err
 	}
 	return result, runErr
