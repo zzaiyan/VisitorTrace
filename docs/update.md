@@ -4,7 +4,7 @@
 
 This file records user-facing changes for each published VisitorTrace release.
 
-## Unreleased
+## 0.4.1 - 2026-09-27
 
 - Amap service tests now use a public Chinese address it can locate, avoiding a false "no location" result for a working service.
 - Interrupted manual GeoIP updates record a final task state instead of remaining "running" indefinitely.
