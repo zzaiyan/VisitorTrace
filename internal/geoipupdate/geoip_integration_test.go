@@ -26,7 +26,7 @@ import (
 // and services whose credentials are empty are skipped, so the file can carry
 // the full matrix at all times.
 type integrationConfig struct {
-	IPs       []integrationAddress        `json:"ips"`
+	IPs       []integrationAddress           `json:"ips"`
 	Providers map[string]integrationProvider `json:"providers"`
 	Online    map[string]integrationOnline   `json:"online"`
 }
@@ -39,12 +39,12 @@ type integrationAddress struct {
 }
 
 type integrationProvider struct {
-	Download    bool   `json:"download"`
-	DownloadURL string `json:"download_url"`
+	Download     bool   `json:"download"`
+	DownloadURL  string `json:"download_url"`
 	DatabasePath string `json:"database_path"`
-	AccountID   string `json:"account_id"`
-	LicenseKey  string `json:"license_key"`
-	Token       string `json:"token"`
+	AccountID    string `json:"account_id"`
+	LicenseKey   string `json:"license_key"`
+	Token        string `json:"token"`
 }
 
 type integrationOnline struct {
@@ -210,8 +210,13 @@ func downloadConfiguredDatabase(t *testing.T, dir string, provider string, fixtu
 	cfg.MaxMindAccountID = fixture.AccountID
 	cfg.MaxMindLicenseKey = fixture.LicenseKey
 	cfg.IP2LocationToken = fixture.Token
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("provider configuration is invalid: %v", err)
+	// This checks an individual provider's updater. ip2region cannot be a
+	// standalone application preset because it has no coordinates, but its
+	// updater still needs independent coverage here.
+	if provider != "ip2region" {
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("provider configuration is invalid: %v", err)
+		}
 	}
 	st, err := store.Initialize(context.Background(), cfg.DatabasePath, "integration-test")
 	if err != nil {
