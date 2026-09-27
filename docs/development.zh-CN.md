@@ -88,7 +88,7 @@ GeoIP Resolver 每次只打开配置中的一个后端。`provider_dbip.go`、`p
 
 更新器在启动时和每 24 小时运行。provider profile 为 DB-IP/IP2Location 选择按自然月判断，为 MaxMind 选择 72 小时新鲜度。MaxMind 官方请求使用 Basic Authentication，IP2Location 通过查询参数接收 Download Token；认证与官方主机绑定，不会发送给自定义镜像。更新器按内容识别原始 MMDB、gzip MMDB、tar.gz 和 ZIP，归档中必须且只能包含一个 MMDB。`{YYYY-MM}` 使用 UTC 月份展开。下载输入限制为 1 GiB，展开后的 MMDB 限制为 2 GiB。配置 SHA-256 sidecar 时先校验下载容器，随后始终执行 MMDB 完整验证。候选文件与目标位于同一文件系统，通过重命名激活，上一版保留为 `.previous`。服务通过互斥保护的 Resolver 热交换，避免关闭仍在查询的旧句柄。
 
-DB-IP City Lite 的 `city.names` 可能同时包含城市和区、街道等限定词，而 Lite Schema 不提供可用于选择行政层级的 feature code。`normalizeDBIPCity` 是 `provider_dbip.go` 的私有逻辑：它清理中国地名中的下级限定词，并对北京、上海、天津、重庆使用上级直辖市名称。统一结果层随后将已知中文城市名和香港常见别名归一为英文；Store 在采集和历史刷新入库时也执行相同的城市归一化。
+DB-IP City Lite 的 `city.names` 可能同时包含城市和区、街道等限定词，而 Lite Schema 不提供可用于选择行政层级的 feature code。`normalizeDBIPCity` 是 `provider_dbip.go` 的私有逻辑：它清理中国地名中的下级限定词，并对北京、上海、天津、重庆使用上级直辖市名称。统一结果层通过别名索引处理已知中英文名称、大小写、标点和中英文行政后缀；只有去掉后缀后能明确匹配已知名称才合并，未知名称保留原样。Store 在采集和历史刷新入库时也执行相同的城市归一化。
 
 Pageview Record 列表使用 `(occurred_at, id)` 复合游标，查询顺序由服务端固定，游标携带规范化筛选指纹，不能跨筛选复用。每页最多 200 条。明细和聚合导出直接遍历 SQLite Rows 并写入 `encoding/csv`，不生成临时导出文件；敏感导出只挂载在管理员认证路由并设置 `Cache-Control: no-store`。
 

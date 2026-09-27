@@ -1,7 +1,5 @@
 package geoip
 
-import "strings"
-
 // cityNamesEN maps Chinese administrative names (prefecture-level cities and
 // provinces, generated from GeoNames alternate names) to their common
 // English names so cross-backend comparisons aggregate on one spelling.
@@ -50,42 +48,4 @@ var cityNamesEN = map[string]string{
 	"陕西省": "Shaanxi", "青海": "Qinghai", "青海省": "Qinghai",
 	"香港": "Hong Kong", "香港特别行政区": "Hong Kong", "驻马店": "Zhumadian",
 	"黑龙江": "Heilongjiang", "黑龙江省": "Heilongjiang",
-}
-
-// citySuffixes are stripped before the second lookup when a full name
-// (such as "武汉市" or "喀什地区") is not present verbatim.
-var citySuffixes = []string{"特别行政区", "维吾尔自治区", "壮族自治区", "回族自治区", "自治区", "自治州", "地区", "盟", "省级", "市", "省"}
-
-// NormalizeCityEN returns the common English name for a Chinese city or
-// province label, or the label unchanged when it is already Latin or
-// unrecognized.
-func NormalizeCityEN(value string) string {
-	value = strings.TrimSpace(value)
-	switch strings.ToLower(value) {
-	case "hong kong sar", "hong kong special administrative region", "hong kong sar china":
-		return "Hong Kong"
-	}
-	if value == "" || !containsHan(value) {
-		return value
-	}
-	if name, ok := cityNamesEN[value]; ok {
-		return name
-	}
-	for _, suffix := range citySuffixes {
-		if strings.HasSuffix(value, suffix) && len(value) > len(suffix) {
-			if name, ok := cityNamesEN[strings.TrimSuffix(value, suffix)]; ok {
-				return name
-			}
-		}
-	}
-	return value
-}
-
-func containsHan(value string) bool {
-	for _, r := range value {
-		if r >= 0x4E00 && r <= 0x9FFF {
-			return true
-		}
-	}
-	return false
 }

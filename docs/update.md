@@ -6,7 +6,7 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## Unreleased
 
-- New Pageviews and historical geography refreshes use consistent English city names; Chinese and common English Hong Kong labels resolve to Hong Kong.
+- New Pageviews and historical geography refreshes use a shared city alias index for known Chinese and English names and administrative suffixes. Unrecognized names retain their original spelling to avoid merging different places.
 - Historical geography refreshes run in the background with progress for lookup, record updates, and aggregate rebuilding. Each distinct IP is queried once, and new Pageviews can be collected during online lookups.
 
 ## 0.4.1 - 2026-09-27

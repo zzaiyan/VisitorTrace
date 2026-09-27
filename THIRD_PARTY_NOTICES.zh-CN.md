@@ -12,6 +12,8 @@ VisitorTrace 包含一个由 Natural Earth 1:110m Admin 0 Countries 矢量数据
 
 Natural Earth 矢量和栅格地图数据属于公有领域，参见 <https://www.naturalearthdata.com/about/terms-of-use/>。
 
+`internal/geoip/citynames_gen.go` 和 `internal/geoip/citynames.go` 中内置的城市名称数据采用了 [GeoNames](https://www.geonames.org/) 的部分地名及别名。GeoNames 数据采用 [知识共享署名 4.0 许可](https://creativecommons.org/licenses/by/4.0/)；VisitorTrace 将这些名称整理为英文展示名称，并另行应用保守的别名与行政后缀规则。
+
 VisitorTrace 支持用户自行提供或自动下载 DB-IP City Lite、MaxMind GeoLite2 City、IP2Location LITE DB11 和 ip2region 数据库，也可使用运营者提供的凭证查询腾讯位置服务、高德、IPinfo 和 BigDataCloud。仓库不包含任何 GeoIP 数据库或供应商凭据。每个数据源仍分别适用其自身的许可证、使用条款、账户要求、调用限制和归因要求。供应商信息见：<https://db-ip.com/db/lite.php>、<https://dev.maxmind.com/geoip/geolite2-free-geolocation-data/>、<https://lite.ip2location.com/ip2location-lite>、<https://github.com/lionsoul2014/ip2region>、<https://lbs.qq.com/>、<https://lbs.amap.com/>、<https://ipinfo.io/> 和 <https://www.bigdatacloud.com/>。
 
 公开分析页的交互式图表使用 Apache ECharts 6.1.0，采用 Apache License 2.0。发布包中包含由 ECharts 源码生成的浏览器 bundle。详见 <https://echarts.apache.org/>。

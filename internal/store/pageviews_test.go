@@ -88,6 +88,41 @@ func TestRecordPageviewUpdatesRawAndAggregateData(t *testing.T) {
 	}
 }
 
+func TestRecordPageviewCombinesKnownCityAliases(t *testing.T) {
+	ctx := context.Background()
+	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	site, err := st.CreateSite(ctx, CreateSiteParams{Name: "City aliases", AllowedOrigins: []string{"https://example.com"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var localDate string
+	for index, city := range []string{"香港特別行政區", "Hong Kong SAR, China"} {
+		result, err := st.RecordPageview(ctx, PageviewObservation{
+			SiteID: site.ID, Hostname: "example.com", Path: "/", OriginalIP: "8.8.8.8",
+			CountryCode: "CN", City: city, VisitorDigest: bytes.Repeat([]byte{byte(index + 1)}, 32),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		localDate = result.LocalDate
+	}
+	var cityRows, pageviews int
+	if err := st.DB.QueryRowContext(ctx, `
+		SELECT COUNT(*), COALESCE(SUM(pageviews), 0) FROM daily_aggregates
+		WHERE site_id = ? AND local_date = ? AND dimension_kind = 'city'
+	`, site.ID, localDate).Scan(&cityRows, &pageviews); err != nil || cityRows != 1 || pageviews != 2 {
+		t.Fatalf("city aggregates = rows %d PV %d, %v", cityRows, pageviews, err)
+	}
+	var storedCity string
+	if err := st.DB.QueryRowContext(ctx, `SELECT city FROM pageviews WHERE site_id = ? LIMIT 1`, site.ID).Scan(&storedCity); err != nil || storedCity != "Hong Kong" {
+		t.Fatalf("stored city = %q, %v", storedCity, err)
+	}
+}
+
 func TestRecordPageviewRejectsInvalidDigestAtomically(t *testing.T) {
 	ctx := context.Background()
 	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")
