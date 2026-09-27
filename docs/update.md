@@ -10,10 +10,11 @@ This file records user-facing changes for each published VisitorTrace release.
 
 ## 0.4.0 - 2026-09-26
 
+- Added ip2region as a fourth local GeoIP backend, with XDB lookup, validation, and independent updates. Added Tencent Location Service, Amap, IPinfo, and BigDataCloud as online IP location services. Online lookups support Tencent and Amap signing keys, private-address filtering, and result caching.
 - GeoIP offers Basic, Recommended, and Precise presets that can combine local databases and online services. Recommended selects one primary for each domestic and foreign branch; Precise selects two per branch plus ordered backups. Because ip2region has no coordinates, it cannot be the sole primary in Basic or Recommended.
+- Domestic and foreign sources can cross-check city results; disagreements are resolved by source voting, and matching city results can supply map coordinates. Amap results can also provide coordinates.
 - The GeoIP status page shows each selected source's online or offline type, credentials, file, and update state. Each source has its own download settings and maintenance actions or online test. Configuration edits are saved together with one supervised restart.
-- The Admin overview reports available and selected GeoIP source counts, and `doctor` checks the selected sources. `geoip update` processes all selected local datasets by default and can target one dataset; `--force` permits a manual download in Manual only mode.
-- Amap lookup results can supply coordinates, and maps show attribution for selected local sources. SQLite Schema remains at 12.
+- The Admin overview reports GeoIP source counts with files or credentials and the number selected; `doctor` checks the selected sources. `geoip update` processes all selected local datasets by default and can target one dataset; `--force` permits a manual download in Manual only mode. Maps show attribution for selected local sources. SQLite Schema remains at 12.
 
 ## 0.3.0 - 2026-09-24
 
