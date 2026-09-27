@@ -33,15 +33,15 @@ make build
 
 ## 安装发布版
 
-正式版本在 GitHub Releases 提供带版本号且无需 Go 环境的 Linux 二进制。根据服务器架构选择 `visitortrace-<版本>-linux-amd64` 或 `visitortrace-<版本>-linux-arm64`，同时下载 `checksums.txt`。例如，校验 `0.4.1` 的 AMD64 版本：
+正式版本在 GitHub Releases 提供带版本号且无需 Go 环境的 Linux 二进制。根据服务器架构选择 `visitortrace-<版本>-linux-amd64` 或 `visitortrace-<版本>-linux-arm64`，同时下载 `checksums.txt`。例如，校验 `0.4.2` 的 AMD64 版本：
 
 ```sh
-grep ' visitortrace-0.4.1-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-0.4.1-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.4.2-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.4.2-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-实际安装时将 `0.4.1` 替换为下载的版本号；ARM64 服务器使用 `linux-arm64` 文件名。每个 Release 还会提供 GPL 文本和来自同一标签的对应源码归档。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
+实际安装时将 `0.4.2` 替换为下载的版本号；ARM64 服务器使用 `linux-arm64` 文件名。每个 Release 还会提供 GPL 文本和来自同一标签的对应源码归档。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
 
 ## 初始化
 
@@ -112,7 +112,7 @@ Site 管理页的“聚合分析”使用相同日期范围和交互组件，并
 
 管理总览顶部显示应用版本与运行时长、SQLite 版本/Schema/占用、可用磁盘空间、已有文件或凭据/已选择的 GeoIP 数据源数量和最近本地备份。任务表记录最近一次备份、维护清理和 GeoIP 更新的结果；低磁盘、超过 48 小时没有新备份、超过 35 天的 GeoIP、清理停滞或任务失败会显示告警。页面可直接触发立即备份、立即清理和 GeoIP 检查。
 
-“管理员设置 > 服务配置”保留公开 Base URL、GeoIP 方案、主库和备用库选择，以及全局更新策略。各后端卡片可展开编辑凭证；离线库还可分别选择官方源或自定义镜像及校验地址。新选中的后端会先显示待保存卡片。凭证不会回显，留空表示保留已保存值。所有配置通过一次管理员验证原子保存，并请求一次受管重启。存在未保存改动时，单项维护按钮暂时停用；保存后可在各卡片分别检查或强制更新离线库、测试在线服务。
+“管理员设置 > 服务配置”保留公开 Base URL、GeoIP 方案、主库和备用库选择，以及全局更新策略。各后端卡片可展开编辑凭证；离线库还可分别选择官方源或自定义镜像及校验地址。新选中的后端会先显示待保存卡片。凭证不会回显，留空表示保留已保存值。保存时按需弹出管理员密码验证；登录或上次验证后 5 分钟内无需重复输入。配置会原子保存，并请求一次受管重启。存在未保存改动时，单项维护按钮暂时停用；保存后可在各卡片分别检查或强制更新离线库、测试在线服务。
 
 ### 访问明细与导出
 
@@ -363,7 +363,7 @@ GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/he
 
 ## Site 清空与删除
 
-每个 Site 管理页底部提供两项危险操作。由于当前页面已限定到该 Site，两项操作均只要求输入当前管理员密码：
+每个 Site 管理页底部提供两项危险操作。点击任一操作会弹出确认对话框，必须准确输入该 Site 的显示名称和当前管理员密码；即使刚登录也会逐次验证：
 
 - “清空 Site 数据”删除 Pageview Record、全部聚合和地图位置，保留 Site 设置，轮换 HMAC 密钥并解除统计时区锁；采集和公开展示会保持关闭，检查设置后再手动开启。
 - “永久删除 Site”删除 Site 及其全部数据和设置，原 Site ID 不会重新分配。
@@ -398,13 +398,13 @@ visitortrace update apply --config "$HOME/.config/visitortrace/config.json"
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.4.1-linux-amd64 \
+  --binary ./visitortrace-0.4.2-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 
 脚本会在提供校验文件时验证本地二进制，运行候选版本的 `doctor --upgrade-check`，创建带校验的升级前备份，原子切换稳定版本链接并重启 systemd 服务。如果新进程无法保持运行，会恢复到旧版本；如果服务原本处于停止状态，脚本也会保持停止。为避免自动回滚时混用可执行文件和数据库版本，本地更新要求数据库 Schema 不变；改变 Schema 的版本应使用签名更新器。默认参数适用于部署指南中的目录；自定义安装可使用 `--user`、`--data-dir`、`--config` 或 `--service-name`。
 
-“管理员设置”提供两种签名更新方式。“在线更新”从配置的清单地址获取清单和平台资产；“本地文件更新”接收同一 Release 中的 `manifest.json` 和界面所示平台的二进制，适合服务器无法连接发布站点的场景。两种方式都会在本次请求中重新验证管理员密码。与 `update-systemd-binary.sh` 不同，后台本地文件方式使用完整签名更新器，可以安装改变数据库 Schema 的版本。
+“管理员设置”提供两种签名更新方式。“在线更新”从配置的清单地址获取清单和平台资产；“本地文件更新”接收同一 Release 中的 `manifest.json` 和界面所示平台的二进制，适合服务器无法连接发布站点的场景。密码验证到期时，提交前会弹出密码对话框；最近 5 分钟内已验证则无需重复输入。与 `update-systemd-binary.sh` 不同，后台本地文件方式使用完整签名更新器，可以安装改变数据库 Schema 的版本。
 
 任一方式准备好候选版本后，当前进程都会优雅退出，由进程管理器从稳定路径拉起新版本。反向代理必须允许本地文件上传；部署指南使用 `client_max_body_size 210m`，以覆盖签名清单规定的 200 MiB 资产上限和 multipart 开销。
 
@@ -426,4 +426,4 @@ VisitorTrace 采用 [GNU 通用公共许可证第 3 版](../LICENSE)发布。第
 
 ## 管理后台恢复备份
 
-“管理员设置 > 恢复备份”会列出本机 `.vtbackup` 归档，并提供“恢复备份”功能。选择归档、输入当前管理员密码并确认后，VisitorTrace 会校验归档旁的校验文件和归档内容，在 `backup_dir/pre-restore` 创建新的恢复前安全快照，并安排在下一次受管重启时替换数据库。当前配置文件不会被覆盖；恢复成功后所有管理员会话都会失效，服务就绪后需要重新登录。
+“管理员设置 > 恢复备份”会列出本机 `.vtbackup` 归档，并提供“恢复备份”功能。选择归档后，在确认对话框中准确输入备份文件名和当前管理员密码，VisitorTrace 会校验归档旁的校验文件和归档内容，在 `backup_dir/pre-restore` 创建新的恢复前安全快照，并安排在下一次受管重启时替换数据库。当前配置文件不会被覆盖；恢复成功后所有管理员会话都会失效，服务就绪后需要重新登录。

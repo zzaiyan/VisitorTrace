@@ -32,7 +32,7 @@ go vet ./...
 go mod verify
 ```
 
-`make check` runs the regular tests and static analysis. `tools/preview-demo.sh` provides a local manual-preview environment with generated data.
+`make check` runs the regular tests and static analysis. `tools/preview-demo.sh` provides a local manual-preview environment with generated data. It restarts the service after configuration saves or backup restores; press `Ctrl-C` to stop the preview and remove its temporary data.
 
 ## GeoIP Integration Verification
 
@@ -82,7 +82,7 @@ Hostname aggregates are non-sensitive and are available to both Public Analytics
 
 The Administrator password is stored as an Argon2id hash. Both the Admin Console change flow and `visitortrace password reset` update the credential and revoke every session in one transaction. Session records retain the most recent password-verification time for short-lived reauthentication gates on high-risk operations such as updates.
 
-A Site-data reset first disables ingestion and publication in the same transaction, then removes records, visitor registrations, aggregates, and map locations and rotates the Site HMAC key. Permanent deletion also disables external behavior before foreign-key cascading cleanup. The HTTP layer additionally requires both the Administrator password and exact Site ID.
+A Site-data reset first disables ingestion and publication in the same transaction, then removes records, visitor registrations, aggregates, and map locations and rotates the Site HMAC key. Permanent deletion also disables external behavior before foreign-key cascading cleanup. The HTTP layer additionally requires both the Administrator password and exact Site display name.
 
 The GeoIP resolver opens one configured provider at a time. `provider_dbip.go`, `provider_maxmind.go`, and `provider_ip2location.go` each own database validation, schema mapping, attribution, and the official update profile. The shared resolver only opens MMDB files, selects an adapter, and returns the common `geoip.Location` fields. DB-IP and MaxMind use the nested country/subdivision/city/location shape; IP2Location primarily uses its flat country/region/city/latitude/longitude shape and also accepts its MaxMind-compatible MMDB variant.
 
@@ -133,15 +133,15 @@ A production binary with self-update enabled can still be built locally:
 
 ```sh
 make build \
-  VERSION=0.4.1 \
+  VERSION=0.4.2 \
   UPDATE_PUBLIC_KEY="BASE64_RAW_ED25519_PUBLIC_KEY"
 ```
 
 Releases use semantic-version tags. Once CI on `main` is green, create and push a tag:
 
 ```sh
-git tag -a v0.4.1 -m "VisitorTrace v0.4.1"
-git push origin v0.4.1
+git tag -a v0.4.2 -m "VisitorTrace v0.4.2"
+git push origin v0.4.2
 ```
 
 `.github/workflows/release.yml` reruns the tests, builds `visitortrace-<version>-linux-amd64` and `visitortrace-<version>-linux-arm64` with `CGO_ENABLED=0`, and embeds the version, commit, build time, database schema, and public key. It derives SHA-256 digests, sizes, and the update manifest from the actual files, then verifies the result with the final public key. Each Release also carries the unmodified GPL text and a source archive generated from the same tagged commit; all files are covered by `checksums.txt`. Verified assets are uploaded to a draft Release and published only after every step succeeds. A rerun can refresh that draft but cannot overwrite an already published release. SemVer tags containing `-` become prereleases and do not replace the stable `releases/latest` target.
@@ -150,10 +150,10 @@ To generate a manifest locally:
 
 ```sh
 go run ./tools/release-manifest generate \
-  --version 0.4.1 \
+  --version 0.4.2 \
   --published-at 2026-09-24T00:00:00Z \
-  --asset linux-amd64=dist/visitortrace-0.4.1-linux-amd64 \
-  --asset linux-arm64=dist/visitortrace-0.4.1-linux-arm64 \
+  --asset linux-amd64=dist/visitortrace-0.4.2-linux-amd64 \
+  --asset linux-arm64=dist/visitortrace-0.4.2-linux-arm64 \
   --output manifest.unsigned.json
 
 go run ./tools/release-manifest sign \

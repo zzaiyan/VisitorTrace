@@ -4,10 +4,12 @@
 
 This file records user-facing changes for each published VisitorTrace release.
 
-## Unreleased
+## 0.4.2 - 2026-09-27
 
 - New Pageviews and historical geography refreshes use a shared city alias index for known Chinese and English names and administrative suffixes. Unrecognized names retain their original spelling to avoid merging different places.
 - Historical geography refreshes run in the background with progress for lookup, record updates, and aggregate rebuilding. Each distinct IP is queried once, and new Pageviews can be collected during online lookups.
+- Sensitive actions now use confirmation, password, or typed-name-and-password dialogs according to risk. Configuration saves and application updates reuse the session's short password-verification window; Site resets, Site deletions, and backup restores require the exact target name and Administrator password every time. Repeated password fields are removed from Admin pages, and a stale page refreshes its CSRF token before submission.
+- Fixed hidden no-JavaScript fallback inputs blocking submissions after in-place navigation. Navigation loads a full page when the application script revision changes so controls use the matching script. SQLite Schema remains at 12.
 
 ## 0.4.1 - 2026-09-27
 

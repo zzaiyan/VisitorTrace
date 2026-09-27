@@ -1,3 +1,5 @@
+import "./auth-dialog.js";
+
 // VisitorTrace application navigation.
 //
 // Progressively enhances same-origin link clicks and GET form submissions into
@@ -127,6 +129,18 @@
 
   function applyDocument(html, finalURL, options) {
     var incoming = new DOMParser().parseFromString(html, "text/html");
+    var currentApp = document.querySelector('script[src*="/assets/app.js"]');
+    var nextApp = incoming.querySelector('script[src*="/assets/app.js"]');
+    if (currentApp && nextApp && absoluteURL(currentApp.src).href !== absoluteURL(nextApp.getAttribute("src")).href) {
+      // A running tab must load the new navigator before adopting templates
+      // from a newer release; otherwise old handlers can block new forms.
+      window.location.href = finalURL.href;
+      return;
+    }
+    // DOMParser parses <noscript> contents as live elements. In the active
+    // document, hidden required fallback inputs would block form submission
+    // before the authorization dialog's submit listener can run.
+    incoming.querySelectorAll("noscript").forEach(function (element) { element.remove(); });
     if (incoming.title) document.title = incoming.title;
     document.documentElement.lang = incoming.documentElement.lang;
     syncStylesheets(incoming);

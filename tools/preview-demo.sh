@@ -24,7 +24,8 @@ cleanup() {
   fi
   rm -rf "$WORK_DIR"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 0' INT TERM
 
 if command -v curl >/dev/null 2>&1 && curl -fsS "http://$LISTEN/health/live" >/dev/null 2>&1; then
   echo "a service is already listening on http://$LISTEN; set VISITORTRACE_LISTEN to another address" >&2
@@ -40,9 +41,6 @@ SITE_ID=$(printf '%s\n' "$SITE_OUTPUT" | awk '/^id:/ {print $2}')
 
 "$GO_BIN" run ./tools/seed-demo --config "$CONFIG" --site-id "$SITE_ID"
 
-"$BINARY" serve --config "$CONFIG" --listen "$LISTEN" &
-SERVER_PID=$!
-
 cat <<EOF
 
 VisitorTrace demo is running.
@@ -57,4 +55,10 @@ The database contains fake Pageviews with geographic coordinates for map marker 
 Press Ctrl-C to stop and remove the temporary database.
 EOF
 
-wait "$SERVER_PID"
+while :; do
+  "$BINARY" serve --config "$CONFIG" --listen "$LISTEN" &
+  SERVER_PID=$!
+  wait "$SERVER_PID" || true
+  SERVER_PID=
+  sleep 1
+done

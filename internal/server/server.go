@@ -199,6 +199,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /health/ready", s.ready)
 	mux.HandleFunc("/admin/login", s.adminLogin)
 	mux.HandleFunc("/admin/logout", s.adminLogout)
+	mux.HandleFunc("GET /admin/auth/context", s.adminAuthContext)
+	mux.HandleFunc("POST /admin/auth/verify", s.adminVerifyPassword)
 	mux.HandleFunc("GET /admin/assets/style.css", s.adminAssets)
 	mux.HandleFunc("GET /assets/analytics.js", s.scriptAsset("analytics.js"))
 	mux.HandleFunc("GET /assets/app.js", s.scriptAsset("app.js"))

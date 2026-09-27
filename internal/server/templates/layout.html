@@ -71,7 +71,7 @@
   <title>{{if .Title}}{{.Title}} · {{end}}VisitorTrace · 访迹</title>
   <link rel="stylesheet" href="{{assetPath "/admin/assets/style.css"}}">
 </head>
-<body class="{{if .Admin}}admin-shell{{else}}public-shell{{end}}"{{if .Admin}} data-stepup-title="{{t "stepup_dialog_title"}}" data-stepup-body="{{t "stepup_dialog_body"}}" data-stepup-submit="{{t "stepup_submit"}}" data-stepup-cancel="{{t "cancel"}}" data-stepup-password="{{t "administrator_password"}}"{{end}}>
+<body class="{{if .Admin}}admin-shell{{else}}public-shell{{end}}"{{if .Admin}} data-stepup-title="{{t "stepup_dialog_title"}}" data-stepup-body="{{t "stepup_dialog_body"}}" data-stepup-submit="{{t "stepup_submit"}}" data-stepup-cancel="{{t "cancel"}}" data-stepup-password="{{t "administrator_password"}}" data-auth-context-url="{{appPath "/admin/auth/context"}}" data-auth-verify-url="{{appPath "/admin/auth/verify"}}" data-auth-login-url="{{appPath "/admin/login"}}" data-auth-confirm-title="{{t "auth_confirm_title"}}" data-auth-target-label="{{t "auth_target_label"}}" data-auth-target-mismatch="{{t "auth_target_mismatch"}}" data-auth-password-invalid="{{t "auth_password_invalid"}}" data-auth-request-failed="{{t "auth_request_failed"}}" data-auth-unavailable="{{t "auth_unavailable"}}"{{end}}>
   {{if .Admin}}
   <aside class="sidebar">
     <a class="brand" href="{{appPath "/admin"}}"><span class="brand-mark">VT</span><span><strong>VisitorTrace</strong><small>访迹</small></span></a>

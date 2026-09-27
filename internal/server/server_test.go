@@ -759,7 +759,7 @@ func TestAdminSiteResetAndDelete(t *testing.T) {
 		app.Handler().ServeHTTP(response, request)
 		return response
 	}
-	reset := post("/admin/sites/"+site.ID+"/reset", nil)
+	reset := post("/admin/sites/"+site.ID+"/reset", url.Values{"confirm_site_name": {site.Name}})
 	if reset.Code != http.StatusSeeOther || reset.Header().Get("Location") != "/admin/sites/"+site.ID+"?saved=reset#danger" {
 		t.Fatalf("reset = status %d location %q", reset.Code, reset.Header().Get("Location"))
 	}
@@ -767,7 +767,7 @@ func TestAdminSiteResetAndDelete(t *testing.T) {
 	if err != nil || resetSite.AcceptPageviews || resetSite.PublishPublic {
 		t.Fatalf("reset Site = %#v, %v", resetSite, err)
 	}
-	deleted := post("/admin/sites/"+site.ID+"/delete", url.Values{"confirm_site_id": {site.ID}})
+	deleted := post("/admin/sites/"+site.ID+"/delete", url.Values{"confirm_site_name": {site.Name}})
 	if deleted.Code != http.StatusSeeOther || deleted.Header().Get("Location") != "/admin/sites?saved=deleted" {
 		t.Fatalf("delete = status %d location %q", deleted.Code, deleted.Header().Get("Location"))
 	}
@@ -874,7 +874,7 @@ func TestAdminOperationalActions(t *testing.T) {
 	if settingsResponse.Code != http.StatusOK || !strings.Contains(settingsResponse.Body.String(), `id="backup"`) || !strings.Contains(settingsResponse.Body.String(), `action="/admin/operations/restore"`) || !strings.Contains(settingsResponse.Body.String(), "恢复备份") {
 		t.Fatalf("settings backup restore section = status %d body %q", settingsResponse.Code, settingsResponse.Body.String())
 	}
-	restoreForm := url.Values{"csrf": {csrf}, "backup": {filepath.Base(archives[0])}, "password": {"correct horse"}}
+	restoreForm := url.Values{"csrf": {csrf}, "backup": {filepath.Base(archives[0])}, "confirm_backup": {filepath.Base(archives[0])}, "password": {"correct horse"}}
 	restoreRequest := httptest.NewRequest(http.MethodPost, "/admin/operations/restore", strings.NewReader(restoreForm.Encode()))
 	restoreRequest.Host = "127.0.0.1:8790"
 	restoreRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -977,7 +977,7 @@ func TestAdminGeoIPSettingsDoNotRenderSavedSecrets(t *testing.T) {
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
 	body := response.Body.String()
-	if response.Code != http.StatusOK || !strings.Contains(body, `action="/admin/settings/configuration"`) || !strings.Contains(body, `name="base_url"`) || !strings.Contains(body, `name="geoip_provider"`) || !strings.Contains(body, `value="maxmind"`) || !strings.Contains(body, `data-backup-list`) || !strings.Contains(body, `data-add-backup`) || !strings.Contains(body, `name="geoip_update"`) || !strings.Contains(body, `class="settings-jump"`) || !strings.Contains(body, `class="geoip-dataset-summary"`) || !strings.Contains(body, "provider=maxmind updated=1") || strings.Count(body, "保存配置并重启") != 2 || !strings.Contains(body, "</html>") {
+	if response.Code != http.StatusOK || !strings.Contains(body, `action="/admin/settings/configuration"`) || !strings.Contains(body, `name="base_url"`) || !strings.Contains(body, `name="geoip_provider"`) || !strings.Contains(body, `value="maxmind"`) || !strings.Contains(body, `data-backup-list`) || !strings.Contains(body, `data-add-backup`) || !strings.Contains(body, `name="geoip_update"`) || !strings.Contains(body, `class="settings-jump"`) || !strings.Contains(body, `class="geoip-dataset-summary"`) || !strings.Contains(body, "provider=maxmind updated=1") || strings.Count(body, "保存配置并重启") < 2 || !strings.Contains(body, "</html>") {
 		t.Fatalf("GeoIP settings = status %d body %q", response.Code, body)
 	}
 	for _, secret := range []string{"account-secret", "license-secret", "token-secret"} {
@@ -1730,37 +1730,90 @@ func TestStepUpWindowAndSiteDeletionConfirmation(t *testing.T) {
 		app.Handler().ServeHTTP(response, request)
 		return response
 	}
-	// Login itself verifies the password, so a fresh session starts inside
-	// the step-up window: reset proceeds without a password field.
-	if response := post("/admin/sites/"+site.ID+"/reset", url.Values{"csrf": {csrf}}); response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "saved=reset") {
-		t.Fatalf("reset inside window = status %d location %q", response.Code, response.Header().Get("Location"))
+	// Irreversible actions require an explicit password and exact target even
+	// immediately after login.
+	if response := post("/admin/sites/"+site.ID+"/reset", url.Values{"csrf": {csrf}, "confirm_site_name": {site.Name}}); response.Code != http.StatusForbidden || response.Header().Get("Vt-Auth") != "step-up" {
+		t.Fatalf("reset without password = status %d step-up %q", response.Code, response.Header().Get("Vt-Auth"))
 	}
-	// Once the window expires, a password-less action is challenged with
-	// 403 + Vt-Auth: step-up instead of executed.
+	if response := post("/admin/sites/"+site.ID+"/reset", url.Values{"csrf": {csrf}, "password": {"correct horse"}}); response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") {
+		t.Fatalf("reset without target = status %d location %q", response.Code, response.Header().Get("Location"))
+	}
 	digest := store.HashSessionToken(cookie.Value)
 	expired := time.Now().UTC().Add(-10 * time.Minute)
 	if err := st.MarkAdministratorPasswordVerified(context.Background(), digest, expired); err != nil {
 		t.Fatalf("expire step-up window: %v", err)
 	}
-	if response := post("/admin/sites/"+site.ID+"/reset", url.Values{"csrf": {csrf}}); response.Code != http.StatusForbidden || response.Header().Get("Vt-Auth") != "step-up" {
+	if response := post("/admin/sites/"+site.ID+"/reset", url.Values{"csrf": {csrf}, "confirm_site_name": {site.Name}}); response.Code != http.StatusForbidden || response.Header().Get("Vt-Auth") != "step-up" {
 		t.Fatalf("reset outside window = status %d step-up %q", response.Code, response.Header().Get("Vt-Auth"))
 	}
 	// A correct password authorizes the action and re-opens the window.
-	if response := post("/admin/sites/"+site.ID+"/reset", url.Values{"csrf": {csrf}, "password": {"correct horse"}}); response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "saved=reset") {
+	if response := post("/admin/sites/"+site.ID+"/reset", url.Values{"csrf": {csrf}, "confirm_site_name": {site.Name}, "password": {"correct horse"}}); response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "saved=reset") {
 		t.Fatalf("reset with password = status %d location %q", response.Code, response.Header().Get("Location"))
 	}
-	// Within the window the password is no longer required, but deleting the
-	// Site additionally demands the Site ID itself.
+	// The renewed window does not bypass the deletion password.
 	deleteURL := "/admin/sites/" + site.ID + "/delete"
-	if response := post(deleteURL, url.Values{"csrf": {csrf}, "confirm_site_id": {"wrong-id"}}); response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") {
+	if response := post(deleteURL, url.Values{"csrf": {csrf}, "confirm_site_name": {"wrong-name"}}); response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "error=") {
 		t.Fatalf("delete with wrong Site ID = status %d location %q", response.Code, response.Header().Get("Location"))
 	}
-	response := post(deleteURL, url.Values{"csrf": {csrf}, "confirm_site_id": {site.ID}})
+	if response := post(deleteURL, url.Values{"csrf": {csrf}, "confirm_site_name": {site.Name}}); response.Code != http.StatusForbidden || response.Header().Get("Vt-Auth") != "step-up" {
+		t.Fatalf("delete without password = status %d step-up %q", response.Code, response.Header().Get("Vt-Auth"))
+	}
+	response := post(deleteURL, url.Values{"csrf": {csrf}, "confirm_site_name": {site.Name}, "password": {"correct horse"}})
 	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "saved=deleted") {
 		t.Fatalf("delete with matching Site ID = status %d location %q", response.Code, response.Header().Get("Location"))
 	}
 	if _, err := st.GetSite(context.Background(), site.ID); err == nil {
 		t.Fatalf("site still exists after deletion")
+	}
+}
+
+func TestAdminAuthorizationDialogEndpoints(t *testing.T) {
+	app, st, _ := testAdminServer(t)
+	cookie, csrf := loginAdmin(t, app)
+	get := func(withCookie bool) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodGet, "/admin/auth/context", nil)
+		request.Host = "127.0.0.1:8790"
+		if withCookie {
+			request.AddCookie(cookie)
+		}
+		response := httptest.NewRecorder()
+		app.Handler().ServeHTTP(response, request)
+		return response
+	}
+	if response := get(false); response.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous auth context = %d", response.Code)
+	}
+	if response := get(true); response.Code != http.StatusOK || !strings.Contains(response.Body.String(), csrf) || !strings.Contains(response.Body.String(), `"stepUpActive":true`) || response.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("admin auth context = %d %s", response.Code, response.Body.String())
+	}
+	verify := func(token, candidate string) *httptest.ResponseRecorder {
+		form := url.Values{"csrf": {token}, "password": {candidate}}
+		request := httptest.NewRequest(http.MethodPost, "/admin/auth/verify", strings.NewReader(form.Encode()))
+		request.Host = "127.0.0.1:8790"
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.AddCookie(cookie)
+		response := httptest.NewRecorder()
+		app.Handler().ServeHTTP(response, request)
+		return response
+	}
+	if response := verify("stale", "correct horse"); response.Code != http.StatusForbidden || response.Header().Get("Vt-Auth") != "csrf" {
+		t.Fatalf("stale token verification = %d %q", response.Code, response.Header().Get("Vt-Auth"))
+	}
+	digest := store.HashSessionToken(cookie.Value)
+	if err := st.MarkAdministratorPasswordVerified(context.Background(), digest, time.Now().UTC().Add(-10*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if response := verify(csrf, "wrong password"); response.Code != http.StatusForbidden || response.Header().Get("Vt-Auth") != "step-up" {
+		t.Fatalf("wrong password verification = %d %q", response.Code, response.Header().Get("Vt-Auth"))
+	}
+	if response := get(true); !strings.Contains(response.Body.String(), `"stepUpActive":false`) {
+		t.Fatalf("wrong password reopened window: %s", response.Body.String())
+	}
+	if response := verify(csrf, "correct horse"); response.Code != http.StatusNoContent {
+		t.Fatalf("correct password verification = %d", response.Code)
+	}
+	if response := get(true); !strings.Contains(response.Body.String(), `"stepUpActive":true`) {
+		t.Fatalf("correct password did not reopen window: %s", response.Body.String())
 	}
 }
 

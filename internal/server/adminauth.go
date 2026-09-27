@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/json"
 	"net"
 	"net/http"
 	"net/netip"
@@ -223,11 +224,70 @@ func stepUpActive(session store.AdministratorSession) bool {
 	return time.Since(session.PasswordVerifiedAt) < adminStepUpWindow
 }
 
+// adminAuthContext lets an open admin tab replace a token from an older
+// session before it submits an action. The final POST remains authoritative.
+func (s *Server) adminAuthContext(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	session, ok := s.currentAdmin(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"authenticated":false}`))
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"authenticated": true,
+		"csrf":          hex.EncodeToString(session.CSRFToken),
+		"stepUpActive":  time.Until(session.PasswordVerifiedAt.Add(adminStepUpWindow)) > 30*time.Second,
+	})
+}
+
+// adminVerifyPassword checks a dialog entry before a native form submission.
+// The action handler checks the password again for irreversible operations.
+func (s *Server) adminVerifyPassword(w http.ResponseWriter, r *http.Request) {
+	session, ok := s.currentAdmin(r)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4*1024)
+	if !s.validCSRF(r, session) {
+		w.Header().Set("Vt-Auth", "csrf")
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	if !s.verifyAndMarkAdministratorPassword(r, session) {
+		w.Header().Set("Vt-Auth", "step-up")
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) verifyAndMarkAdministratorPassword(r *http.Request, session store.AdministratorSession) bool {
+	if !s.administratorPasswordMatches(r.Context(), r.FormValue("password")) {
+		return false
+	}
+	return s.Store.MarkAdministratorPasswordVerified(r.Context(), session.TokenDigest, time.Now().UTC()) == nil
+}
+
+// Irreversible actions demand a password for every submission, even during
+// the shared step-up window. The caller validates the named target as well.
+func (s *Server) authorizeCriticalAction(w http.ResponseWriter, r *http.Request, session store.AdministratorSession) bool {
+	if s.verifyAndMarkAdministratorPassword(r, session) {
+		return true
+	}
+	w.Header().Set("Vt-Auth", "step-up")
+	s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_step_up"))
+	return false
+}
+
 // authorizeStepUp gates a sensitive action: it passes when the session
 // verified the administrator password recently, or when the request carries
 // the correct password (which then starts a fresh window). AJAX callers get
 // a 403 with Vt-Auth: step-up so they can prompt once and replay the form;
-// forms rendered without JavaScript always include the password field.
+// forms without JavaScript can supply the password in their action form.
 func (s *Server) authorizeStepUp(w http.ResponseWriter, r *http.Request, session store.AdministratorSession) bool {
 	if stepUpActive(session) {
 		return true

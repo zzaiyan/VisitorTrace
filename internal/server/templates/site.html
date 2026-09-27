@@ -176,7 +176,7 @@
     <div><p class="eyebrow">Records</p><h2>{{t "recent_records"}}</h2></div>
     <div class="records-heading-actions">
       <a class="button ghost" href="{{appPath (printf "/admin/records?site_id=%s" .Site.ID)}}">{{t "view_site_records"}}</a>
-      <form method="post" action="{{appPath (printf "/admin/sites/%s/records/geoip" .Site.ID)}}" data-confirm-message="{{t "refresh_record_geoip_confirm"}}" data-record-geoip-form>
+    <form method="post" action="{{appPath (printf "/admin/sites/%s/records/geoip" .Site.ID)}}" data-auth-level="confirm" data-auth-title="{{t "refresh_record_geoip"}}" data-auth-message="{{t "refresh_record_geoip_confirm"}}" data-record-geoip-form>
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <button class="button ghost" type="submit" {{if not .GeoIPAvailable}}disabled title="{{t "geoip_unavailable"}}"{{else if .RecordGeoIPTask}}{{if eq .RecordGeoIPTask.State "running"}}disabled aria-busy="true"{{end}}{{end}} title="{{t "refresh_record_geoip"}}">{{t "refresh_record_geoip"}}</button>
       </form>
@@ -203,17 +203,16 @@
 <section class="section-block danger-zone" id="danger">
   <div class="section-heading"><div><p class="eyebrow">Danger zone</p><h2>{{t "danger_zone"}}</h2></div><span class="muted">{{t "irreversible_backup_first"}}</span></div>
   <div class="danger-grid">
-    <form method="post" action="{{appPath (printf "/admin/sites/%s/reset" .Site.ID)}}" class="danger-form" data-confirm-message="{{t "reset_site_confirm"}}">
+    <form method="post" action="{{appPath (printf "/admin/sites/%s/reset" .Site.ID)}}" class="danger-form" data-auth-level="critical" data-auth-title="{{t "reset_site_data"}}" data-auth-message="{{t "reset_site_confirm"}}" data-auth-target="{{.Site.Name}}" data-auth-confirm-name="confirm_site_name" data-auth-target-label="{{t "confirm_site_name"}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div><h3>{{t "reset_site_data"}}</h3><p>{{t "reset_site_help"}}</p></div>
-      {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>{{end}}
+      <noscript><label class="field"><span>{{t "confirm_site_name"}} · {{.Site.Name}}</span><input type="text" name="confirm_site_name" autocomplete="off" required></label><label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label></noscript>
       <button class="button danger" type="submit">{{t "reset_data"}}</button>
     </form>
-    <form method="post" action="{{appPath (printf "/admin/sites/%s/delete" .Site.ID)}}" class="danger-form" data-confirm-message="{{t "delete_site_confirm"}}">
+    <form method="post" action="{{appPath (printf "/admin/sites/%s/delete" .Site.ID)}}" class="danger-form" data-auth-level="critical" data-auth-title="{{t "delete_site"}}" data-auth-message="{{t "delete_site_confirm"}}" data-auth-target="{{.Site.Name}}" data-auth-confirm-name="confirm_site_name" data-auth-target-label="{{t "confirm_site_name"}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <div><h3>{{t "delete_site"}}</h3><p>{{t "delete_site_help"}}</p></div>
-      <label class="field"><span>{{t "confirm_site_id"}}</span><input type="text" name="confirm_site_id" autocomplete="off" spellcheck="false" required aria-describedby="confirm-site-id-help"><small id="confirm-site-id-help">{{t "confirm_site_id_help"}} <code>{{.Site.ID}}</code></small></label>
-      {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>{{end}}
+      <noscript><label class="field"><span>{{t "confirm_site_name"}} · {{.Site.Name}}</span><input type="text" name="confirm_site_name" autocomplete="off" required></label><label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label></noscript>
       <button class="button danger" type="submit">{{t "delete_permanently"}}</button>
     </form>
   </div>
@@ -392,15 +391,6 @@
     button.addEventListener("click", function () { autoDimension(button.dataset.autoDimension); });
   });
   if (resetButton) resetButton.addEventListener("click", restoreDefaults);
-}());
-</script>
-<script>
-(function () {
-  document.querySelectorAll("[data-confirm-message]").forEach(function (form) {
-    form.addEventListener("submit", function (event) {
-      if (!window.confirm(form.dataset.confirmMessage)) event.preventDefault();
-    });
-  });
 }());
 </script>
 <script>

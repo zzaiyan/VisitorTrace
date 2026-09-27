@@ -12,7 +12,7 @@
 
 <section class="section-block settings-configuration" id="configuration" data-geoip-settings>
   <div class="section-heading"><div><p class="eyebrow">Configuration</p><h2>{{t "service_configuration"}}</h2><p class="subhead">{{t "service_configuration_help"}}</p></div><span class="status paused">{{t "managed_restart"}}</span></div>
-  <form id="geoip-configuration-form" method="post" action="{{appPath "/admin/settings/configuration"}}" class="configuration-form">
+  <form id="geoip-configuration-form" method="post" action="{{appPath "/admin/settings/configuration"}}" class="configuration-form" data-auth-level="password" data-auth-title="{{t "save_configuration"}}" data-auth-message="{{t "apply_configuration_help"}}">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
     <input type="hidden" name="geoip_provider" value="{{.GeoIPProvider}}" data-selected-provider>
 
@@ -150,7 +150,7 @@
 
     <div class="configuration-actions">
       <div class="configuration-action-copy"><strong>{{t "apply_configuration"}}</strong><span>{{t "geoip_card_config_hint"}}</span></div>
-      {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>{{end}}
+      <noscript><label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label></noscript>
       <button class="button primary" type="submit">{{t "save_configuration"}}</button>
     </div>
   </form>
@@ -180,7 +180,7 @@
           <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-vt-nav><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><button class="button ghost" type="submit" {{if not .Configured}}disabled{{end}}>{{t "geoip_test_service"}}</button></form>
         {{else}}
           <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-vt-nav><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><input type="hidden" name="force" value="0"><button class="button ghost" type="submit">{{t "check_now"}}</button></form>
-          <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-vt-nav><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><input type="hidden" name="force" value="1"><button class="button primary" type="submit">{{t "force_download"}}</button></form>
+          <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-auth-level="confirm" data-auth-title="{{t "force_download"}}" data-auth-message="{{t "force_download_confirm"}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><input type="hidden" name="force" value="1"><button class="button primary" type="submit">{{t "force_download"}}</button></form>
         {{end}}
       </div>
     </article>
@@ -193,10 +193,10 @@
   <div class="section-heading"><div><p class="eyebrow">Maintenance</p><h2>{{t "restore_backup"}}</h2><p class="subhead">{{t "restore_backup_help"}}</p></div></div>
   <div class="restore-panel restore-panel-single">
     {{if .Backups}}
-    <form class="restore-form" method="post" action="{{appPath "/admin/operations/restore"}}" data-confirm-message="{{t "restore_backup_confirm"}}">
+    <form class="restore-form" method="post" action="{{appPath "/admin/operations/restore"}}" data-auth-level="critical" data-auth-title="{{t "restore_now"}}" data-auth-message="{{t "restore_backup_confirm"}}" data-auth-target-source="select[name=backup]" data-auth-confirm-name="confirm_backup" data-auth-target-label="{{t "confirm_backup_name"}}">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
       <label class="field"><span>{{t "choose_backup"}}</span><select name="backup" required>{{range .Backups}}<option value="{{.Name}}">{{.Name}} · {{formatBytes .Size}} · {{formatUTC .ModifiedAt}}{{if not .HasChecksum}} · {{t "checksum_missing"}}{{end}}</option>{{end}}</select></label>
-      {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label>{{end}}
+      <noscript><label class="field"><span>{{t "confirm_backup_name"}}</span><input type="text" name="confirm_backup" autocomplete="off" required></label><label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label></noscript>
       <button class="button danger" type="submit">{{t "restore_now"}}</button>
     </form>
     {{else}}<p class="muted">{{t "no_backups"}}</p>{{end}}
@@ -227,22 +227,22 @@
   <div class="update-methods">
     <div class="update-method">
       <div class="update-method-heading"><h3>{{t "online_update"}}</h3><p>{{t "online_update_help"}}</p></div>
-      <form method="post" action="{{appPath "/admin/settings/update"}}" class="update-form">
+      <form method="post" action="{{appPath "/admin/settings/update"}}" class="update-form" data-auth-level="password" data-auth-title="{{t "check_and_update"}}" data-auth-message="{{t "online_update_help"}}">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
-        {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>{{end}}
+        <noscript><label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label></noscript>
         <button class="button primary" type="submit" {{if or (not .UpdateKeyReady) (not .RunningFromStablePath)}}disabled{{end}}>{{t "check_and_update"}}</button>
       </form>
     </div>
     <div class="update-method">
       <div class="update-method-heading"><h3>{{t "local_update"}}</h3><p>{{t "local_update_help"}}</p></div>
-      <form method="post" action="{{appPath "/admin/settings/update/local"}}" enctype="multipart/form-data" class="local-update-form">
+      <form method="post" action="{{appPath "/admin/settings/update/local"}}" enctype="multipart/form-data" class="local-update-form" data-auth-level="password" data-auth-title="{{t "install_local_update"}}" data-auth-message="{{t "local_update_help"}}">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <div class="update-file-grid">
           <label class="field"><span>{{t "signed_manifest"}}</span><input type="file" name="manifest" accept="application/json,.json" required></label>
           <label class="field"><span>{{t "release_binary"}} <code>{{.UpdatePlatform}}</code></span><input type="file" name="binary" required></label>
         </div>
         <div class="update-submit-row">
-          {{if not .StepUpActive}}<label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label>{{end}}
+          <noscript><label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label></noscript>
           <button class="button primary" type="submit" {{if or (not .UpdateKeyReady) (not .RunningFromStablePath)}}disabled{{end}}>{{t "install_local_update"}}</button>
         </div>
       </form>

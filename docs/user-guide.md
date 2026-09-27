@@ -33,15 +33,15 @@ make build
 
 ## Install a Release
 
-GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.4.1` on AMD64:
+GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.4.2` on AMD64:
 
 ```sh
-grep ' visitortrace-0.4.1-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-0.4.1-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.4.2-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.4.2-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-Replace `0.4.1` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
+Replace `0.4.2` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
 
 ## Initialize
 
@@ -112,7 +112,7 @@ The Admin Console defaults to Simplified Chinese and stores the selected Chinese
 
 The top of the Admin dashboard reports application version and uptime, SQLite version/schema/size, available disk space, the number of GeoIP sources with files or credentials and the number selected, and the latest local backup. A task table retains the latest backup, maintenance cleanup, and GeoIP update outcomes. Low disk, a backup older than 48 hours, GeoIP data older than 35 days, stalled cleanup, or failed operations produce warnings. The page can trigger an immediate backup, cleanup, or GeoIP check.
 
-**Administrator Settings > Service configuration** holds the Public Base URL, GeoIP preset, backend selection, and global update policy. Each selected backend's card in **GeoIP data** has an expandable editor for its credentials; local database cards also contain their own official/custom download source and optional checksum URL. Newly selected backends appear as pending cards before saving. Saved secrets are never rendered back to the browser: an empty credential field retains its value. All configuration edits are saved atomically with one Administrator-password confirmation and one supervised restart. While edits are pending, immediate maintenance actions are disabled so they cannot discard unsaved input. Each local dataset shows its own file, loaded state, and latest update, with separate check and force-download controls even when the update policy is **Manual only**. Each online service shows its credential state and latest connection test, with a separate test button.
+**Administrator Settings > Service configuration** holds the Public Base URL, GeoIP preset, backend selection, and global update policy. Each selected backend's card in **GeoIP data** has an expandable editor for its credentials; local database cards also contain their own official/custom download source and optional checksum URL. Newly selected backends appear as pending cards before saving. Saved secrets are never rendered back to the browser: an empty credential field retains its value. Saving prompts for the Administrator password when the five-minute verification window has expired. Configuration edits are saved atomically with one supervised restart. While edits are pending, immediate maintenance actions are disabled so they cannot discard unsaved input. Each local dataset shows its own file, loaded state, and latest update, with separate check and force-download controls even when the update policy is **Manual only**. Each online service shows its credential state and latest connection test, with a separate test button.
 
 ### Pageview Records and Exports
 
@@ -363,7 +363,7 @@ The command reads and confirms the new password interactively. Automation may pr
 
 ## Site Reset and Deletion
 
-The bottom of each Site page contains two dangerous operations. Because the page is already scoped to one Site, both require only the current Administrator password:
+The bottom of each Site page contains two dangerous operations. Each action opens a confirmation dialog and requires the exact Site display name and current Administrator password, even immediately after sign-in:
 
 - Reset Site data removes Pageview Records, all aggregates, and map locations while preserving Site settings. It rotates the HMAC key, unlocks the statistics timezone, and leaves collection and public views disabled until they are reviewed and enabled manually.
 - Permanently delete Site removes the Site, all associated data, and its settings. Its Site ID is never reassigned.
@@ -398,13 +398,13 @@ When a release binary has already been downloaded manually, use the repository s
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.4.1-linux-amd64 \
+  --binary ./visitortrace-0.4.2-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 
 The script verifies the local checksum when supplied, runs the candidate's `doctor --upgrade-check`, creates a verified pre-update backup, switches the stable release link atomically, and restarts the systemd service. If the new process does not stay active, it restores the previous release. It preserves an intentionally inactive service as inactive. To keep automatic rollback from mixing executable and database versions, local updates must keep the same database schema; use the signed updater for a schema-changing release. The defaults match the deployment guide; use `--user`, `--data-dir`, `--config`, or `--service-name` for a custom installation.
 
-Administrator Settings offers two signed update methods. **Online update** fetches the configured manifest and platform asset. **Local files** accepts the `manifest.json` and the binary for the displayed platform from the same Release, which is useful when the server cannot reach the release host. Both methods re-verify the current Administrator password. Unlike `update-systemd-binary.sh`, the local-file Admin method uses the complete signed updater and can apply a release that changes the database schema.
+Administrator Settings offers two signed update methods. **Online update** fetches the configured manifest and platform asset. **Local files** accepts the `manifest.json` and the binary for the displayed platform from the same Release, which is useful when the server cannot reach the release host. Both methods prompt for the current Administrator password when the five-minute verification window has expired. Unlike `update-systemd-binary.sh`, the local-file Admin method uses the complete signed updater and can apply a release that changes the database schema.
 
 After either method prepares the candidate, the current process exits gracefully and the supervisor starts the new version through the stable path. A reverse proxy must allow the local upload size; the deployment guide uses `client_max_body_size 210m` to cover the signed 200 MiB asset limit plus multipart overhead.
 
@@ -426,4 +426,4 @@ VisitorTrace is distributed under the [GNU General Public License, version 3](..
 
 ## Admin Backup Restore
 
-**Administrator Settings > Backup restore** lists local `.vtbackup` archives and provides **Restore backup**. Select an archive, enter the current Administrator password, and confirm the destructive operation. VisitorTrace verifies both the sidecar and archive contents, creates a new safety snapshot under `backup_dir/pre-restore`, and schedules the replacement for the next supervised restart. The active configuration file is not overwritten. A successful restore revokes all Administrator sessions, so sign in again after the service becomes ready.
+**Administrator Settings > Backup restore** lists local `.vtbackup` archives and provides **Restore backup**. Select an archive, then enter its exact filename and the current Administrator password in the confirmation dialog. VisitorTrace verifies both the sidecar and archive contents, creates a new safety snapshot under `backup_dir/pre-restore`, and schedules the replacement for the next supervised restart. The active configuration file is not overwritten. A successful restore revokes all Administrator sessions, so sign in again after the service becomes ready.

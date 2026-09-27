@@ -39,15 +39,14 @@ var pageAssetRevision = func() string {
 }()
 
 type pageLayout struct {
-	Title        string
-	Admin        bool
-	CSRF         string
-	Flash        string
-	Error        string
-	Active       string
-	CurrentPath  string
-	Lang         string
-	StepUpActive bool
+	Title       string
+	Admin       bool
+	CSRF        string
+	Flash       string
+	Error       string
+	Active      string
+	CurrentPath string
+	Lang        string
 }
 
 func (p pageLayout) PageLanguage() string { return p.Lang }
@@ -212,7 +211,7 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string,
 func (s *Server) adminLayout(r *http.Request, session store.AdministratorSession, title, active string) pageLayout {
 	return pageLayout{
 		Title: title, Admin: true, CSRF: hex.EncodeToString(session.CSRFToken),
-		Active: active, CurrentPath: r.URL.Path, Lang: adminLanguage(r), StepUpActive: stepUpActive(session),
+		Active: active, CurrentPath: r.URL.Path, Lang: adminLanguage(r),
 	}
 }
 
@@ -553,7 +552,16 @@ func (s *Server) adminResetSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	siteID := r.PathValue("siteID")
-	if !s.authorizeStepUp(w, r, session) {
+	site, err := s.Store.GetSite(r.Context(), siteID)
+	if err != nil {
+		s.redirectWithError(w, r, "/admin/sites", translate(adminLanguage(r), "err_site_not_found"))
+		return
+	}
+	if r.FormValue("confirm_site_name") != site.Name {
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", translate(adminLanguage(r), "err_site_name_mismatch"))
+		return
+	}
+	if !s.authorizeCriticalAction(w, r, session) {
 		return
 	}
 	if err := s.Store.ResetSiteData(r.Context(), siteID); err != nil {
@@ -579,11 +587,16 @@ func (s *Server) adminDeleteSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	siteID := r.PathValue("siteID")
-	if !s.authorizeStepUp(w, r, session) {
+	site, err := s.Store.GetSite(r.Context(), siteID)
+	if err != nil {
+		s.redirectWithError(w, r, "/admin/sites", translate(adminLanguage(r), "err_site_not_found"))
 		return
 	}
-	if r.FormValue("confirm_site_id") != siteID {
-		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", translate(adminLanguage(r), "err_site_id_mismatch"))
+	if r.FormValue("confirm_site_name") != site.Name {
+		s.redirectWithError(w, r, "/admin/sites/"+siteID+"#danger", translate(adminLanguage(r), "err_site_name_mismatch"))
+		return
+	}
+	if !s.authorizeCriticalAction(w, r, session) {
 		return
 	}
 	if err := s.Store.DeleteSite(r.Context(), siteID); err != nil {

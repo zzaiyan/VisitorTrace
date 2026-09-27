@@ -32,7 +32,7 @@ go vet ./...
 go mod verify
 ```
 
-`make check` 执行常规测试和静态检查，`tools/preview-demo.sh` 提供带伪数据的本地人工预览环境。
+`make check` 执行常规测试和静态检查，`tools/preview-demo.sh` 提供带伪数据的本地人工预览环境。保存配置或恢复备份导致服务退出后，预览脚本会自动重新启动服务；按 `Ctrl-C` 结束预览并清理临时数据。
 
 ## GeoIP 集成验证
 
@@ -82,7 +82,7 @@ Hostname 聚合不属于敏感数据，Public Analytics 和 Admin Analytics 都�
 
 管理员密码以 Argon2id 哈希保存。后台修改和 `visitortrace password reset` 都在同一事务中更新凭据并撤销全部 Session。Session 记录保存最近密码验证时间，供更新等高风险操作实施短时重新验证。
 
-Site 数据清空会在一个事务中先关闭采集和公开展示，再删除逐条记录、访客登记、聚合和地图位置，并轮换 Site HMAC 密钥。永久删除同样先关闭对外能力，再依靠外键级联清理。HTTP 层还要求管理员密码与 Site ID 双重确认。
+Site 数据清空会在一个事务中先关闭采集和公开展示，再删除逐条记录、访客登记、聚合和地图位置，并轮换 Site HMAC 密钥。永久删除同样先关闭对外能力，再依靠外键级联清理。HTTP 层还要求管理员密码与 Site 显示名称双重确认。
 
 GeoIP Resolver 每次只打开配置中的一个后端。`provider_dbip.go`、`provider_maxmind.go` 和 `provider_ip2location.go` 分别负责数据库校验、Schema 映射、归因信息和官方更新 profile；通用 Resolver 只负责打开 MMDB、选择 adapter 和返回统一的 `geoip.Location` 字段。DB-IP 与 MaxMind 使用嵌套的 country/subdivision/city/location 结构；IP2Location 主要使用扁平的 country/region/city/latitude/longitude 结构，同时兼容其 MaxMind 结构 MMDB 变体。
 
@@ -133,15 +133,15 @@ Release 工作流只把公钥嵌入正式二进制。私钥仅暴露给受 Envir
 
 ```sh
 make build \
-  VERSION=0.4.1 \
+  VERSION=0.4.2 \
   UPDATE_PUBLIC_KEY="BASE64_RAW_ED25519_PUBLIC_KEY"
 ```
 
 发布使用语义化版本标签。确认 `main` 的 CI 通过后创建并推送标签：
 
 ```sh
-git tag -a v0.4.1 -m "VisitorTrace v0.4.1"
-git push origin v0.4.1
+git tag -a v0.4.2 -m "VisitorTrace v0.4.2"
+git push origin v0.4.2
 ```
 
 `.github/workflows/release.yml` 会重新执行测试，使用 `CGO_ENABLED=0` 构建 `visitortrace-<版本>-linux-amd64` 和 `visitortrace-<版本>-linux-arm64`，并将版本、Commit、构建时间、数据库 Schema 和公钥嵌入二进制。工作流从实际文件生成 SHA-256、大小和更新清单，再用最终公钥验签。每个 Release 还会包含未经修改的 GPL 文本和由同一标签 Commit 生成的源码归档，所有文件都纳入 `checksums.txt`。验证完成的文件先上传到草稿 Release，全部成功后才公开；任务重跑可以刷新同一草稿，不能覆盖已经发布的版本。含 `-` 的 SemVer 标签会发布为 prerelease，不会替换稳定版 `releases/latest`。
@@ -150,10 +150,10 @@ git push origin v0.4.1
 
 ```sh
 go run ./tools/release-manifest generate \
-  --version 0.4.1 \
+  --version 0.4.2 \
   --published-at 2026-09-24T00:00:00Z \
-  --asset linux-amd64=dist/visitortrace-0.4.1-linux-amd64 \
-  --asset linux-arm64=dist/visitortrace-0.4.1-linux-arm64 \
+  --asset linux-amd64=dist/visitortrace-0.4.2-linux-amd64 \
+  --asset linux-arm64=dist/visitortrace-0.4.2-linux-arm64 \
   --output manifest.unsigned.json
 
 go run ./tools/release-manifest sign \

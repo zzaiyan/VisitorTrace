@@ -53,7 +53,11 @@ func (s *Server) adminRunRestore(w http.ResponseWriter, r *http.Request) {
 		s.redirectWithError(w, r, "/admin", translate(adminLanguage(r), "err_config_path"))
 		return
 	}
-	if !s.authorizeStepUp(w, r, session) {
+	if r.FormValue("confirm_backup") == "" || r.FormValue("confirm_backup") != r.FormValue("backup") {
+		s.redirectWithError(w, r, "/admin/settings#backup", translate(adminLanguage(r), "err_backup_confirmation"))
+		return
+	}
+	if !s.authorizeCriticalAction(w, r, session) {
 		return
 	}
 
