@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/config"
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
@@ -14,7 +13,56 @@ import (
 
 const maxConfigurationSettingsBody = 40 * 1024
 
-func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request) {
+func (s *Server) adminUpdateGeoIPConfiguration(w http.ResponseWriter, r *http.Request) {
+	s.saveGeoIPConfiguration(w, r)
+}
+
+func (s *Server) adminUpdateServiceConfiguration(w http.ResponseWriter, r *http.Request) {
+	session, ok := s.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
+	if !s.validCSRF(r, session) {
+		s.renderError(w, r, http.StatusForbidden, translate(adminLanguage(r), "err_csrf"))
+		return
+	}
+	if s.ConfigPath == "" {
+		s.redirectWithError(w, r, "/admin/settings/service", translate(adminLanguage(r), "err_config_path"))
+		return
+	}
+	if !s.authorizeStepUp(w, r, session) {
+		return
+	}
+	baseURL, err := config.NormalizeBaseURL(r.FormValue("base_url"))
+	if err != nil {
+		s.redirectWithError(w, r, "/admin/settings/service", err.Error())
+		return
+	}
+	s.configMu.Lock()
+	defer s.configMu.Unlock()
+	current, err := s.savedSettings()
+	if err != nil {
+		s.redirectWithError(w, r, "/admin/settings/service", err.Error())
+		return
+	}
+	updated := current
+	updated.BaseURL = baseURL
+	if sameSettings(current, updated) {
+		s.redirect(w, r, "/admin/settings/service?saved=no-change", http.StatusSeeOther)
+		return
+	}
+	if err := config.Save(s.ConfigPath, updated); err != nil {
+		message := fmt.Sprintf(translate(adminLanguage(r), "configuration_save_failed"), err, filepath.Dir(s.ConfigPath))
+		s.redirectWithError(w, r, "/admin/settings/service", message)
+		return
+	}
+	s.applyHotSettings(updated)
+	s.redirect(w, r, "/admin/settings/service?saved=service", http.StatusSeeOther)
+}
+
+func (s *Server) saveGeoIPConfiguration(w http.ResponseWriter, r *http.Request) {
+	target := "/admin/settings/geoip"
 	session, ok := s.requireAdmin(w, r)
 	if !ok {
 		return
@@ -25,30 +73,30 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if s.ConfigPath == "" {
-		s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_config_path"))
+		s.redirectWithError(w, r, target, translate(adminLanguage(r), "err_config_path"))
 		return
 	}
 	if !s.authorizeStepUp(w, r, session) {
 		return
 	}
-	baseURL, err := config.NormalizeBaseURL(r.FormValue("base_url"))
+	s.configMu.Lock()
+	defer s.configMu.Unlock()
+	current, err := s.savedSettings()
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
+		s.redirectWithError(w, r, target, err.Error())
 		return
 	}
-
 	provider, err := geoip.NormalizeProvider(r.FormValue("geoip_provider"))
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
+		s.redirectWithError(w, r, target, err.Error())
 		return
 	}
 	updateMode := r.FormValue("geoip_update")
 	if updateMode != "automatic" && updateMode != "disabled" {
-		s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_mode"))
+		s.redirectWithError(w, r, target, translate(adminLanguage(r), "err_geoip_mode"))
 		return
 	}
-	updated := s.Config
-	updated.BaseURL = baseURL
+	updated := current
 	updated.GeoIPProvider = provider
 	defaultMMDB := filepath.Join(updated.DataDir, "geoip.mmdb")
 	defaultXDB := filepath.Join(updated.DataDir, "geoip.xdb")
@@ -60,12 +108,12 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 	updated.GeoIPUpdate = updateMode
 	updated.MaxMindAccountID, updated.MaxMindLicenseKey, err = updatedMaxMindCredentials(r, updated)
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
+		s.redirectWithError(w, r, target, err.Error())
 		return
 	}
 	updated.IP2LocationToken, err = updatedSecret(r.FormValue("ip2location_token"), r.FormValue("clear_ip2location_token") == "1", updated.IP2LocationToken, "IP2Location Token", adminLanguage(r))
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#configuration", err.Error())
+		s.redirectWithError(w, r, target, err.Error())
 		return
 	}
 	// GeoIP preset and per-branch backend selection.
@@ -79,7 +127,7 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 	updated.GeoIPForeignOnline = r.FormValue("geoip_foreign_online")
 	if updated.GeoIPPreset == "precise" {
 		if err := r.ParseForm(); err != nil {
-			s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_source"))
+			s.redirectWithError(w, r, target, translate(adminLanguage(r), "err_geoip_source"))
 			return
 		}
 		updated.GeoIPBackups = append([]string(nil), r.PostForm["geoip_backups"]...)
@@ -90,18 +138,18 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 		key := strings.TrimSpace(r.FormValue("online_" + service + "_key"))
 		sk := strings.TrimSpace(r.FormValue("online_" + service + "_sk"))
 		if key == "" && sk == "" {
-			if existing, ok := s.Config.OnlineServices[service]; ok && existing.Key != "" {
+			if existing, ok := current.OnlineServices[service]; ok && existing.Key != "" {
 				updated.OnlineServices[service] = existing
 			}
 			continue
 		}
 		if key == "" {
-			if existing, ok := s.Config.OnlineServices[service]; ok {
+			if existing, ok := current.OnlineServices[service]; ok {
 				key = existing.Key
 			}
 		}
 		if sk == "" {
-			if existing, ok := s.Config.OnlineServices[service]; ok {
+			if existing, ok := current.OnlineServices[service]; ok {
 				sk = existing.SK
 			}
 		}
@@ -113,8 +161,8 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 			updated.OnlineServices[service] = entry
 		}
 	}
-	updated.GeoIPDatasetSources = make(map[string]config.GeoIPDatasetSource, len(s.Config.GeoIPDatasetSources))
-	for id, source := range s.Config.GeoIPDatasetSources {
+	updated.GeoIPDatasetSources = make(map[string]config.GeoIPDatasetSource, len(current.GeoIPDatasetSources))
+	for id, source := range current.GeoIPDatasetSources {
 		updated.GeoIPDatasetSources[id] = source
 	}
 	for _, dataset := range updated.SelectedGeoIPDatasets() {
@@ -122,9 +170,6 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 			continue
 		}
 		mode := r.FormValue("geoip_source_" + dataset.ID)
-		if mode == "" && dataset.ID == "primary" {
-			mode = r.FormValue("geoip_source")
-		}
 		if mode == "" {
 			mode = "official"
 		}
@@ -132,23 +177,17 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 		updateURL := profile.URL
 		if mode == "custom" {
 			updateURL = strings.TrimSpace(r.FormValue("geoip_update_url_" + dataset.ID))
-			if updateURL == "" && dataset.ID == "primary" {
-				updateURL = strings.TrimSpace(r.FormValue("geoip_update_url"))
-			}
 			if updateURL == "" {
-				s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_url_required"))
+				s.redirectWithError(w, r, target, translate(adminLanguage(r), "err_geoip_url_required"))
 				return
 			}
 		} else if mode != "official" {
-			s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_source"))
+			s.redirectWithError(w, r, target, translate(adminLanguage(r), "err_geoip_source"))
 			return
 		}
 		checksumURL := strings.TrimSpace(r.FormValue("geoip_checksum_url_" + dataset.ID))
-		if checksumURL == "" && dataset.ID == "primary" {
-			checksumURL = strings.TrimSpace(r.FormValue("geoip_checksum_url"))
-		}
 		if len(updateURL) > 4096 || len(checksumURL) > 4096 {
-			s.redirectWithError(w, r, "/admin/settings#configuration", translate(adminLanguage(r), "err_geoip_url_long"))
+			s.redirectWithError(w, r, target, translate(adminLanguage(r), "err_geoip_url_long"))
 			return
 		}
 		if dataset.ID == "primary" {
@@ -164,25 +203,17 @@ func (s *Server) adminUpdateConfiguration(w http.ResponseWriter, r *http.Request
 			delete(updated.GeoIPDatasetSources, dataset.ID)
 		}
 	}
-	if err := config.Save(s.ConfigPath, updated); err != nil {
-		message := fmt.Sprintf(translate(adminLanguage(r), "configuration_save_failed"), err, filepath.Dir(s.ConfigPath))
-		s.redirectWithError(w, r, "/admin/settings#configuration", message)
+	if sameSettings(current, updated) {
+		s.redirect(w, r, target+"?saved=no-change", http.StatusSeeOther)
 		return
 	}
-
-	layout := s.adminLayout(r, session, translate(adminLanguage(r), "service_restarting"), "settings")
-	reconnectURL := s.requestOrigin(r) + "/admin/settings#configuration"
-	if baseURL != "" {
-		reconnectURL = strings.TrimSuffix(baseURL, "/") + "/admin/settings#configuration"
+	if err := config.Save(s.ConfigPath, updated); err != nil {
+		message := fmt.Sprintf(translate(adminLanguage(r), "configuration_save_failed"), err, filepath.Dir(s.ConfigPath))
+		s.redirectWithError(w, r, target, message)
+		return
 	}
-	s.renderPage(w, r, "settings-restarting", settingsRestartData{
-		pageLayout: layout, ReconnectURL: reconnectURL, Eyebrow: "Configuration",
-		Message: translate(layout.Lang, "configuration_saved"),
-	})
-	go func() {
-		time.Sleep(300 * time.Millisecond)
-		s.RequestRestart()
-	}()
+	s.applyHotSettings(updated)
+	s.redirect(w, r, target+"?saved=geoip-settings", http.StatusSeeOther)
 }
 
 func updatedMaxMindCredentials(r *http.Request, current config.Config) (string, string, error) {

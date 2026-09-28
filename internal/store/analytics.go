@@ -180,33 +180,25 @@ func (s *Store) readDeduplicationRuleChanges(ctx context.Context, siteID, startD
 
 func (s *Store) readRangeMapPoints(ctx context.Context, siteID, startDate, endDate string) ([]MapPoint, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT g.country_code, g.region_code, g.city, g.latitude, g.longitude,
-		       SUM(a.pageviews), SUM(a.unique_visitors)
+		SELECT a.dimension_value, g.latitude, g.longitude, SUM(a.pageviews), SUM(a.unique_visitors)
 		FROM daily_aggregates AS a
-		JOIN geo_locations AS g
+		LEFT JOIN geo_locations AS g
 		  ON g.site_id = a.site_id
 		 AND g.dimension_kind = a.dimension_kind
 		 AND g.dimension_value = a.dimension_value
 		WHERE a.site_id = ? AND a.local_date BETWEEN ? AND ? AND a.dimension_kind = 'city'
-		GROUP BY g.dimension_value, g.country_code, g.region_code, g.city, g.latitude, g.longitude
-		ORDER BY SUM(a.pageviews) DESC, g.dimension_value
+		GROUP BY a.dimension_value, g.latitude, g.longitude
+		ORDER BY SUM(a.pageviews) DESC, a.dimension_value
 	`, siteID, startDate, endDate)
 	if err != nil {
 		return nil, fmt.Errorf("read date-range map points: %w", err)
 	}
 	defer rows.Close()
-	var result []MapPoint
-	for rows.Next() {
-		var point MapPoint
-		if err := rows.Scan(&point.CountryCode, &point.RegionCode, &point.City, &point.Latitude, &point.Longitude, &point.Pageviews, &point.UniqueVisitors); err != nil {
-			return nil, fmt.Errorf("scan date-range map point: %w", err)
-		}
-		result = append(result, point)
+	observations, err := scanCityObservations(rows)
+	if err != nil {
+		return nil, fmt.Errorf("read date-range map points: %w", err)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate date-range map points: %w", err)
-	}
-	return result, nil
+	return mergeCities(observations, true), nil
 }
 
 func analyticsDates(timezone, startDate, endDate string) (string, string, error) {
@@ -288,27 +280,31 @@ func (s *Store) readDimensionMetrics(ctx context.Context, siteID, startDate, end
 
 func (s *Store) readCityMetrics(ctx context.Context, siteID, startDate, endDate string) ([]AnalyticsMetric, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT a.dimension_value, SUM(a.pageviews), SUM(a.unique_visitors)
+		SELECT a.dimension_value, g.latitude, g.longitude, SUM(a.pageviews), SUM(a.unique_visitors)
 		FROM daily_aggregates AS a
+		LEFT JOIN geo_locations AS g
+		  ON g.site_id = a.site_id AND g.dimension_kind = a.dimension_kind
+		 AND g.dimension_value = a.dimension_value
 		WHERE a.site_id = ? AND a.local_date BETWEEN ? AND ? AND a.dimension_kind = 'city'
-		GROUP BY a.dimension_value
+		GROUP BY a.dimension_value, g.latitude, g.longitude
 		ORDER BY SUM(a.pageviews) DESC, a.dimension_value
-		LIMIT 12
 	`, siteID, startDate, endDate)
 	if err != nil {
 		return nil, fmt.Errorf("read city Analytics metrics: %w", err)
 	}
 	defer rows.Close()
-	result := make([]AnalyticsMetric, 0)
-	for rows.Next() {
-		var item AnalyticsMetric
-		if err := rows.Scan(&item.Value, &item.Pageviews, &item.UniqueVisitors); err != nil {
-			return nil, fmt.Errorf("scan city Analytics metric: %w", err)
-		}
-		result = append(result, item)
+	observations, err := scanCityObservations(rows)
+	if err != nil {
+		return nil, fmt.Errorf("read city Analytics metrics: %w", err)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate city Analytics metrics: %w", err)
+	merged := mergeCities(observations, false)
+	if len(merged) > 12 {
+		merged = merged[:12]
+	}
+	result := make([]AnalyticsMetric, 0, len(merged))
+	for _, point := range merged {
+		result = append(result, AnalyticsMetric{Value: point.CountryCode + "|" + point.RegionCode + "|" + point.City,
+			Pageviews: point.Pageviews, UniqueVisitors: point.UniqueVisitors})
 	}
 	return result, nil
 }

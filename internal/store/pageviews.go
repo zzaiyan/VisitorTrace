@@ -134,7 +134,7 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 
 	dimensions := aggregateDimensions(observation)
 	if observation.City != "" && observation.Latitude != nil && observation.Longitude != nil {
-		cityValue := observation.CountryCode + "|" + observation.RegionCode + "|" + observation.City
+		cityValue := cityDimensionValue(observation.CountryCode, observation.RegionCode, observation.City, observation.Latitude, observation.Longitude)
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO geo_locations (
 				site_id, dimension_kind, dimension_value, country_code, region_code, city,
@@ -217,7 +217,7 @@ func aggregateDimensions(observation PageviewObservation) []aggregateDimension {
 		result = append(result, aggregateDimension{kind: "region", value: observation.CountryCode + "|" + observation.RegionCode})
 	}
 	if observation.City != "" {
-		result = append(result, aggregateDimension{kind: "city", value: observation.CountryCode + "|" + observation.RegionCode + "|" + observation.City})
+		result = append(result, aggregateDimension{kind: "city", value: cityDimensionValue(observation.CountryCode, observation.RegionCode, observation.City, observation.Latitude, observation.Longitude)})
 	}
 	return result
 }

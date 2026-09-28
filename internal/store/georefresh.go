@@ -250,7 +250,7 @@ func (s *Store) RefreshPageviewGeoIPWithProgress(ctx context.Context, siteID str
 				}
 			}
 			if geography.City != "" && geography.Latitude != nil && geography.Longitude != nil {
-				value := geography.CountryCode + "|" + geography.RegionCode + "|" + geography.City
+				value := cityDimensionValue(geography.CountryCode, geography.RegionCode, geography.City, geography.Latitude, geography.Longitude)
 				locations[value] = geography
 			}
 		}
@@ -374,7 +374,7 @@ func geographicAggregateDimensions(geography PageviewGeography) []aggregateDimen
 		result = append(result, aggregateDimension{kind: "region", value: geography.CountryCode + "|" + geography.RegionCode})
 	}
 	if geography.City != "" {
-		result = append(result, aggregateDimension{kind: "city", value: geography.CountryCode + "|" + geography.RegionCode + "|" + geography.City})
+		result = append(result, aggregateDimension{kind: "city", value: cityDimensionValue(geography.CountryCode, geography.RegionCode, geography.City, geography.Latitude, geography.Longitude)})
 	}
 	return result
 }

@@ -19,7 +19,7 @@
   <div class="analytics-map site-analytics-map">
     <div class="interactive-map-shell"><div id="geo-chart" class="interactive-chart geo-chart" role="img" aria-label="{{.Site.Name}} {{t "visitor_map"}}"></div><div class="map-controls" data-map-controls data-reset-label="{{t "reset_map_view"}}" role="toolbar" aria-label="{{t "map_controls"}}"></div></div>
     <a class="chart-fallback" href="{{.MapPreviewURL}}" target="_blank" rel="noopener"><img src="{{.MapPreviewURL}}" alt="{{.Site.Name}} {{t "visitor_map"}}"></a>
-    {{range geoAttributions}}<a class="attribution" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}
+    {{template "geoip-attributions" .}}
   </div>
 </section>
 
@@ -141,7 +141,7 @@
         <iframe id="preset-widget-preview" src="{{.WidgetPreviewURL}}" data-preview-base="{{.WidgetPreviewURL}}" width="{{.Preset.Width}}" height="{{.Preset.Height}}" title="{{t "interactive_widget_preview"}}" scrolling="no" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe>
         <img id="preset-image-preview" data-preview-base="{{.MapPreviewURL}}" width="{{.Preset.Width}}" height="{{.Preset.Height}}" alt="{{t "image_fallback"}}" hidden>
       </div>
-      {{range geoAttributions}}<a class="attribution" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}
+      {{template "geoip-attributions" .}}
     </div>
     <form id="preset-form" method="post" action="{{appPath (printf "/admin/sites/%s/preset" .Site.ID)}}" class="preset-form" data-map-aspect="{{.MapAspect}}" data-default-preset="{{presetJSON .DefaultPreset}}" data-vt-nav>
       <input type="hidden" name="csrf" value="{{.CSRF}}">

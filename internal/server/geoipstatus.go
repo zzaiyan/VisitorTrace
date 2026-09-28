@@ -22,20 +22,37 @@ type geoIPDatasetStatus struct {
 	Loaded      bool
 }
 
+var onlineAttributions = map[string]geoip.Attribution{
+	"ipinfo":       {URL: "https://ipinfo.io", Label: "IPinfo"},
+	"tencent":      {URL: "https://lbs.qq.com", Label: "Tencent Maps"},
+	"amap":         {URL: "https://lbs.amap.com", Label: "Amap"},
+	"bigdatacloud": {URL: "https://www.bigdatacloud.com", Label: "BigDataCloud"},
+}
+
 func (s *Server) geoIPAttributions() []geoip.Attribution {
-	seen := make(map[string]bool)
 	var attributions []geoip.Attribution
+	seen := make(map[string]bool)
 	for _, dataset := range s.Config.SelectedGeoIPDatasets() {
-		if dataset.Online || seen[dataset.Provider] {
+		primary := false
+		for _, role := range dataset.Roles {
+			primary = primary || role != "backup"
+		}
+		if !primary || seen[dataset.Provider] {
 			continue
 		}
 		seen[dataset.Provider] = true
-		attributions = append(attributions, geoip.AttributionForProvider(dataset.Provider))
+		if attribution, online := onlineAttributions[dataset.Provider]; online {
+			attributions = append(attributions, attribution)
+			continue
+		}
+		attribution := geoip.AttributionForProvider(dataset.Provider)
+		attribution.Label = strings.TrimPrefix(attribution.Label, "IP geolocation by ")
+		attributions = append(attributions, attribution)
 	}
 	return attributions
 }
 
-func (s *Server) geoIPDatasetStatuses(tasks []operations.TaskStatus, now time.Time, lang string) []geoIPDatasetStatus {
+func (s *Server) geoIPDatasetStatuses(cfg config.Config, tasks []operations.TaskStatus, now time.Time, lang string) []geoIPDatasetStatus {
 	taskByName := make(map[string]operations.TaskStatus, len(tasks))
 	for _, task := range tasks {
 		taskByName[task.Operation] = task
@@ -53,7 +70,7 @@ func (s *Server) geoIPDatasetStatuses(tasks []operations.TaskStatus, now time.Ti
 	if roleNames == nil {
 		roleNames = roles["zh-CN"]
 	}
-	selected := s.Config.SelectedGeoIPDatasets()
+	selected := cfg.SelectedGeoIPDatasets()
 	result := make([]geoIPDatasetStatus, 0, len(selected))
 	s.geoMu.RLock()
 	defer s.geoMu.RUnlock()
@@ -77,7 +94,7 @@ func (s *Server) geoIPDatasetStatuses(tasks []operations.TaskStatus, now time.Ti
 			item.Task = &copy
 		}
 		if dataset.Online {
-			item.Configured = s.Config.OnlineServices[dataset.Provider].Key != ""
+			item.Configured = cfg.OnlineServices[dataset.Provider].Key != ""
 		} else {
 			if info, err := os.Stat(dataset.Path); err == nil && !info.IsDir() {
 				item.File = operations.FileStatus{Exists: true, Name: info.Name(), Size: info.Size(), ModifiedAt: info.ModTime().UTC()}
@@ -88,6 +105,14 @@ func (s *Server) geoIPDatasetStatuses(tasks []operations.TaskStatus, now time.Ti
 					item.File.Stale = now.Sub(info.ModTime().UTC()) > profile.FreshFor
 				}
 			}
+			active := s.Config.SelectedGeoIPDatasets()
+			activeProvider := ""
+			for _, selected := range active {
+				if selected.ID == dataset.ID {
+					activeProvider = selected.Provider
+					break
+				}
+			}
 			switch dataset.ID {
 			case "primary":
 				item.Loaded = s.geoIP != nil
@@ -96,6 +121,7 @@ func (s *Server) geoIPDatasetStatuses(tasks []operations.TaskStatus, now time.Ti
 			default:
 				item.Loaded = s.geoBackups[dataset.Provider] != nil
 			}
+			item.Loaded = item.Loaded && activeProvider == dataset.Provider
 		}
 		result = append(result, item)
 	}

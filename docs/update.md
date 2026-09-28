@@ -4,6 +4,13 @@
 
 This file records user-facing changes for each published VisitorTrace release.
 
+## 0.4.3 - 2026-09-28
+
+- Administrator Settings now groups service configuration, GeoIP sources, maintenance and updates, and account security into separate pages. GeoIP status cards include source-specific configuration and maintenance actions.
+- Saving settings no longer restarts the service automatically. Changes that need a restart show a persistent notice across Administrator pages, and Maintenance and updates provides one manual restart action. Base URL changes that preserve the URL path and manual GeoIP download settings can take effect without restarting.
+- City statistics and map markers merge known Chinese and English city aliases across provider and region labels when every pair of coordinates is within 80 km. Distant namesakes remain separate; new aggregates retain enough location detail to apply this limit.
+- Map and analytics attribution shows the primary GeoIP services active in the selected preset, including cross-checking primaries, under one “IP geolocation by” label. Standby services are omitted. SQLite Schema remains at 12.
+
 ## 0.4.2 - 2026-09-27
 
 - New Pageviews and historical geography refreshes use a shared city alias index for known Chinese and English names and administrative suffixes. Unrecognized names retain their original spelling to avoid merging different places.

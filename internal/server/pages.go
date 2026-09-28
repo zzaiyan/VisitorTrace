@@ -39,14 +39,15 @@ var pageAssetRevision = func() string {
 }()
 
 type pageLayout struct {
-	Title       string
-	Admin       bool
-	CSRF        string
-	Flash       string
-	Error       string
-	Active      string
-	CurrentPath string
-	Lang        string
+	Title          string
+	Admin          bool
+	CSRF           string
+	Flash          string
+	Error          string
+	Active         string
+	CurrentPath    string
+	Lang           string
+	RestartPending bool
 }
 
 func (p pageLayout) PageLanguage() string { return p.Lang }
@@ -110,6 +111,8 @@ type newSiteData struct {
 
 type adminSettingsData struct {
 	pageLayout
+	SettingsSection        string
+	GeoIPPending           bool
 	CurrentVersion         string
 	StableExecutable       string
 	UpdateKeyReady         bool
@@ -211,7 +214,7 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, page string,
 func (s *Server) adminLayout(r *http.Request, session store.AdministratorSession, title, active string) pageLayout {
 	return pageLayout{
 		Title: title, Admin: true, CSRF: hex.EncodeToString(session.CSRFToken),
-		Active: active, CurrentPath: r.URL.Path, Lang: adminLanguage(r),
+		Active: active, CurrentPath: r.URL.Path, Lang: adminLanguage(r), RestartPending: s.settingsRestartPending(),
 	}
 }
 
@@ -264,6 +267,21 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	section := r.PathValue("section")
+	if section == "" {
+		section = "overview"
+	}
+	switch section {
+	case "overview", "service", "geoip", "maintenance", "security":
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	cfg, err := s.savedSettings()
+	if err != nil {
+		s.renderError(w, r, http.StatusInternalServerError, err.Error())
+		return
+	}
 	manager := selfupdate.New(s.Config, s.ConfigPath, s.Store)
 	dbipProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderDBIP))
 	maxMindProfile, _ := geoip.UpdateProfileForProvider(string(geoip.ProviderMaxMind))
@@ -276,40 +294,41 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := adminSettingsData{
+		SettingsSection: section, GeoIPPending: !sameGeoIPSettings(s.effectiveSettings(), cfg),
 		pageLayout:     s.adminLayout(r, session, translate(adminLanguage(r), "settings"), "settings"),
 		CurrentVersion: manager.CurrentVersion, StableExecutable: manager.StableBinaryPath(),
 		UpdateKeyReady: len(manager.PublicKey) > 0, RunningFromStablePath: manager.RunningFromStablePath(),
 		UpdatePlatform: manager.Platform,
-		BaseURL:        s.Config.BaseURL, EffectiveBaseURL: s.externalBaseURL(r),
-		GeoIPProvider: s.Config.GeoIPProvider, GeoIPUpdate: s.Config.GeoIPUpdate,
-		GeoIPPreset: s.Config.GeoIPPreset,
+		BaseURL:        cfg.BaseURL, EffectiveBaseURL: s.externalBaseURL(r),
+		GeoIPProvider: cfg.GeoIPProvider, GeoIPUpdate: cfg.GeoIPUpdate,
+		GeoIPPreset: cfg.GeoIPPreset,
 		GeoIPBasicProvider: func() string {
-			if s.Config.GeoIPBasicBackend != "" {
-				return s.Config.GeoIPBasicBackend
+			if cfg.GeoIPBasicBackend != "" {
+				return cfg.GeoIPBasicBackend
 			}
-			return s.Config.GeoIPProvider
+			return cfg.GeoIPProvider
 		}(),
 		GeoIPDomesticOffline: func() string {
-			if s.Config.GeoIPDomesticOffline != "" {
-				return s.Config.GeoIPDomesticOffline
+			if cfg.GeoIPDomesticOffline != "" {
+				return cfg.GeoIPDomesticOffline
 			}
-			if s.Config.GeoIPPreset == "recommended" {
+			if cfg.GeoIPPreset == "recommended" {
 				return "ipinfo"
 			}
 			return "ip2region"
 		}(),
-		GeoIPDomesticOnline: s.Config.GeoIPDomesticOnline,
+		GeoIPDomesticOnline: cfg.GeoIPDomesticOnline,
 		GeoIPForeignOffline: func() string {
-			if s.Config.GeoIPForeignOffline != "" {
-				return s.Config.GeoIPForeignOffline
+			if cfg.GeoIPForeignOffline != "" {
+				return cfg.GeoIPForeignOffline
 			}
 			return "ip2location"
 		}(),
-		GeoIPForeignOnline: s.Config.GeoIPForeignOnline,
-		GeoIPBackups:       s.Config.GeoIPBackups,
+		GeoIPForeignOnline: cfg.GeoIPForeignOnline,
+		GeoIPBackups:       cfg.GeoIPBackups,
 		OnlineServiceKeys: func() map[string]bool {
 			result := make(map[string]bool)
-			for name, svc := range s.Config.OnlineServices {
+			for name, svc := range cfg.OnlineServices {
 				if svc.Key != "" {
 					result[name] = true
 				}
@@ -318,10 +337,10 @@ func (s *Server) adminSettings(w http.ResponseWriter, r *http.Request) {
 		}(),
 		DBIPOfficialURL: dbipProfile.URL, MaxMindOfficialURL: maxMindProfile.URL, IP2LocationOfficialURL: ip2LocationProfile.URL,
 		IP2RegionOfficialURL:  ip2RegionProfile.URL,
-		MaxMindConfigured:     s.Config.MaxMindAccountID != "" && s.Config.MaxMindLicenseKey != "",
-		IP2LocationConfigured: s.Config.IP2LocationToken != "", Backups: backups,
+		MaxMindConfigured:     cfg.MaxMindAccountID != "" && cfg.MaxMindLicenseKey != "",
+		IP2LocationConfigured: cfg.IP2LocationToken != "", Backups: backups,
 	}
-	data.GeoIPDatasets = s.geoIPDatasetStatuses(operationSnapshot.Tasks, time.Now(), data.Lang)
+	data.GeoIPDatasets = s.geoIPDatasetStatuses(cfg, operationSnapshot.Tasks, time.Now(), data.Lang)
 	data.Flash = adminFlash(r)
 	data.Error = r.URL.Query().Get("error")
 	s.renderPage(w, r, "settings", data)
@@ -944,6 +963,12 @@ func adminFlash(r *http.Request) string {
 		key = "flash_geoip"
 	case "geoip-current":
 		key = "flash_geoip_current"
+	case "service":
+		key = "flash_service_saved"
+	case "geoip-settings":
+		key = "flash_geoip_saved"
+	case "no-change":
+		key = "flash_no_change"
 	case "update-current":
 		key = "flash_update_current"
 	}
@@ -1147,8 +1172,8 @@ func operationState(value, lang string) string {
 }
 
 func (s *Server) externalBaseURL(r *http.Request) string {
-	if s.Config.BaseURL != "" {
-		return strings.TrimSuffix(s.Config.BaseURL, "/")
+	if baseURL := s.effectiveSettings().BaseURL; baseURL != "" {
+		return strings.TrimSuffix(baseURL, "/")
 	}
 	return s.requestOrigin(r) + s.basePath
 }

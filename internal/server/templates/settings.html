@@ -3,25 +3,39 @@
   <div><p class="eyebrow">Administrator</p><h1>{{t "settings"}}</h1><p class="subhead">{{t "settings_page_help"}}</p></div>
 </header>
 <nav class="settings-jump" aria-label="{{t "settings_navigation"}}">
-  <a href="#configuration">{{t "service_configuration"}}</a>
-  <a href="#geoip">{{t "geoip_operations"}}</a>
-  <a href="#backup">{{t "restore_backup"}}</a>
-  <a href="#account">{{t "account_security"}}</a>
-  <a href="#self-update">{{t "application_update"}}</a>
+  <a href="{{appPath "/admin/settings"}}" {{if eq .SettingsSection "overview"}}aria-current="page"{{end}}>{{t "settings_overview"}}</a>
+  <a href="{{appPath "/admin/settings/service"}}" {{if eq .SettingsSection "service"}}aria-current="page"{{end}}>{{t "service_configuration"}}</a>
+  <a href="{{appPath "/admin/settings/geoip"}}" {{if eq .SettingsSection "geoip"}}aria-current="page"{{end}}>{{t "geoip_operations"}}</a>
+  <a href="{{appPath "/admin/settings/maintenance"}}" {{if eq .SettingsSection "maintenance"}}aria-current="page"{{end}}>{{t "settings_maintenance"}}</a>
+  <a href="{{appPath "/admin/settings/security"}}" {{if eq .SettingsSection "security"}}aria-current="page"{{end}}>{{t "account_security"}}</a>
 </nav>
-
+{{if eq .SettingsSection "overview"}}
+<section class="settings-overview" aria-label="{{t "settings_overview"}}">
+  <a class="settings-overview-card" href="{{appPath "/admin/settings/service"}}"><strong>{{t "service_configuration"}}</strong><span>{{t "settings_service_summary"}}</span></a>
+  <a class="settings-overview-card" href="{{appPath "/admin/settings/geoip"}}"><strong>{{t "geoip_operations"}}</strong><span>{{t "settings_geoip_summary"}}</span></a>
+  <a class="settings-overview-card" href="{{appPath "/admin/settings/maintenance"}}"><strong>{{t "settings_maintenance"}}</strong><span>{{t "settings_maintenance_summary"}}</span></a>
+  <a class="settings-overview-card" href="{{appPath "/admin/settings/security"}}"><strong>{{t "account_security"}}</strong><span>{{t "account_security_help"}}</span></a>
+</section>
+{{end}}
+{{if eq .SettingsSection "service"}}
+<section class="section-block" id="configuration">
+  <div class="section-heading"><div><p class="eyebrow">Service</p><h2>{{t "service_configuration"}}</h2><p class="subhead">{{t "settings_service_summary"}}</p></div></div>
+  <form method="post" action="{{appPath "/admin/settings/service"}}" class="configuration-form" data-auth-level="password" data-auth-title="{{t "save_service_settings"}}" data-auth-message="{{t "save_settings_help"}}">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <div class="configuration-group">
+      <div class="configuration-group-heading"><h3>{{t "public_access"}}</h3><p>{{t "base_url_help"}}</p></div>
+      <div class="configuration-fields"><label class="field"><span>{{t "base_url"}}</span><input type="url" name="base_url" value="{{.BaseURL}}" placeholder="https://stats.example.com/visitortrace" autocomplete="url"><small>{{t "base_url_effective"}} <code>{{.EffectiveBaseURL}}</code></small></label></div>
+    </div>
+    <div class="configuration-actions"><span>{{t "settings_service_effect"}}</span><noscript><label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label></noscript><button class="button primary" type="submit">{{t "save_service_settings"}}</button></div>
+  </form>
+</section>
+{{end}}
+{{if eq .SettingsSection "geoip"}}
 <section class="section-block settings-configuration" id="configuration" data-geoip-settings>
-  <div class="section-heading"><div><p class="eyebrow">Configuration</p><h2>{{t "service_configuration"}}</h2><p class="subhead">{{t "service_configuration_help"}}</p></div><span class="status paused">{{t "managed_restart"}}</span></div>
-  <form id="geoip-configuration-form" method="post" action="{{appPath "/admin/settings/configuration"}}" class="configuration-form" data-auth-level="password" data-auth-title="{{t "save_configuration"}}" data-auth-message="{{t "apply_configuration_help"}}">
+  <div class="section-heading"><div><p class="eyebrow">GeoIP</p><h2>{{t "geoip_database"}}</h2><p class="subhead">{{t "settings_geoip_summary"}}</p></div></div>
+  <form id="geoip-configuration-form" method="post" action="{{appPath "/admin/settings/geoip/configuration"}}" class="configuration-form" data-auth-level="password" data-auth-title="{{t "save_geoip_settings"}}" data-auth-message="{{t "save_settings_help"}}">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
     <input type="hidden" name="geoip_provider" value="{{.GeoIPProvider}}" data-selected-provider>
-
-    <div class="configuration-group">
-      <div class="configuration-group-heading"><p class="eyebrow">Public access</p><h3>{{t "public_access"}}</h3><p>{{t "base_url_help"}}</p></div>
-      <div class="configuration-fields">
-        <label class="field"><span>{{t "base_url"}}</span><input type="url" name="base_url" value="{{.BaseURL}}" placeholder="https://stats.example.com/visitortrace" autocomplete="url"><small>{{t "base_url_effective"}} <code>{{.EffectiveBaseURL}}</code></small></label>
-      </div>
-    </div>
 
     <div class="configuration-group">
       <div class="configuration-group-heading"><p class="eyebrow">Database updates</p><h3>{{t "update_mode"}}</h3></div>
@@ -148,16 +162,12 @@
     </div>
 
 
-    <div class="configuration-actions">
-      <div class="configuration-action-copy"><strong>{{t "apply_configuration"}}</strong><span>{{t "geoip_card_config_hint"}}</span></div>
-      <noscript><label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" minlength="8" maxlength="128" required></label></noscript>
-      <button class="button primary" type="submit">{{t "save_configuration"}}</button>
-    </div>
   </form>
 </section>
 
 <section class="section-block" id="geoip">
-  <div class="section-heading"><div><p class="eyebrow">GeoIP</p><h2>{{t "geoip_database_status"}}</h2><p class="subhead">{{t "geoip_status_help"}}</p></div><span class="status paused">{{if eq .GeoIPUpdate "automatic"}}{{t "automatic_updates"}}{{else}}{{t "manual_only"}}{{end}}</span></div>
+  <div class="section-heading"><div><p class="eyebrow">GeoIP</p><h2>{{t "geoip_database_status"}}</h2><p class="subhead">{{t "geoip_status_help"}}</p></div><span class="status paused">{{if .GeoIPPending}}{{t "restart_pending_label"}}{{else if eq .GeoIPUpdate "automatic"}}{{t "automatic_updates"}}{{else}}{{t "manual_only"}}{{end}}</span></div>
+  {{if .GeoIPPending}}<p class="notice">{{t "geoip_pending_maintenance"}}</p>{{end}}
   <p class="notice" data-unsaved-geoip hidden>{{t "geoip_unsaved_maintenance"}}</p>
   <div class="geoip-dataset-grid" data-geoip-grid>
     {{range .GeoIPDatasets}}
@@ -177,20 +187,22 @@
       <details class="geoip-dataset-editor" data-backend-config><summary>{{t "geoip_edit_backend"}}</summary><div data-editor-fields></div></details>
       <div class="geoip-dataset-actions">
         {{if .Online}}
-          <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-vt-nav><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><button class="button ghost" type="submit" {{if not .Configured}}disabled{{end}}>{{t "geoip_test_service"}}</button></form>
+          <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-vt-nav><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><button class="button ghost" type="submit" {{if or (not .Configured) $.GeoIPPending}}disabled{{end}}>{{t "geoip_test_service"}}</button></form>
         {{else}}
-          <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-vt-nav><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><input type="hidden" name="force" value="0"><button class="button ghost" type="submit">{{t "check_now"}}</button></form>
-          <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-auth-level="confirm" data-auth-title="{{t "force_download"}}" data-auth-message="{{t "force_download_confirm"}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><input type="hidden" name="force" value="1"><button class="button primary" type="submit">{{t "force_download"}}</button></form>
+          <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-vt-nav><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><input type="hidden" name="force" value="0"><button class="button ghost" type="submit" {{if $.GeoIPPending}}disabled{{end}}>{{t "check_now"}}</button></form>
+          <form method="post" action="{{appPath "/admin/settings/geoip/update"}}" data-auth-level="confirm" data-auth-title="{{t "force_download"}}" data-auth-message="{{t "force_download_confirm"}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="dataset" value="{{.ID}}"><input type="hidden" name="force" value="1"><button class="button primary" type="submit" {{if $.GeoIPPending}}disabled{{end}}>{{t "force_download"}}</button></form>
         {{end}}
       </div>
     </article>
     {{end}}
   </div>
-  <div class="geoip-config-save"><span>{{t "geoip_card_config_hint"}}</span><button class="button primary" type="submit" form="geoip-configuration-form">{{t "save_configuration"}}</button></div>
+  <div class="geoip-config-save"><span>{{t "geoip_card_config_hint"}}</span><noscript><label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" form="geoip-configuration-form" autocomplete="current-password" required></label></noscript><button class="button primary" type="submit" form="geoip-configuration-form">{{t "save_geoip_settings"}}</button></div>
 </section>
-
+{{end}}
+{{if eq .SettingsSection "maintenance"}}
 <section class="section-block" id="backup">
   <div class="section-heading"><div><p class="eyebrow">Maintenance</p><h2>{{t "restore_backup"}}</h2><p class="subhead">{{t "restore_backup_help"}}</p></div></div>
+  <div class="settings-backup-action"><form method="post" action="{{appPath "/admin/operations/backup"}}" data-vt-nav><input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="return_to" value="maintenance"><button class="button ghost" type="submit">{{t "backup_now"}}</button></form></div>
   <div class="restore-panel restore-panel-single">
     {{if .Backups}}
     <form class="restore-form" method="post" action="{{appPath "/admin/operations/restore"}}" data-auth-level="critical" data-auth-title="{{t "restore_now"}}" data-auth-message="{{t "restore_backup_confirm"}}" data-auth-target-source="select[name=backup]" data-auth-confirm-name="confirm_backup" data-auth-target-label="{{t "confirm_backup_name"}}">
@@ -202,7 +214,8 @@
     {{else}}<p class="muted">{{t "no_backups"}}</p>{{end}}
   </div>
 </section>
-
+{{end}}
+{{if eq .SettingsSection "security"}}
 <section class="section-block" id="account">
   <div class="section-heading"><div><p class="eyebrow">Security</p><h2>{{t "change_password"}}</h2><p class="subhead">{{t "account_security_help"}}</p></div></div>
   <form method="post" action="{{appPath "/admin/settings/password"}}" class="password-settings-form">
@@ -216,7 +229,8 @@
     <button class="button primary" type="submit">{{t "update_password"}}</button>
   </form>
 </section>
-
+{{end}}
+{{if eq .SettingsSection "maintenance"}}
 <section class="section-block" id="self-update">
   <div class="section-heading"><div><p class="eyebrow">Update</p><h2>{{t "version_update"}}</h2></div><span class="muted">{{t "current"}} {{.CurrentVersion}}</span></div>
   <div class="update-status">
@@ -249,6 +263,16 @@
     </div>
   </div>
 </section>
+<section class="section-block settings-restart" id="restart">
+  <div class="section-heading"><div><p class="eyebrow">Service</p><h2>{{t "restart_service"}}</h2><p class="subhead">{{if .RestartPending}}{{t "restart_pending_help"}}{{else}}{{t "restart_optional_help"}}{{end}}</p></div>{{if .RestartPending}}<span class="status paused">{{t "restart_pending_label"}}</span>{{end}}</div>
+  <form method="post" action="{{appPath "/admin/settings/restart"}}" data-auth-level="password" data-auth-title="{{t "restart_service"}}" data-auth-message="{{t "restart_confirm"}}">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <noscript><label class="field"><span>{{t "administrator_password"}}</span><input type="password" name="password" autocomplete="current-password" required></label></noscript>
+    <button class="button {{if .RestartPending}}primary{{else}}ghost{{end}}" type="submit">{{t "restart_service"}}</button>
+  </form>
+</section>
+{{end}}
+{{if eq .SettingsSection "geoip"}}
 <script>
 (function () {
   var CRED = {
@@ -655,4 +679,5 @@
   initialSignature = configurationSignature();
 })();
 </script>
+{{end}}
 {{end}}

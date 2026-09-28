@@ -219,7 +219,7 @@ func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 	body := response.Body.String()
 	for _, want := range []string{
 		`<!doctype html>`, `<html lang="en">`, `width="320" height="180"`, `data-width="320" data-height="180"`, `data-city="Wuhan"`, `id="widget-tooltip"`,
-		`href="/public/` + site.ID + `/analytics"`, `draggable="false"`, `IP geolocation by DB-IP`, `dragstart`, `pointerover`, `(hover: none)`, `window.parent.postMessage`, `visitortrace:resize`, `.visitortrace-marker > title`,
+		`href="/public/` + site.ID + `/analytics"`, `draggable="false"`, `data-attribution="IP geolocation by DB-IP"`, `dragstart`, `pointerover`, `(hover: none)`, `window.parent.postMessage`, `visitortrace:resize`, `.visitortrace-marker > title`,
 		`visitortrace-map-content`, `visitortrace-marker-layer`, `root.addEventListener("click"`,
 	} {
 		if !strings.Contains(body, want) {
@@ -271,6 +271,48 @@ func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("interactive widget frame created Pageview records: count = %d", count)
+	}
+}
+
+func TestGeoIPAttributionSharesPrefixAcrossActiveSources(t *testing.T) {
+	app, _, site := testAdminServer(t)
+	app.Config.GeoIPPreset = "precise"
+	app.Config.GeoIPDomesticOffline = "dbip"
+	app.Config.GeoIPDomesticOnline = "ipinfo"
+	app.Config.GeoIPForeignOffline = "tencent"
+	app.Config.GeoIPForeignOnline = "amap"
+	app.Config.GeoIPBackups = []string{"ip2region"}
+	attrs := app.geoIPAttributions()
+	if len(attrs) != 4 || attrs[0].Label != "DB-IP" || attrs[1].Label != "IPinfo" || attrs[2].Label != "Tencent Maps" || attrs[3].Label != "Amap" {
+		t.Fatalf("active attribution sources = %#v", attrs)
+	}
+	handler := app.Handler()
+	public := httptest.NewRecorder()
+	handler.ServeHTTP(public, httptest.NewRequest(http.MethodGet, "/public/"+site.ID+"/analytics?range=all", nil))
+	publicBody := public.Body.String()
+	if public.Code != http.StatusOK || strings.Count(publicBody, "IP geolocation by") != 1 ||
+		!strings.Contains(publicBody, `>DB-IP</a>`) || !strings.Contains(publicBody, `>IPinfo</a>`) || !strings.Contains(publicBody, `>Tencent Maps</a>`) || !strings.Contains(publicBody, `>Amap</a>`) ||
+		strings.Contains(publicBody, `>MaxMind</a>`) || strings.Contains(publicBody, `>ip2region</a>`) {
+		t.Fatalf("public attribution = %d %s", public.Code, publicBody)
+	}
+	widget := httptest.NewRecorder()
+	handler.ServeHTTP(widget, httptest.NewRequest(http.MethodGet, "/embed/widget?site_id="+site.ID, nil))
+	if widget.Code != http.StatusOK || !strings.Contains(widget.Body.String(), `data-attribution="IP geolocation by DB-IP · IPinfo · Tencent Maps · Amap"`) {
+		t.Fatalf("widget attribution = %d %s", widget.Code, widget.Body.String())
+	}
+	cookie, _ := loginAdmin(t, app)
+	adminRequest := httptest.NewRequest(http.MethodGet, "/admin/sites/"+site.ID, nil)
+	adminRequest.AddCookie(cookie)
+	admin := httptest.NewRecorder()
+	handler.ServeHTTP(admin, adminRequest)
+	if admin.Code != http.StatusOK || strings.Count(admin.Body.String(), "IP geolocation by") != 2 {
+		t.Fatalf("Admin map attribution = %d, prefix count %d", admin.Code, strings.Count(admin.Body.String(), "IP geolocation by"))
+	}
+	app.Config.GeoIPPreset = "recommended"
+	app.Config.GeoIPForeignOffline = "ipinfo"
+	attrs = app.geoIPAttributions()
+	if len(attrs) != 2 || attrs[0].Label != "DB-IP" || attrs[1].Label != "IPinfo" {
+		t.Fatalf("non-primary services should be omitted: %#v", attrs)
 	}
 }
 
@@ -494,16 +536,15 @@ func TestSubpathRoutesAndConfiguredBaseURL(t *testing.T) {
 
 	baseForm := url.Values{
 		"csrf": {csrfMatch[1]}, "password": {"correct horse"}, "base_url": {"https://stats.example.com/visitortrace"},
-		"geoip_provider": {"dbip"}, "geoip_update": {"automatic"}, "geoip_source": {"official"},
 	}
-	baseRequest := httptest.NewRequest(http.MethodPost, "/visitortrace/admin/settings/configuration", strings.NewReader(baseForm.Encode()))
+	baseRequest := httptest.NewRequest(http.MethodPost, "/visitortrace/admin/settings/service", strings.NewReader(baseForm.Encode()))
 	baseRequest.Host = "stats.example.com"
 	baseRequest.TLS = &tls.ConnectionState{}
 	baseRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	baseRequest.AddCookie(cookies[0])
 	baseResponse := httptest.NewRecorder()
 	handler.ServeHTTP(baseResponse, baseRequest)
-	if baseResponse.Code != http.StatusOK || !strings.Contains(baseResponse.Body.String(), "https://stats.example.com/visitortrace/admin/settings") {
+	if baseResponse.Code != http.StatusSeeOther || !strings.Contains(baseResponse.Header().Get("Location"), "/admin/settings/service?saved=no-change") {
 		t.Fatalf("base URL update = status %d, body = %q", baseResponse.Code, baseResponse.Body.String())
 	}
 	loaded, err := config.Load(configPath)
@@ -552,6 +593,30 @@ func TestPublicMap(t *testing.T) {
 	app.Handler().ServeHTTP(conditionalResponse, conditional)
 	if conditionalResponse.Code != http.StatusNotModified {
 		t.Fatalf("conditional map status = %d, want %d", conditionalResponse.Code, http.StatusNotModified)
+	}
+}
+
+func TestPublicMapShowsOneMarkerPerCityAcrossRegions(t *testing.T) {
+	app, st, site := testServer(t)
+	for index, region := range []string{"HB", ""} {
+		latitude, longitude := 30.5928+float64(index)*0.01, 114.3055+float64(index)*0.01
+		_, err := st.RecordPageview(context.Background(), store.PageviewObservation{
+			SiteID: site.ID, OccurredAt: time.Now().UTC(), Hostname: "example.com", Path: "/",
+			CountryCode: "CN", RegionCode: region, City: []string{"Wuhan", "武汉市"}[index],
+			Latitude: &latitude, Longitude: &longitude,
+			VisitorDigest: bytes.Repeat([]byte{1}, 32), OriginalIP: "192.0.2.1",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/sites/"+site.ID+"/map.svg?w=640&h=360", nil)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	body := response.Body.String()
+	if response.Code != http.StatusOK || strings.Count(body, `data-city="Wuhan"`) != 1 || !strings.Contains(body, `data-pv="2" data-uv="2"`) {
+		t.Fatalf("city map merge = status %d, marker count %d, expected city totals present %t", response.Code,
+			strings.Count(body, `data-city="Wuhan"`), strings.Contains(body, `data-pv="2" data-uv="2"`))
 	}
 }
 
@@ -866,7 +931,7 @@ func TestAdminOperationalActions(t *testing.T) {
 	if dashboardResponse.Code != http.StatusOK || !strings.Contains(dashboardResponse.Body.String(), "运行状态") || !strings.Contains(dashboardResponse.Body.String(), "visitortrace-") || strings.Contains(dashboardResponse.Body.String(), `action="/admin/operations/restore"`) {
 		t.Fatalf("operations dashboard = status %d body %q", dashboardResponse.Code, dashboardResponse.Body.String())
 	}
-	settingsRequest := httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	settingsRequest := httptest.NewRequest(http.MethodGet, "/admin/settings/maintenance", nil)
 	settingsRequest.Host = "127.0.0.1:8790"
 	settingsRequest.AddCookie(cookie)
 	settingsResponse := httptest.NewRecorder()
@@ -897,7 +962,7 @@ func TestAdminOperationalActions(t *testing.T) {
 func TestAdminSelfUpdateRequiresEmbeddedKey(t *testing.T) {
 	app, _, _ := testAdminServer(t)
 	cookie, csrf := loginAdmin(t, app)
-	settings := httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	settings := httptest.NewRequest(http.MethodGet, "/admin/settings/maintenance", nil)
 	settings.Host = "127.0.0.1:8790"
 	settings.AddCookie(cookie)
 	settingsResponse := httptest.NewRecorder()
@@ -971,13 +1036,13 @@ func TestAdminGeoIPSettingsDoNotRenderSavedSecrets(t *testing.T) {
 	}
 	app.Config = loaded
 	cookie, _ := loginAdmin(t, app)
-	request := httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	request := httptest.NewRequest(http.MethodGet, "/admin/settings/geoip", nil)
 	request.Host = "127.0.0.1:8790"
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
 	body := response.Body.String()
-	if response.Code != http.StatusOK || !strings.Contains(body, `action="/admin/settings/configuration"`) || !strings.Contains(body, `name="base_url"`) || !strings.Contains(body, `name="geoip_provider"`) || !strings.Contains(body, `value="maxmind"`) || !strings.Contains(body, `data-backup-list`) || !strings.Contains(body, `data-add-backup`) || !strings.Contains(body, `name="geoip_update"`) || !strings.Contains(body, `class="settings-jump"`) || !strings.Contains(body, `class="geoip-dataset-summary"`) || !strings.Contains(body, "provider=maxmind updated=1") || strings.Count(body, "保存配置并重启") < 2 || !strings.Contains(body, "</html>") {
+	if response.Code != http.StatusOK || !strings.Contains(body, `action="/admin/settings/geoip/configuration"`) || !strings.Contains(body, `name="geoip_provider"`) || !strings.Contains(body, `value="maxmind"`) || !strings.Contains(body, `data-backup-list`) || !strings.Contains(body, `data-add-backup`) || !strings.Contains(body, `name="geoip_update"`) || !strings.Contains(body, `class="settings-jump"`) || !strings.Contains(body, `class="geoip-dataset-summary"`) || !strings.Contains(body, "provider=maxmind updated=1") || !strings.Contains(body, "保存 GeoIP 设置") || !strings.Contains(body, "</html>") {
 		t.Fatalf("GeoIP settings = status %d body %q", response.Code, body)
 	}
 	for _, secret := range []string{"account-secret", "license-secret", "token-secret"} {
@@ -1141,35 +1206,162 @@ func TestAdminGeoIPSettingsCanClearPartialMaxMindCredentials(t *testing.T) {
 	}
 }
 
-func TestAdminSavesCombinedConfigurationAndRequestsOneRestart(t *testing.T) {
+func TestAdminSavesGeoIPConfigurationWithoutRestart(t *testing.T) {
 	app, _, _ := testAdminServer(t)
 	app.Config.IP2LocationToken = "retained-token"
+	if err := config.Save(app.ConfigPath, app.Config); err != nil {
+		t.Fatal(err)
+	}
 	cookie, csrf := loginAdmin(t, app)
 	form := url.Values{
-		"csrf": {csrf}, "password": {"correct horse"}, "base_url": {"https://stats.example.com/visitortrace"},
-		"geoip_provider": {"maxmind"}, "geoip_update": {"automatic"}, "geoip_source": {"official"},
+		"csrf": {csrf}, "password": {"correct horse"},
+		"geoip_provider": {"maxmind"}, "geoip_basic_provider": {"maxmind"}, "geoip_update": {"automatic"},
 		"maxmind_account_id": {"123456"}, "maxmind_license_key": {"license-key"},
 	}
-	request := httptest.NewRequest(http.MethodPost, "/admin/settings/configuration", strings.NewReader(form.Encode()))
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip/configuration", strings.NewReader(form.Encode()))
 	request.Host = "127.0.0.1:8790"
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "服务配置已保存") {
+	if response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "saved=geoip-settings") {
 		t.Fatalf("configuration save = status %d body %q", response.Code, response.Body.String())
 	}
 	loaded, err := config.Load(app.ConfigPath)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if loaded.BaseURL != "https://stats.example.com/visitortrace" || loaded.GeoIPProvider != "maxmind" || loaded.GeoIPUpdate != "automatic" || loaded.MaxMindAccountID != "123456" || loaded.MaxMindLicenseKey != "license-key" || loaded.IP2LocationToken != "retained-token" || !strings.Contains(loaded.GeoIPUpdateURL, "maxmind.com") {
+	if loaded.GeoIPProvider != "maxmind" || loaded.GeoIPUpdate != "automatic" || loaded.MaxMindAccountID != "123456" || loaded.MaxMindLicenseKey != "license-key" || loaded.IP2LocationToken != "retained-token" || !strings.Contains(loaded.GeoIPUpdateURL, "maxmind.com") {
 		t.Fatalf("saved GeoIP config = %#v", loaded)
 	}
 	select {
 	case <-app.RestartRequested():
+		t.Fatal("configuration save unexpectedly requested a restart")
+	default:
+	}
+	if !app.settingsRestartPending() {
+		t.Fatal("saved GeoIP configuration should require restart")
+	}
+}
+
+func TestSettingsRestartNoticePersistsUntilManualRestart(t *testing.T) {
+	app, st, _ := testAdminServer(t)
+	cookie, csrf := loginAdmin(t, app)
+	handler := app.Handler()
+	post := func(path string, values url.Values) *httptest.ResponseRecorder {
+		values.Set("csrf", csrf)
+		values.Set("password", "correct horse")
+		request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(values.Encode()))
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.AddCookie(cookie)
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		return response
+	}
+	get := func(path string) string {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.AddCookie(cookie)
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("GET %s = %d", path, response.Code)
+		}
+		return response.Body.String()
+	}
+	if strings.Contains(get("/admin"), `class="restart-toast"`) {
+		t.Fatal("unexpected initial restart notice")
+	}
+	for _, section := range []string{"", "/service", "/geoip", "/security"} {
+		if strings.Contains(get("/admin/settings"+section), `action="/admin/settings/restart"`) {
+			t.Fatalf("restart control duplicated in settings section %q", section)
+		}
+	}
+	if strings.Count(get("/admin/settings/maintenance"), `action="/admin/settings/restart"`) != 1 {
+		t.Fatal("maintenance should have one restart control")
+	}
+	if response := post("/admin/settings/service", url.Values{"base_url": {"https://stats.example.com"}}); response.Code != http.StatusSeeOther {
+		t.Fatalf("host save = %d", response.Code)
+	}
+	if app.settingsRestartPending() || app.externalBaseURL(httptest.NewRequest(http.MethodGet, "/admin", nil)) != "https://stats.example.com" {
+		t.Fatal("same-path host change should apply immediately")
+	}
+	if response := post("/admin/settings/service", url.Values{"base_url": {"https://stats.example.com"}}); response.Code != http.StatusSeeOther || !strings.Contains(response.Header().Get("Location"), "saved=no-change") {
+		t.Fatalf("no-op save = %d %s", response.Code, response.Header().Get("Location"))
+	}
+	if response := post("/admin/settings/service", url.Values{"base_url": {"https://stats.example.com/visitortrace"}}); response.Code != http.StatusSeeOther {
+		t.Fatalf("path save = %d", response.Code)
+	}
+	if !app.settingsRestartPending() || !strings.Contains(get("/admin"), `href="/admin/settings/maintenance#restart"`) || !strings.Contains(get("/admin/settings/maintenance"), `action="/admin/settings/restart"`) {
+		t.Fatal("restart reminder did not persist across Admin pages")
+	}
+	select {
+	case <-app.RestartRequested():
+		t.Fatal("save restarted the server")
+	default:
+	}
+	saved, err := config.Load(app.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh := New(saved, st)
+	fresh.ConfigPath = app.ConfigPath
+	if fresh.settingsRestartPending() {
+		t.Fatal("notice should clear after a new process loads saved settings")
+	}
+	invalid := httptest.NewRequest(http.MethodPost, "/admin/settings/restart", strings.NewReader("csrf=invalid"))
+	invalid.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	invalid.AddCookie(cookie)
+	denied := httptest.NewRecorder()
+	handler.ServeHTTP(denied, invalid)
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("invalid restart CSRF = %d", denied.Code)
+	}
+	select {
+	case <-app.RestartRequested():
+		t.Fatal("invalid restart request stopped the server")
+	default:
+	}
+	response := post("/admin/settings/restart", url.Values{})
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "正在重启") {
+		t.Fatalf("manual restart = %d: %s", response.Code, response.Body.String())
+	}
+	select {
+	case <-app.RestartRequested():
 	case <-time.After(2 * time.Second):
-		t.Fatal("GeoIP settings did not request a restart")
+		t.Fatal("manual restart was not requested")
+	}
+}
+
+func TestManualGeoIPSourceSaveTakesEffectWithoutRestart(t *testing.T) {
+	app, _, _ := testAdminServer(t)
+	app.Config.GeoIPUpdate = "disabled"
+	if err := config.Save(app.ConfigPath, app.Config); err != nil {
+		t.Fatal(err)
+	}
+	var err error
+	app.Config, err = config.Load(app.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cookie, csrf := loginAdmin(t, app)
+	mirror := "https://mirror.example.com/dbip.mmdb.gz"
+	form := url.Values{
+		"csrf": {csrf}, "password": {"correct horse"}, "geoip_provider": {"dbip"},
+		"geoip_update": {"disabled"}, "geoip_preset": {"basic"}, "geoip_basic_provider": {"dbip"},
+		"geoip_source_primary": {"custom"}, "geoip_update_url_primary": {mirror},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip/configuration", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusSeeOther || app.effectiveSettings().GeoIPUpdateURL != mirror || app.settingsRestartPending() {
+		t.Fatalf("manual source save = %d, effective = %q, pending = %v", response.Code, app.effectiveSettings().GeoIPUpdateURL, app.settingsRestartPending())
+	}
+	select {
+	case <-app.RestartRequested():
+		t.Fatal("manual source change restarted the server")
+	default:
 	}
 }
 
@@ -1178,7 +1370,7 @@ func TestAdminSavesOrderedGeoIPBackups(t *testing.T) {
 	cookie, csrf := loginAdmin(t, app)
 	form := url.Values{
 		"csrf": {csrf}, "password": {"correct horse"},
-		"geoip_provider": {"dbip"}, "geoip_update": {"disabled"}, "geoip_source": {"official"},
+		"geoip_provider": {"dbip"}, "geoip_update": {"disabled"},
 		"geoip_preset": {"precise"}, "geoip_domestic_offline": {"dbip"},
 		"geoip_domestic_online": {"tencent"}, "geoip_foreign_offline": {"ip2location"}, "geoip_foreign_online": {"ipinfo"},
 		"online_tencent_key": {"key"}, "online_tencent_sk": {"secret"},
@@ -1193,13 +1385,13 @@ func TestAdminSavesOrderedGeoIPBackups(t *testing.T) {
 		"geoip_update_url_backup_ip2region":   {"https://mirror.example.com/ip2region.xdb"},
 		"geoip_checksum_url_backup_ip2region": {"https://mirror.example.com/ip2region.sha256"},
 	}
-	request := httptest.NewRequest(http.MethodPost, "/admin/settings/configuration", strings.NewReader(form.Encode()))
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip/configuration", strings.NewReader(form.Encode()))
 	request.Host = "127.0.0.1:8790"
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
-	if response.Code != http.StatusOK {
+	if response.Code != http.StatusSeeOther {
 		t.Fatalf("save = %d: %s", response.Code, response.Body.String())
 	}
 	loaded, err := config.Load(app.ConfigPath)
@@ -1213,7 +1405,7 @@ func TestAdminSavesOrderedGeoIPBackups(t *testing.T) {
 		t.Fatalf("saved dataset sources = %#v", loaded.GeoIPDatasetSources)
 	}
 	app.Config = loaded
-	settings := httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	settings := httptest.NewRequest(http.MethodGet, "/admin/settings/geoip", nil)
 	settings.Host = "127.0.0.1:8790"
 	settings.AddCookie(cookie)
 	page := httptest.NewRecorder()
@@ -1233,13 +1425,13 @@ func TestAdminSavesForeignCustomSourceWithoutOfficialToken(t *testing.T) {
 		"geoip_source_primary": {"official"}, "geoip_source_foreign": {"custom"},
 		"geoip_update_url_foreign": {"https://mirror.example.com/foreign.mmdb"},
 	}
-	request := httptest.NewRequest(http.MethodPost, "/admin/settings/configuration", strings.NewReader(form.Encode()))
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip/configuration", strings.NewReader(form.Encode()))
 	request.Host = "127.0.0.1:8790"
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
-	if response.Code != http.StatusOK {
+	if response.Code != http.StatusSeeOther {
 		t.Fatalf("save custom source = %d %s", response.Code, response.Body.String())
 	}
 	loaded, err := config.Load(app.ConfigPath)
@@ -1261,13 +1453,13 @@ func TestAdminRecommendedIPinfoUsesOnlineDataset(t *testing.T) {
 		"online_ipinfo_key":    {"token"},
 		"geoip_source_primary": {"official"}, "geoip_source_foreign": {"official"},
 	}
-	request := httptest.NewRequest(http.MethodPost, "/admin/settings/configuration", strings.NewReader(form.Encode()))
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip/configuration", strings.NewReader(form.Encode()))
 	request.Host = "127.0.0.1:8790"
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
-	if response.Code != http.StatusOK {
+	if response.Code != http.StatusSeeOther {
 		t.Fatalf("save recommended = %d %s", response.Code, response.Body.String())
 	}
 	loaded, err := config.Load(app.ConfigPath)
@@ -1312,13 +1504,13 @@ func TestAdminSavesBasicOnlinePrimary(t *testing.T) {
 		"geoip_provider": {"dbip"}, "geoip_update": {"disabled"}, "geoip_preset": {"basic"},
 		"geoip_basic_provider": {"ipinfo"}, "online_ipinfo_key": {"test-token"},
 	}
-	request := httptest.NewRequest(http.MethodPost, "/admin/settings/configuration", strings.NewReader(form.Encode()))
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip/configuration", strings.NewReader(form.Encode()))
 	request.Host = "127.0.0.1:8790"
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
-	if response.Code != http.StatusOK {
+	if response.Code != http.StatusSeeOther {
 		t.Fatalf("save basic online = %d %s", response.Code, response.Body.String())
 	}
 	loaded, err := config.Load(app.ConfigPath)
@@ -1341,13 +1533,13 @@ func TestAdminSavesPreciseOfflineSecondary(t *testing.T) {
 		"geoip_backups": {"amap"}, "online_amap_key": {"test-key"},
 		"geoip_source_domestic_b": {"custom"}, "geoip_update_url_domestic_b": {"https://mirror.example.com/domestic-b.mmdb"},
 	}
-	request := httptest.NewRequest(http.MethodPost, "/admin/settings/configuration", strings.NewReader(form.Encode()))
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip/configuration", strings.NewReader(form.Encode()))
 	request.Host = "127.0.0.1:8790"
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.AddCookie(cookie)
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
-	if response.Code != http.StatusOK {
+	if response.Code != http.StatusSeeOther {
 		t.Fatalf("save precise offline secondary = %d %s", response.Code, response.Body.String())
 	}
 	loaded, err := config.Load(app.ConfigPath)
@@ -1371,9 +1563,9 @@ func TestAdminConfigurationRejectsWrongPassword(t *testing.T) {
 	}
 	form := url.Values{
 		"csrf": {csrf}, "password": {"wrong password"}, "base_url": {"https://stats.example.com"},
-		"geoip_provider": {"ip2location"}, "geoip_update": {"disabled"}, "geoip_source": {"official"},
+		"geoip_provider": {"ip2location"}, "geoip_update": {"disabled"},
 	}
-	request := httptest.NewRequest(http.MethodPost, "/admin/settings/configuration", strings.NewReader(form.Encode()))
+	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip/configuration", strings.NewReader(form.Encode()))
 	request.Host = "127.0.0.1:8790"
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.AddCookie(cookie)
@@ -1398,6 +1590,9 @@ func TestAdminManualGeoIPUpdateRunsWhenAutomaticUpdatesAreDisabled(t *testing.T)
 	app, st, _ := testAdminServer(t)
 	app.Config.GeoIPUpdate = "disabled"
 	app.Config.GeoIPUpdateURL = downloadServer.URL + "/city.mmdb"
+	if err := config.Save(app.ConfigPath, app.Config); err != nil {
+		t.Fatal(err)
+	}
 	cookie, csrf := loginAdmin(t, app)
 	form := url.Values{"csrf": {csrf}, "force": {"1"}}
 	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip/update", strings.NewReader(form.Encode()))
@@ -1447,9 +1642,12 @@ func TestGeoIPSettingsShowSelectedDatasetsAndRejectUnselectedMaintenance(t *test
 	if err := st.FinishOperation(context.Background(), "geoip_foreign_ip2location", now, true, "foreign dataset updated"); err != nil {
 		t.Fatal(err)
 	}
+	if err := config.Save(app.ConfigPath, app.Config); err != nil {
+		t.Fatal(err)
+	}
 	cookie, csrf := loginAdmin(t, app)
 	page := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/admin/settings", nil)
+	request := httptest.NewRequest(http.MethodGet, "/admin/settings/geoip", nil)
 	request.Host = "127.0.0.1:8790"
 	request.AddCookie(cookie)
 	app.Handler().ServeHTTP(page, request)
@@ -1491,6 +1689,13 @@ func TestGeoIPBackupManualCheckUsesItsOwnFile(t *testing.T) {
 	if err := os.WriteFile(backupPath, fixture, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := config.Save(app.ConfigPath, app.Config); err != nil {
+		t.Fatal(err)
+	}
+	app.Config, err = config.Load(app.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cookie, csrf := loginAdmin(t, app)
 	form := url.Values{"csrf": {csrf}, "dataset": {"backup_ip2region"}, "force": {"0"}}
 	request := httptest.NewRequest(http.MethodPost, "/admin/settings/geoip/update", strings.NewReader(form.Encode()))
@@ -1517,6 +1722,14 @@ func TestGeoIPOnlineServiceProbeRecordsResultWithoutLeakingToken(t *testing.T) {
 	app.Config.GeoIPForeignOnline = "ipinfo"
 	app.Config.GeoIPBackups = []string{"ip2region"}
 	app.Config.OnlineServices = map[string]config.OnlineServiceConfig{"ipinfo": {Key: "probe-secret-token"}}
+	if err := config.Save(app.ConfigPath, app.Config); err != nil {
+		t.Fatal(err)
+	}
+	loadedConfig, err := config.Load(app.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.Config = loadedConfig
 	cookie, csrf := loginAdmin(t, app)
 	failed := false
 	previousTransport := http.DefaultTransport
@@ -1898,6 +2111,10 @@ func testAdminServer(t *testing.T) (*Server, *store.Store, store.Site) {
 	configPath := filepath.Join(dir, "config.json")
 	if err := config.Save(configPath, cfg); err != nil {
 		t.Fatalf("Save() error = %v", err)
+	}
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
 	}
 	passwordHash, err := password.Hash([]byte("correct horse"))
 	if err != nil {

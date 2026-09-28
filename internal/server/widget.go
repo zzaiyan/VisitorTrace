@@ -95,13 +95,17 @@ func (s *Server) renderWidgetFrame(configuredSite store.Site, width, height int,
 	for _, attribution := range s.geoIPAttributions() {
 		attributionLabels = append(attributionLabels, attribution.Label)
 	}
+	attributionText := ""
+	if len(attributionLabels) > 0 {
+		attributionText = "IP geolocation by " + strings.Join(attributionLabels, " · ")
+	}
 	// maprender escapes every dynamic label before producing the SVG.
 	inlineSVG := template.HTML(strings.TrimPrefix(string(svgBody), svgXMLDeclaration))
 	data := widgetFrameData{
 		Language:       language,
 		Title:          configuredSite.Name + " " + translate(language, "visitor_map"),
 		AnalyticsURL:   s.appPath("/public/" + configuredSite.ID + "/analytics"),
-		Attribution:    strings.Join(attributionLabels, " · "),
+		Attribution:    attributionText,
 		PageviewsLabel: translate(language, "pageviews"),
 		VisitorsLabel:  translate(language, "unique_visitors"),
 		Width:          width,

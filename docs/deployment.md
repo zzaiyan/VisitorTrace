@@ -18,7 +18,7 @@ Only ports 80 and 443 need to be public. Do not expose the VisitorTrace port to 
 Set the release version and architecture, then download the matching executable and checksum file:
 
 ```sh
-VERSION=0.4.2
+VERSION=0.4.3
 ARCH=amd64
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/visitortrace-${VERSION}-linux-${ARCH}"
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/checksums.txt"
@@ -47,7 +47,7 @@ sudo -u visitortrace /usr/local/bin/visitortrace init \
 
 The default configuration listens on `127.0.0.1:8790`, stores SQLite and GeoIP data under `/var/lib/visitortrace`, and uses DB-IP City Lite as its automatically updated provider. MaxMind GeoLite2 City and IP2Location LITE DB11 have equivalent automatic-update support but require account credentials. Add `--geoip-provider maxmind --maxmind-account-id ACCOUNT_ID --maxmind-license-key LICENSE_KEY` or `--geoip-provider ip2location --ip2location-token DOWNLOAD_TOKEN` to the initialization command. Keep the configuration at mode `0600`; backups include these credentials and require the same access control.
 
-After installation, choose a GeoIP preset and its providers under **Administrator Settings > Service configuration**; configure credentials and download sources in the selected cards under **GeoIP data**. The form atomically updates the same protected configuration and requests a systemd-supervised restart, so the unit must retain `Restart=always` and write access to `/etc/visitortrace` as shown below.
+After installation, choose a GeoIP preset, providers, credentials, and download sources under **Administrator Settings > GeoIP**. Saving atomically updates the protected configuration. Changes that require a restart remain flagged in the Admin Console until you restart manually from the bottom of Maintenance and updates. The unit must retain `Restart=always` and write access to `/etc/visitortrace` as shown below.
 
 Before placing a reverse proxy in front of the service, add its loopback addresses to `trusted_proxies` in `/etc/visitortrace/config.json`:
 
@@ -75,7 +75,7 @@ The optional `base_url` is the public URL used in integration snippets and gener
 "base_url": "https://stats.example.com/visitortrace"
 ```
 
-The value must be an absolute HTTP or HTTPS URL without credentials, query parameters, or a fragment. Leave it empty for a root deployment. The same setting is available in **Administrator Settings > Public Base URL**. Saving it writes the protected configuration file and restarts the service; systemd must be running with `Restart=always` for the new route prefix to take effect.
+The value must be an absolute HTTP or HTTPS URL without credentials, query parameters, or a fragment. Leave it empty for a root deployment. The same setting is available in **Administrator Settings > Service configuration**. Saving it writes the protected configuration file. Host and scheme changes take effect immediately when the route prefix is unchanged; a route prefix change requires a manual restart from Maintenance and updates. systemd must use `Restart=always`.
 
 Initialize the stable executable path used by one-click updates:
 
@@ -94,7 +94,7 @@ If the new release binary and `checksums.txt` are already on the server, update 
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.4.2-linux-amd64 \
+  --binary ./visitortrace-0.4.3-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 

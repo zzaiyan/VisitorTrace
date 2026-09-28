@@ -33,15 +33,15 @@ make build
 
 ## Install a Release
 
-GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.4.2` on AMD64:
+GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.4.3` on AMD64:
 
 ```sh
-grep ' visitortrace-0.4.2-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-0.4.2-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.4.3-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.4.3-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-Replace `0.4.2` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
+Replace `0.4.3` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
 
 ## Initialize
 
@@ -112,7 +112,7 @@ The Admin Console defaults to Simplified Chinese and stores the selected Chinese
 
 The top of the Admin dashboard reports application version and uptime, SQLite version/schema/size, available disk space, the number of GeoIP sources with files or credentials and the number selected, and the latest local backup. A task table retains the latest backup, maintenance cleanup, and GeoIP update outcomes. Low disk, a backup older than 48 hours, GeoIP data older than 35 days, stalled cleanup, or failed operations produce warnings. The page can trigger an immediate backup, cleanup, or GeoIP check.
 
-**Administrator Settings > Service configuration** holds the Public Base URL, GeoIP preset, backend selection, and global update policy. Each selected backend's card in **GeoIP data** has an expandable editor for its credentials; local database cards also contain their own official/custom download source and optional checksum URL. Newly selected backends appear as pending cards before saving. Saved secrets are never rendered back to the browser: an empty credential field retains its value. Saving prompts for the Administrator password when the five-minute verification window has expired. Configuration edits are saved atomically with one supervised restart. While edits are pending, immediate maintenance actions are disabled so they cannot discard unsaved input. Each local dataset shows its own file, loaded state, and latest update, with separate check and force-download controls even when the update policy is **Manual only**. Each online service shows its credential state and latest connection test, with a separate test button.
+Administrator Settings is divided into access settings, GeoIP, maintenance and updates, and account security. Access settings contain the Public Base URL: host and scheme changes take effect immediately if the path stays the same; path changes take effect after a restart. GeoIP holds the preset, providers, update policy, and selected dataset cards. Each card can edit credentials and, for local data, official or custom download sources and checksums. Saved secrets are never rendered back to the browser; blank fields retain saved values. Saving prompts for the Administrator password when the five-minute verification window has expired. Changes are saved atomically without automatically restarting. Changes requiring a restart keep a notice at the bottom right of every Admin page until the service is restarted from the bottom of Maintenance and updates. Unsaved GeoIP edits and GeoIP changes awaiting restart pause dataset maintenance; after restart each local dataset can be checked or force-downloaded and each online service can be tested separately. Maintenance and updates also contains backup creation, restore, and application updates. Changing the Administrator password does not require a restart.
 
 ### Pageview Records and Exports
 
@@ -303,9 +303,9 @@ The primary local database uses `geoip_update_url` and `geoip_checksum_url`. Oth
 
 The account credentials are secrets. Keep the configuration at mode `0600`, restrict backup access because backups include the configuration, and do not put credentials in either update URL.
 
-Existing installations can switch providers without rerunning `init`: use **Administrator Settings > Service configuration**, enter new credentials when required, and save the combined configuration. The service restarts with the selected sources. Previously saved credentials remain in the protected configuration for later reuse.
+Existing installations can switch providers without rerunning `init`: use **Administrator Settings > GeoIP**, enter new credentials when required, save, and restart manually from Maintenance and updates. Previously saved credentials remain in the protected configuration for later reuse. In **Manual only** mode, changes to the current local dataset download sources and credentials are available on the next manual check without a restart.
 
-Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. The map hover details, Admin previews, and Public Analytics show attribution for selected local data sources. DB-IP's district-level cleanup is specific to DB-IP; known Chinese and English city aliases are normalized for every source, while unknown names keep their original spelling.
+Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. The map hover details, Admin previews, and Public Analytics show one “IP geolocation by” label followed by the domestic and foreign primary services in the active preset, including cross-checking primaries. Standby databases are omitted. DB-IP's district-level cleanup is specific to DB-IP; known Chinese and English city aliases are normalized for every source, while unknown names keep their original spelling. City statistics and map markers normalize known Chinese/English aliases. Groups merge only when every pair of contributing coordinates is at most 80 km apart; groups without coordinates do not bypass this check. Distant namesakes remain separate, and a merged marker uses the location with the most Pageviews. City UV is the sum of existing location-group counts, so a visitor seen across providers or location groups may be counted more than once. UV in historical aggregates whose records were removed cannot be deduplicated exactly.
 
 ## Backup and Restore
 
@@ -398,7 +398,7 @@ When a release binary has already been downloaded manually, use the repository s
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.4.2-linux-amd64 \
+  --binary ./visitortrace-0.4.3-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 
@@ -426,4 +426,4 @@ VisitorTrace is distributed under the [GNU General Public License, version 3](..
 
 ## Admin Backup Restore
 
-**Administrator Settings > Backup restore** lists local `.vtbackup` archives and provides **Restore backup**. Select an archive, then enter its exact filename and the current Administrator password in the confirmation dialog. VisitorTrace verifies both the sidecar and archive contents, creates a new safety snapshot under `backup_dir/pre-restore`, and schedules the replacement for the next supervised restart. The active configuration file is not overwritten. A successful restore revokes all Administrator sessions, so sign in again after the service becomes ready.
+**Administrator Settings > Maintenance and updates > Backup restore** lists local `.vtbackup` archives and provides **Restore backup**. Select an archive, then enter its exact filename and the current Administrator password in the confirmation dialog. VisitorTrace verifies both the sidecar and archive contents, creates a new safety snapshot under `backup_dir/pre-restore`, and schedules the replacement for the next supervised restart. The active configuration file is not overwritten. A successful restore revokes all Administrator sessions, so sign in again after the service becomes ready.

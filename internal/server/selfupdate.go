@@ -36,7 +36,7 @@ func (s *Server) adminRunSelfUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := manager.PrepareAndActivate(r.Context())
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_update_failed")+err.Error())
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", translate(adminLanguage(r), "err_update_failed")+err.Error())
 		return
 	}
 	s.finishSelfUpdate(w, r, session, result)
@@ -49,7 +49,7 @@ func (s *Server) adminRunLocalSelfUpdate(w http.ResponseWriter, r *http.Request)
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, localUpdateBodyLimit)
 	if err := r.ParseMultipartForm(localUpdateFormMemory); err != nil {
-		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_local_update_read")+err.Error())
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", translate(adminLanguage(r), "err_local_update_read")+err.Error())
 		return
 	}
 	if r.MultipartForm != nil {
@@ -65,32 +65,32 @@ func (s *Server) adminRunLocalSelfUpdate(w http.ResponseWriter, r *http.Request)
 	}
 	manifestFile, manifestHeader, err := r.FormFile("manifest")
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_choose_manifest"))
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", translate(adminLanguage(r), "err_choose_manifest"))
 		return
 	}
 	defer manifestFile.Close()
 	if manifestHeader.Size < 1 || manifestHeader.Size > selfupdate.MaxManifestBytes {
-		s.redirectWithError(w, r, "/admin/settings#self-update", fmt.Sprintf(translate(adminLanguage(r), "err_manifest_max_bytes"), selfupdate.MaxManifestBytes))
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", fmt.Sprintf(translate(adminLanguage(r), "err_manifest_max_bytes"), selfupdate.MaxManifestBytes))
 		return
 	}
 	manifestData, err := io.ReadAll(io.LimitReader(manifestFile, selfupdate.MaxManifestBytes+1))
 	if err != nil || int64(len(manifestData)) > selfupdate.MaxManifestBytes {
-		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_manifest_read"))
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", translate(adminLanguage(r), "err_manifest_read"))
 		return
 	}
 	binaryFile, binaryHeader, err := r.FormFile("binary")
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_choose_binary"))
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", translate(adminLanguage(r), "err_choose_binary"))
 		return
 	}
 	defer binaryFile.Close()
 	if binaryHeader.Size < 1 || binaryHeader.Size > selfupdate.MaxReleaseAssetBytes {
-		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_binary_too_large"))
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", translate(adminLanguage(r), "err_binary_too_large"))
 		return
 	}
 	result, err := manager.PrepareAndActivateLocal(r.Context(), manifestData, binaryFile)
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_update_failed")+err.Error())
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", translate(adminLanguage(r), "err_update_failed")+err.Error())
 		return
 	}
 	s.finishSelfUpdate(w, r, session, result)
@@ -98,7 +98,7 @@ func (s *Server) adminRunLocalSelfUpdate(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) authorizedSelfUpdateManager(w http.ResponseWriter, r *http.Request, session store.AdministratorSession) (*selfupdate.Manager, bool) {
 	if s.ConfigPath == "" {
-		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_config_path"))
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", translate(adminLanguage(r), "err_config_path"))
 		return nil, false
 	}
 	if !s.authorizeStepUp(w, r, session) {
@@ -106,11 +106,11 @@ func (s *Server) authorizedSelfUpdateManager(w http.ResponseWriter, r *http.Requ
 	}
 	manager := selfupdate.New(s.Config, s.ConfigPath, s.Store)
 	if len(manager.PublicKey) == 0 {
-		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_no_update_key"))
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", translate(adminLanguage(r), "err_no_update_key"))
 		return nil, false
 	}
 	if !manager.RunningFromStablePath() {
-		s.redirectWithError(w, r, "/admin/settings#self-update", translate(adminLanguage(r), "err_not_stable_path"))
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", translate(adminLanguage(r), "err_not_stable_path"))
 		return nil, false
 	}
 	return manager, true
@@ -118,7 +118,7 @@ func (s *Server) authorizedSelfUpdateManager(w http.ResponseWriter, r *http.Requ
 
 func (s *Server) finishSelfUpdate(w http.ResponseWriter, r *http.Request, session store.AdministratorSession, result selfupdate.PrepareResult) {
 	if result.Current {
-		s.redirect(w, r, "/admin/settings?saved=update-current#self-update", http.StatusSeeOther)
+		s.redirect(w, r, "/admin/settings/maintenance?saved=update-current#self-update", http.StatusSeeOther)
 		return
 	}
 	s.renderPage(w, r, "update-restarting", updateRestartData{

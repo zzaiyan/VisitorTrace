@@ -215,6 +215,24 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .settings-jump { display: flex; flex-wrap: wrap; gap: 4px 24px; margin: -10px 0 12px; border-bottom: 1px solid var(--line); }
 .settings-jump a { padding: 12px 0 10px; border-bottom: 2px solid transparent; color: var(--muted); font-size: 11px; font-weight: 700; text-decoration: none; }
 .settings-jump a:hover, .settings-jump a:focus-visible { border-bottom-color: var(--coral); color: var(--ink); outline: none; }
+.settings-jump a[aria-current="page"] { border-bottom-color: var(--green); color: var(--green-dark); }
+.settings-overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 20px 0 30px; }
+.settings-overview-card { display: grid; gap: 10px; min-height: 126px; align-content: start; padding: 22px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--ink); text-decoration: none; }
+.settings-overview-card:hover, .settings-overview-card:focus-visible { border-color: var(--green); outline: none; box-shadow: 0 3px 14px #1c4e3b17; }
+.settings-overview-card strong { font-size: 15px; }
+.settings-overview-card span { color: var(--muted); font-size: 11px; line-height: 1.55; }
+.settings-backup-action { margin-bottom: 18px; }
+.settings-restart { margin-top: 36px; }
+.settings-restart form { display: grid; justify-items: start; gap: 12px; }
+.restart-toast { position: fixed; z-index: 80; right: 22px; bottom: 22px; display: flex; gap: 11px; width: min(340px, calc(100vw - 32px)); padding: 16px; border: 1px solid #cfae69; border-radius: 6px; background: #fffaf0; box-shadow: 0 8px 32px #1c242b2c; color: var(--ink); }
+.restart-pending .workspace { padding-bottom: 170px; }
+.restart-pending .toast-host { bottom: 156px; }
+.restart-toast { pointer-events: none; }
+.restart-toast a { pointer-events: auto; }
+.restart-toast-dot { flex: 0 0 8px; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: #c67c25; }
+.restart-toast strong { font-size: 12px; }
+.restart-toast p { margin: 6px 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.restart-toast a { color: var(--green-dark); font-size: 11px; font-weight: 700; }
 .configuration-form { display: grid; }
 .configuration-group { display: grid; grid-template-columns: minmax(180px, .42fr) minmax(0, 1.58fr); gap: 34px; padding: 24px 0; border-top: 1px solid var(--line); }
 .configuration-group-heading h3 { margin: 3px 0 7px; font-size: 15px; }
@@ -247,6 +265,8 @@ h3 { margin-bottom: 12px; font-size: 15px; }
 .preview-surface [hidden] { display: none; }
 .attribution { color: var(--muted); font-size: 10px; text-decoration: none; }
 .attribution:hover { color: var(--green); }
+.geoip-attributions { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; margin-top: 9px; color: var(--muted); font-size: 10px; }
+.geoip-attributions .attribution { display: inline; margin: 0; }
 .preset-form { display: grid; gap: 18px; }
 .check-group { display: flex; flex-wrap: wrap; gap: 15px; margin: 0; padding: 13px; border: 1px solid var(--line); }
 .check-group legend { padding: 0 5px; color: var(--muted); font-size: 11px; }
@@ -439,7 +459,6 @@ tbody tr:hover { background: #f6f9f7; }
 .analytics-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr); gap: 20px; }
 .analytics-map, .trend-panel, .data-panel { min-width: 0; padding: 20px; border: 1px solid var(--line); background: white; }
 .analytics-map img { display: block; width: 100%; height: auto; background: #e7edeb; }
-.analytics-map .attribution { display: block; margin-top: 9px; }
 .site-analytics-map { padding: clamp(14px, 2vw, 24px); }
 .site-analytics-map > .chart-fallback { display: block; }
 .interactive-map-shell { position: relative; min-width: 0; }
@@ -508,10 +527,14 @@ tbody tr:hover { background: #f6f9f7; }
   .logout-form .button { padding: 0 8px; font-size: 11px; }
   .page-header, .analytics-heading, .public-header { align-items: flex-start; flex-direction: column; }
 	.settings-jump { flex-wrap: nowrap; gap: 20px; overflow-x: auto; }
+	.settings-overview { grid-template-columns: 1fr; }
+	.restart-toast { right: 12px; bottom: 12px; }
 	.settings-jump a { flex: 0 0 auto; }
 	.integration-method, .site-settings-group { grid-template-columns: 1fr; gap: 14px; padding: 21px 0; }
 	.site-settings-actions .button { width: 100%; }
 	.configuration-group { grid-template-columns: 1fr; gap: 14px; padding: 21px 0; }
+	.preset-cards { flex-direction: column; }
+	.preset-card { text-align: left; }
 	.configuration-actions { padding: 17px 16px; }
 	.configuration-actions .field, .configuration-actions .button { flex-basis: 100%; }
 	.credential-grid { grid-template-columns: 1fr; gap: 20px; }

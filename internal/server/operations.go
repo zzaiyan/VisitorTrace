@@ -27,16 +27,20 @@ func (s *Server) adminRunBackup(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeOperation(w, r) {
 		return
 	}
+	target := "/admin"
+	if r.FormValue("return_to") == "maintenance" {
+		target = "/admin/settings/maintenance"
+	}
 	if s.ConfigPath == "" {
-		s.redirectWithError(w, r, "/admin/settings#backup", translate(adminLanguage(r), "err_config_path"))
+		s.redirectWithError(w, r, "/admin/settings/maintenance#backup", translate(adminLanguage(r), "err_config_path"))
 		return
 	}
 	_, err := backupservice.CreateTracked(r.Context(), s.Store, s.ConfigPath, s.Config.BackupDir, 3, time.Now())
 	if err != nil {
-		s.redirectWithError(w, r, "/admin", translate(adminLanguage(r), "err_backup_failed")+err.Error())
+		s.redirectWithError(w, r, target, translate(adminLanguage(r), "err_backup_failed")+err.Error())
 		return
 	}
-	s.redirect(w, r, "/admin?saved=backup", http.StatusSeeOther)
+	s.redirect(w, r, target+"?saved=backup", http.StatusSeeOther)
 }
 
 func (s *Server) adminRunRestore(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +58,7 @@ func (s *Server) adminRunRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.FormValue("confirm_backup") == "" || r.FormValue("confirm_backup") != r.FormValue("backup") {
-		s.redirectWithError(w, r, "/admin/settings#backup", translate(adminLanguage(r), "err_backup_confirmation"))
+		s.redirectWithError(w, r, "/admin/settings/maintenance#backup", translate(adminLanguage(r), "err_backup_confirmation"))
 		return
 	}
 	if !s.authorizeCriticalAction(w, r, session) {
@@ -64,7 +68,7 @@ func (s *Server) adminRunRestore(w http.ResponseWriter, r *http.Request) {
 	s.restoreMu.Lock()
 	if s.restoreActive {
 		s.restoreMu.Unlock()
-		s.redirectWithError(w, r, "/admin/settings#backup", translate(adminLanguage(r), "err_restore_pending"))
+		s.redirectWithError(w, r, "/admin/settings/maintenance#backup", translate(adminLanguage(r), "err_restore_pending"))
 		return
 	}
 	s.restoreActive = true
@@ -81,22 +85,22 @@ func (s *Server) adminRunRestore(w http.ResponseWriter, r *http.Request) {
 	archiveName := strings.TrimSpace(r.FormValue("backup"))
 	archivePath, err := backupservice.Resolve(s.Config.BackupDir, archiveName)
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#backup", translate(adminLanguage(r), "err_backup_missing")+err.Error())
+		s.redirectWithError(w, r, "/admin/settings/maintenance#backup", translate(adminLanguage(r), "err_backup_missing")+err.Error())
 		return
 	}
 	manifest, err := backupservice.ValidateArchive(r.Context(), archivePath)
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#backup", translate(adminLanguage(r), "err_backup_verify_failed")+err.Error())
+		s.redirectWithError(w, r, "/admin/settings/maintenance#backup", translate(adminLanguage(r), "err_backup_verify_failed")+err.Error())
 		return
 	}
 	preRestoreDir := filepath.Join(s.Config.BackupDir, "pre-restore")
 	preRestore, err := backupservice.Create(r.Context(), s.Store, s.ConfigPath, preRestoreDir, 3, time.Now())
 	if err != nil {
-		s.redirectWithError(w, r, "/admin/settings#backup", translate(adminLanguage(r), "err_restore_snapshot_failed")+err.Error())
+		s.redirectWithError(w, r, "/admin/settings/maintenance#backup", translate(adminLanguage(r), "err_restore_snapshot_failed")+err.Error())
 		return
 	}
 	if err := backupservice.ScheduleRestore(s.Config.DataDir, s.Config.BackupDir, archivePath, preRestore.Path, time.Now()); err != nil {
-		s.redirectWithError(w, r, "/admin/settings#backup", translate(adminLanguage(r), "err_restore_schedule_failed")+err.Error())
+		s.redirectWithError(w, r, "/admin/settings/maintenance#backup", translate(adminLanguage(r), "err_restore_schedule_failed")+err.Error())
 		return
 	}
 	scheduled = true
@@ -136,9 +140,18 @@ func (s *Server) runGeoIPUpdate(w http.ResponseWriter, r *http.Request, fromSett
 	}
 	target := "/admin"
 	if fromSettings {
-		target = "/admin/settings#geoip"
+		target = "/admin/settings/geoip"
+		saved, err := s.savedSettings()
+		if err != nil {
+			s.redirectWithError(w, r, target, err.Error())
+			return
+		}
+		if !sameGeoIPSettings(s.effectiveSettings(), saved) {
+			s.redirectWithError(w, r, target, translate(adminLanguage(r), "geoip_pending_maintenance"))
+			return
+		}
 	}
-	cfg := s.Config
+	cfg := s.effectiveSettings()
 	if err := cfg.Validate(); err != nil {
 		s.redirectWithError(w, r, target, translate(adminLanguage(r), "err_geoip_settings_failed")+err.Error())
 		return

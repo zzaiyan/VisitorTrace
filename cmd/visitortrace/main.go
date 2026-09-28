@@ -280,10 +280,10 @@ func runServe(args []string) int {
 		return 0
 	case <-app.RestartRequested():
 		if shutdownErr := shutdown(); shutdownErr != nil {
-			logger.Error("server shutdown for update failed", "error", shutdownErr)
+			logger.Error("server shutdown for requested restart failed", "error", shutdownErr)
 			return 1
 		}
-		logger.Info("server stopped for self-update restart")
+		logger.Info("server stopped for requested restart")
 		return 0
 	case err := <-serverErrors:
 		_ = shutdown()

@@ -18,7 +18,7 @@
 设置版本和架构，然后下载对应二进制及校验文件：
 
 ```sh
-VERSION=0.4.2
+VERSION=0.4.3
 ARCH=amd64
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/visitortrace-${VERSION}-linux-${ARCH}"
 curl -fLO "https://github.com/zzaiyan/VisitorTrace/releases/download/v${VERSION}/checksums.txt"
@@ -75,7 +75,7 @@ sudo ./scripts/install-systemd.sh --binary /usr/local/bin/visitortrace
 "base_url": "https://stats.example.com/visitortrace"
 ```
 
-该值必须是没有凭据、查询参数和片段的完整 HTTP 或 HTTPS URL。根路径部署时可以留空。也可以在后台“管理员设置 > 公开 Base URL”中设置；保存后会写入受保护的配置文件并请求服务重启。要让新的路由前缀生效，systemd 必须使用 `Restart=always`。
+该值必须是没有凭据、查询参数和片段的完整 HTTP 或 HTTPS URL。根路径部署时可以留空。也可以在后台“管理员设置 > 服务配置”中设置；保存后会写入受保护的配置文件。主机名或协议变更在路由前缀不变时立即生效；路由前缀变更需使用“维护与更新”页底部的按钮主动重启。systemd 必须使用 `Restart=always`。
 
 初始化一键自更新使用的稳定执行路径：
 
@@ -94,7 +94,7 @@ sudo -u visitortrace /usr/local/bin/visitortrace update bootstrap \
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.4.2-linux-amd64 \
+  --binary ./visitortrace-0.4.3-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 

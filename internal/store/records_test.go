@@ -198,8 +198,8 @@ func TestRefreshPageviewGeoIPRebuildsRetainedGeography(t *testing.T) {
 	assertAggregate(localDate, "country", "US", 2, 1)
 	assertAggregate(localDate, "country", "unknown", 1, 1)
 	assertAggregate(localDate, "country", "CN", 1, 1)
-	assertAggregate(localDate, "city", "US|CA|San Francisco", 2, 1)
-	assertAggregate(localDate, "city", "CN|GD|Shenzhen", 1, 1)
+	assertAggregate(localDate, "city", cityDimensionValue("US", "CA", "San Francisco", &sanFranciscoLatitude, &sanFranciscoLongitude), 2, 1)
+	assertAggregate(localDate, "city", cityDimensionValue("CN", "GD", "Shenzhen", &latitude, &longitude), 1, 1)
 	assertAggregate("2000-01-01", "country", "LEGACY", 7, 5)
 	var staleWuhan int
 	if err := st.DB.QueryRowContext(ctx, `

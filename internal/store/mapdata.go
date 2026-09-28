@@ -85,30 +85,24 @@ func (s *Store) mapData(ctx context.Context, siteID string, requirePublished boo
 		return PublicMapData{}, fmt.Errorf("read Public Map totals: %w", err)
 	}
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT g.country_code, g.region_code, g.city, g.latitude, g.longitude,
-		       SUM(a.pageviews), SUM(a.unique_visitors)
+		SELECT a.dimension_value, g.latitude, g.longitude, SUM(a.pageviews), SUM(a.unique_visitors)
 		FROM daily_aggregates AS a
-		JOIN geo_locations AS g
+		LEFT JOIN geo_locations AS g
 		  ON g.site_id = a.site_id
 		 AND g.dimension_kind = a.dimension_kind
 		 AND g.dimension_value = a.dimension_value
 		WHERE a.site_id = ? AND a.dimension_kind = 'city'
-		GROUP BY g.dimension_value, g.country_code, g.region_code, g.city, g.latitude, g.longitude
-		ORDER BY SUM(a.pageviews) DESC, g.dimension_value
+		GROUP BY a.dimension_value, g.latitude, g.longitude
+		ORDER BY SUM(a.pageviews) DESC, a.dimension_value
 	`, siteID)
 	if err != nil {
 		return PublicMapData{}, fmt.Errorf("read Public Map points: %w", err)
 	}
 	defer rows.Close()
-	for rows.Next() {
-		var point MapPoint
-		if err := rows.Scan(&point.CountryCode, &point.RegionCode, &point.City, &point.Latitude, &point.Longitude, &point.Pageviews, &point.UniqueVisitors); err != nil {
-			return PublicMapData{}, fmt.Errorf("scan Public Map point: %w", err)
-		}
-		result.Points = append(result.Points, point)
+	observations, err := scanCityObservations(rows)
+	if err != nil {
+		return PublicMapData{}, fmt.Errorf("read Public Map points: %w", err)
 	}
-	if err := rows.Err(); err != nil {
-		return PublicMapData{}, fmt.Errorf("iterate Public Map points: %w", err)
-	}
+	result.Points = mergeCities(observations, true)
 	return result, nil
 }

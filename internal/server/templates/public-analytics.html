@@ -19,7 +19,7 @@
       <div class="section-heading"><div><p class="eyebrow">Geography</p><h2>{{t "visitor_map"}}</h2></div><span class="muted">{{t "selected_range"}}</span></div>
       <div class="interactive-map-shell"><div id="geo-chart" class="interactive-chart geo-chart" role="img" aria-label="{{.Site.Name}} {{t "visitor_map"}}"></div><div class="map-controls" data-map-controls data-reset-label="{{t "reset_map_view"}}" role="toolbar" aria-label="{{t "map_controls"}}"></div></div>
       <a class="chart-fallback" href="{{.MapURL}}" target="_blank" rel="noopener"><img src="{{.MapURL}}" alt="{{.Site.Name}} {{t "visitor_map"}}"></a>
-      {{range geoAttributions}}<a class="attribution" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}
+      {{template "geoip-attributions" .}}
     </div>
     <div class="trend-panel">
       <div class="section-heading"><div><p class="eyebrow">Trend</p><h2>{{t "visit_trend"}}</h2></div></div>

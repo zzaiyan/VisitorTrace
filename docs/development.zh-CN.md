@@ -32,7 +32,7 @@ go vet ./...
 go mod verify
 ```
 
-`make check` 执行常规测试和静态检查，`tools/preview-demo.sh` 提供带伪数据的本地人工预览环境。保存配置或恢复备份导致服务退出后，预览脚本会自动重新启动服务；按 `Ctrl-C` 结束预览并清理临时数据。
+`make check` 执行常规测试和静态检查，`tools/preview-demo.sh` 提供带伪数据的本地人工预览环境。主动重启或恢复备份导致服务退出后，预览脚本会自动重新启动服务；按 `Ctrl-C` 结束预览并清理临时数据。
 
 ## GeoIP 集成验证
 
@@ -88,11 +88,11 @@ GeoIP Resolver 每次只打开配置中的一个后端。`provider_dbip.go`、`p
 
 更新器在启动时和每 24 小时运行。provider profile 为 DB-IP/IP2Location 选择按自然月判断，为 MaxMind 选择 72 小时新鲜度。MaxMind 官方请求使用 Basic Authentication，IP2Location 通过查询参数接收 Download Token；认证与官方主机绑定，不会发送给自定义镜像。更新器按内容识别原始 MMDB、gzip MMDB、tar.gz 和 ZIP，归档中必须且只能包含一个 MMDB。`{YYYY-MM}` 使用 UTC 月份展开。下载输入限制为 1 GiB，展开后的 MMDB 限制为 2 GiB。配置 SHA-256 sidecar 时先校验下载容器，随后始终执行 MMDB 完整验证。候选文件与目标位于同一文件系统，通过重命名激活，上一版保留为 `.previous`。服务通过互斥保护的 Resolver 热交换，避免关闭仍在查询的旧句柄。
 
-DB-IP City Lite 的 `city.names` 可能同时包含城市和区、街道等限定词，而 Lite Schema 不提供可用于选择行政层级的 feature code。`normalizeDBIPCity` 是 `provider_dbip.go` 的私有逻辑：它清理中国地名中的下级限定词，并对北京、上海、天津、重庆使用上级直辖市名称。统一结果层通过别名索引处理已知中英文名称、大小写、标点和中英文行政后缀；只有去掉后缀后能明确匹配已知名称才合并，未知名称保留原样。Store 在采集和历史刷新入库时也执行相同的城市归一化。
+DB-IP City Lite 的 `city.names` 可能同时包含城市和区、街道等限定词，而 Lite Schema 不提供可用于选择行政层级的 feature code。`normalizeDBIPCity` 是 `provider_dbip.go` 的私有逻辑：它清理中国地名中的下级限定词，并对北京、上海、天津、重庆使用上级直辖市名称。统一结果层通过别名索引处理已知中英文名称、大小写、标点和中英文行政后缀；只有去掉后缀后能明确匹配已知名称才合并，未知名称保留原样。Store 在采集和历史刷新入库时也执行相同的城市归一化。新城市聚合键保留半度坐标网格，避免远距离同名地点在读取前合并；地图和城市统计读取时，只有同名组内任意两点相距不超过 80 公里才合并。无坐标分组保持独立，访问量最多的位置作为地图标记坐标。城市 UV 来自现有聚合键的计数相加，因此跨键访客可能重复计算；已删除明细的历史 UV 无法精确追溯去重。
 
 Pageview Record 列表使用 `(occurred_at, id)` 复合游标，查询顺序由服务端固定，游标携带规范化筛选指纹，不能跨筛选复用。每页最多 200 条。明细和聚合导出直接遍历 SQLite Rows 并写入 `encoding/csv`，不生成临时导出文件；敏感导出只挂载在管理员认证路由并设置 `Cache-Control: no-store`。
 
-`internal/operations` 聚合只读运行信息：构建元数据、进程运行时长、SQLite/WAL/SHM 占用、文件系统空间、GeoIP 与本地备份状态，以及 `operation_status` 中的任务结果。Linux 使用 `statfs`，其他平台明确返回不可用而不伪造数值。后台手动操作复用 CLI 相同的备份、维护和 GeoIP 实现，并受管理员 Session 与 CSRF 保护。合并后的服务配置路由会重新验证管理员密码，同时校验 Base URL 与全部 GeoIP 字段、保留未提交的新秘密，并在请求一次受管重启前原子保存一份配置。配置写入会跳过多余的权限修改，但仍会把不符合要求的目录和文件分别收紧到 `0700`、`0600`。人工 GeoIP 检查会临时启用 Runner，不改变已经保存的“仅手动”策略。GeoIP 和维护 Runner 使用进程级互斥避免重复执行。
+`internal/operations` 聚合只读运行信息：构建元数据、进程运行时长、SQLite/WAL/SHM 占用、文件系统空间、GeoIP 与本地备份状态，以及 `operation_status` 中的任务结果。Linux 使用 `statfs`，其他平台明确返回不可用而不伪造数值。后台手动操作复用 CLI 相同的备份、维护和 GeoIP 实现，并受管理员 Session 与 CSRF 保护。独立的服务配置和 GeoIP 路由会重新验证管理员密码，分别校验字段、保留未修改的秘密，并原子保存配置，不会自动重启。管理员页面通过比较已保存与正在生效的配置持续显示重启提示；手动重启路由发起受管重启。不改变路径的 Base URL 修改会立即生效；仅手动模式下的 GeoIP 下载源和凭证可供下次手动更新直接使用。GeoIP 方案及自动调度在重启前继续使用启动时的配置。配置写入会跳过多余的权限修改，但仍会把不符合要求的目录和文件分别收紧到 `0700`、`0600`。人工 GeoIP 检查会临时启用 Runner，不改变已经保存的“仅手动”策略。GeoIP 和维护 Runner 使用进程级互斥避免重复执行。
 
 后台 CSS 和分析页 JavaScript 的 URL 带有由内容计算的 revision，因此可以继续使用一小时公开缓存，同时避免升级后的后台加载旧样式或旧脚本。
 
@@ -133,15 +133,15 @@ Release 工作流只把公钥嵌入正式二进制。私钥仅暴露给受 Envir
 
 ```sh
 make build \
-  VERSION=0.4.2 \
+  VERSION=0.4.3 \
   UPDATE_PUBLIC_KEY="BASE64_RAW_ED25519_PUBLIC_KEY"
 ```
 
 发布使用语义化版本标签。确认 `main` 的 CI 通过后创建并推送标签：
 
 ```sh
-git tag -a v0.4.2 -m "VisitorTrace v0.4.2"
-git push origin v0.4.2
+git tag -a v0.4.3 -m "VisitorTrace v0.4.3"
+git push origin v0.4.3
 ```
 
 `.github/workflows/release.yml` 会重新执行测试，使用 `CGO_ENABLED=0` 构建 `visitortrace-<版本>-linux-amd64` 和 `visitortrace-<版本>-linux-arm64`，并将版本、Commit、构建时间、数据库 Schema 和公钥嵌入二进制。工作流从实际文件生成 SHA-256、大小和更新清单，再用最终公钥验签。每个 Release 还会包含未经修改的 GPL 文本和由同一标签 Commit 生成的源码归档，所有文件都纳入 `checksums.txt`。验证完成的文件先上传到草稿 Release，全部成功后才公开；任务重跑可以刷新同一草稿，不能覆盖已经发布的版本。含 `-` 的 SemVer 标签会发布为 prerelease，不会替换稳定版 `releases/latest`。
@@ -150,10 +150,10 @@ git push origin v0.4.2
 
 ```sh
 go run ./tools/release-manifest generate \
-  --version 0.4.2 \
-  --published-at 2026-09-24T00:00:00Z \
-  --asset linux-amd64=dist/visitortrace-0.4.2-linux-amd64 \
-  --asset linux-arm64=dist/visitortrace-0.4.2-linux-arm64 \
+  --version 0.4.3 \
+  --published-at 2026-09-28T00:00:00Z \
+  --asset linux-amd64=dist/visitortrace-0.4.3-linux-amd64 \
+  --asset linux-arm64=dist/visitortrace-0.4.3-linux-arm64 \
   --output manifest.unsigned.json
 
 go run ./tools/release-manifest sign \

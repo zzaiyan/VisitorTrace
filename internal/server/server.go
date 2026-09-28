@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/zzaiyan/VisitorTrace/internal/clientip"
@@ -70,6 +71,8 @@ type Server struct {
 	basePath          string
 	restartOnce       sync.Once
 	restart           chan struct{}
+	configMu          sync.Mutex
+	runtimeConfig     atomic.Pointer[config.Config]
 }
 
 func New(cfg config.Config, st *store.Store, loggers ...*slog.Logger) *Server {
@@ -206,7 +209,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /assets/app.js", s.scriptAsset("app.js"))
 	mux.HandleFunc("GET /admin", s.adminDashboard)
 	mux.HandleFunc("GET /admin/settings", s.adminSettings)
-	mux.HandleFunc("POST /admin/settings/configuration", s.adminUpdateConfiguration)
+	mux.HandleFunc("GET /admin/settings/{section}", s.adminSettings)
+	mux.HandleFunc("POST /admin/settings/service", s.adminUpdateServiceConfiguration)
+	mux.HandleFunc("POST /admin/settings/geoip/configuration", s.adminUpdateGeoIPConfiguration)
+	mux.HandleFunc("POST /admin/settings/restart", s.adminRestartService)
 	mux.HandleFunc("POST /admin/settings/geoip/update", s.adminRunGeoIPUpdateFromSettings)
 	mux.HandleFunc("POST /admin/settings/password", s.adminChangePassword)
 	mux.HandleFunc("POST /admin/settings/update", s.adminRunSelfUpdate)
