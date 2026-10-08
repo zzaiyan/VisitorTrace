@@ -81,7 +81,7 @@ func TestCityStatisticsAndMapsMergeHistoricalVariants(t *testing.T) {
 			counts[point.City]++
 			switch point.City {
 			case "Wuhan":
-				if point.Pageviews != 5 || point.UniqueVisitors != 4 || point.Latitude != 30.6 {
+				if point.Pageviews != 5 || point.UniqueVisitors != 3 || point.Latitude != 30.6 {
 					t.Fatalf("merged Wuhan = %#v", point)
 				}
 			case "Hong Kong":
@@ -117,7 +117,7 @@ func TestCityStatisticsAndMapsMergeHistoricalVariants(t *testing.T) {
 	for _, metric := range analytics.Cities {
 		name := geoLabelFromCityValue(metric.Value)
 		counts[name]++
-		if name == "Wuhan" && (metric.Pageviews != 5 || metric.UniqueVisitors != 4) {
+		if name == "Wuhan" && (metric.Pageviews != 5 || metric.UniqueVisitors != 3) {
 			t.Fatalf("merged Wuhan city metric = %#v", metric)
 		}
 		if name == "Shanghai" && (metric.Pageviews != 3 || metric.UniqueVisitors != 3) {

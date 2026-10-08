@@ -88,7 +88,7 @@ The GeoIP resolver opens one configured provider at a time. `provider_dbip.go`, 
 
 The updater runs at startup and every 24 hours. Provider profiles choose calendar-month freshness for DB-IP/IP2Location and a 72-hour freshness interval for MaxMind. Official MaxMind requests use Basic Authentication; IP2Location receives its Download Token as a query parameter. Authentication is host-bound and is never attached to custom mirrors. Raw MMDB, gzip MMDB, tar.gz, and ZIP containers are identified by content; an archive must contain exactly one MMDB. `{YYYY-MM}` expands using the UTC month. Downloaded input is limited to 1 GiB and the expanded MMDB to 2 GiB. A configured SHA-256 sidecar verifies the downloaded container first; full MMDB verification always follows. The candidate is created on the target filesystem and activated by rename, preserving the prior file as `.previous`. The service swaps resolvers behind a mutex so an old reader is not closed during an active lookup.
 
-DB-IP City Lite's `city.names` can contain a city together with a district or subdistrict qualifier, while its Lite schema does not expose a feature code for selecting an administrative level. `normalizeDBIPCity` is private to `provider_dbip.go`: it removes lower-level qualifiers from Chinese labels and uses the broad subdivision for Beijing, Shanghai, Tianjin, and Chongqing. The shared result path uses an alias index for known Chinese and English names, case, punctuation, and administrative suffixes. It strips a suffix only when the remainder resolves unambiguously; unknown names remain unchanged. Store applies the same city normalization at ingestion and historical refresh boundaries. New geolocated city aggregates and visitor registrations retain country, region, canonical city, and a half-degree coordinate cell in the dimension key; distant same-name points cannot be combined before reads. Map and city-metric reads normalize legacy names and merge only groups whose every coordinate pair is at most 80 km apart. Coordinate-less groups remain separate. The highest-PV location supplies the marker coordinate. City UV is summed from stored aggregate keys, so cross-key visitors may be counted more than once; removed raw records cannot be used to correct historical UV.
+DB-IP City Lite's `city.names` can contain a city together with a district or subdistrict qualifier, while its Lite schema does not expose a feature code for selecting an administrative level. `normalizeDBIPCity` is private to `provider_dbip.go`: it removes lower-level qualifiers from Chinese labels and uses the broad subdivision for Beijing, Shanghai, Tianjin, and Chongqing. The shared result path uses a generated global place-name index with case, punctuation, and administrative-suffix folding. It resolves country-scoped city aliases to a common English label and can fill the first-level subdivision code when a source returns only a city. Same-name localities are resolved deterministically by administrative level and population; names without a usable match remain unchanged. Store applies the same normalization at ingestion and historical-refresh boundaries. `tools/generate-place-names.py` rebuilds `internal/geoip/place_names.tsv.gz` from GeoNames `cities500`, `alternateNamesV2`, and `admin1CodesASCII`, plus the ISO 3166-2 subdivision list used only to map subdivision names onto standard codes. New geolocated city aggregates and visitor registrations retain country, region, canonical city, and a half-degree coordinate cell in the dimension key; distant same-name points cannot be combined before reads. Map and city-metric reads normalize legacy names and merge only groups whose every coordinate pair is at most 80 km apart. Coordinate-less groups remain separate. The highest-PV location supplies the marker coordinate. City UV is summed from stored aggregate keys, so cross-key visitors may be counted more than once; removed raw records cannot be used to correct historical UV.
 
 Pageview Record lists use a compound `(occurred_at, id)` cursor with server-controlled ordering. Each cursor carries a fingerprint of normalized filters and cannot be reused across a changed filter set. Responses contain no more than 200 rows. Record and aggregate exports iterate SQLite rows directly into `encoding/csv` without temporary export files; sensitive exports exist only on authenticated Administrator routes and send `Cache-Control: no-store`.
 
@@ -133,15 +133,15 @@ A production binary with self-update enabled can still be built locally:
 
 ```sh
 make build \
-  VERSION=0.4.3 \
+  VERSION=0.4.4 \
   UPDATE_PUBLIC_KEY="BASE64_RAW_ED25519_PUBLIC_KEY"
 ```
 
 Releases use semantic-version tags. Once CI on `main` is green, create and push a tag:
 
 ```sh
-git tag -a v0.4.3 -m "VisitorTrace v0.4.3"
-git push origin v0.4.3
+git tag -a v0.4.4 -m "VisitorTrace v0.4.4"
+git push origin v0.4.4
 ```
 
 `.github/workflows/release.yml` reruns the tests, builds `visitortrace-<version>-linux-amd64` and `visitortrace-<version>-linux-arm64` with `CGO_ENABLED=0`, and embeds the version, commit, build time, database schema, and public key. It derives SHA-256 digests, sizes, and the update manifest from the actual files, then verifies the result with the final public key. Each Release also carries the unmodified GPL text and a source archive generated from the same tagged commit; all files are covered by `checksums.txt`. Verified assets are uploaded to a draft Release and published only after every step succeeds. A rerun can refresh that draft but cannot overwrite an already published release. SemVer tags containing `-` become prereleases and do not replace the stable `releases/latest` target.
@@ -150,10 +150,10 @@ To generate a manifest locally:
 
 ```sh
 go run ./tools/release-manifest generate \
-  --version 0.4.3 \
-  --published-at 2026-09-28T00:00:00Z \
-  --asset linux-amd64=dist/visitortrace-0.4.3-linux-amd64 \
-  --asset linux-arm64=dist/visitortrace-0.4.3-linux-arm64 \
+  --version 0.4.4 \
+  --published-at 2026-10-08T00:00:00Z \
+  --asset linux-amd64=dist/visitortrace-0.4.4-linux-amd64 \
+  --asset linux-arm64=dist/visitortrace-0.4.4-linux-arm64 \
   --output manifest.unsigned.json
 
 go run ./tools/release-manifest sign \

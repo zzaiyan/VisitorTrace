@@ -69,7 +69,14 @@ func (s *Store) RecordPageview(ctx context.Context, observation PageviewObservat
 	if !ValidCollectionMethod(observation.CollectionMethod) {
 		return RecordPageviewResult{}, fmt.Errorf("unsupported collection method %q", observation.CollectionMethod)
 	}
-	observation.City = geoip.NormalizeCityEN(observation.City)
+	place := geoip.PostprocessLocation(geoip.Location{
+		CountryCode: observation.CountryCode,
+		RegionCode:  observation.RegionCode,
+		City:        observation.City,
+	})
+	observation.CountryCode = place.CountryCode
+	observation.RegionCode = place.RegionCode
+	observation.City = place.City
 
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()

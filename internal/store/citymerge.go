@@ -59,7 +59,7 @@ func mergeCities(rows []cityObservation, requireCoordinates bool) []MapPoint {
 	groups := make([]*mergedCity, 0, len(rows))
 	byName := make(map[string][]*mergedCity)
 	for _, row := range rows {
-		city := geoip.NormalizeCityEN(row.City)
+		city := geoip.NormalizeCityForCountry(row.CountryCode, row.City)
 		if city == "" {
 			continue
 		}
@@ -138,7 +138,7 @@ const cityCellSeparator = "\x1f"
 // Half-degree cells are narrower than 80 km, keeping distant namesakes separate
 // before read-time city merging. The prefix distinguishes them from older cells.
 func cityDimensionValue(countryCode, regionCode, city string, latitude, longitude *float64) string {
-	value := strings.ToUpper(strings.TrimSpace(countryCode)) + "|" + strings.TrimSpace(regionCode) + "|" + geoip.NormalizeCityEN(city)
+	value := strings.ToUpper(strings.TrimSpace(countryCode)) + "|" + strings.TrimSpace(regionCode) + "|" + geoip.NormalizeCityForCountry(countryCode, city)
 	if latitude != nil && longitude != nil {
 		value += cityCellSeparator + "h" + strconv.Itoa(int(math.Floor(*latitude*2))) + "," + strconv.Itoa(int(math.Floor(*longitude*2)))
 	}

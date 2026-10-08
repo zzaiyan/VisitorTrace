@@ -4,6 +4,12 @@
 
 This file records user-facing changes for each published VisitorTrace release.
 
+## 0.4.4 - 2026-10-08
+
+- City labels now use a built-in global place-name index. Common Chinese and English aliases, administrative suffixes, case, punctuation, and full-width Latin text resolve to consistent English names; unmatched labels keep their original spelling.
+- City-only location results can fill the available first-level region code. New Pageviews use this hierarchy immediately; retained historical records receive it after Refresh geography rebuilds their stored geography and aggregates.
+- The place-name index carries country context through provider cross-checking, historical refreshes, city statistics, and map merging. SQLite Schema remains at 12.
+
 ## 0.4.3 - 2026-09-28
 
 - Administrator Settings now groups service configuration, GeoIP sources, maintenance and updates, and account security into separate pages. GeoIP status cards include source-specific configuration and maintenance actions.

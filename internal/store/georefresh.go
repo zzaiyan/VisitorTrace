@@ -380,9 +380,14 @@ func geographicAggregateDimensions(geography PageviewGeography) []aggregateDimen
 }
 
 func normalizedPageviewGeography(value PageviewGeography) PageviewGeography {
-	value.CountryCode = strings.TrimSpace(value.CountryCode)
-	value.RegionCode = strings.TrimSpace(value.RegionCode)
-	value.City = geoip.NormalizeCityEN(value.City)
+	place := geoip.PostprocessLocation(geoip.Location{
+		CountryCode: value.CountryCode,
+		RegionCode:  value.RegionCode,
+		City:        value.City,
+	})
+	value.CountryCode = place.CountryCode
+	value.RegionCode = place.RegionCode
+	value.City = place.City
 	return value
 }
 

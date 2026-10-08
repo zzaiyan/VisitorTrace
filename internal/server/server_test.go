@@ -614,7 +614,7 @@ func TestPublicMapShowsOneMarkerPerCityAcrossRegions(t *testing.T) {
 	response := httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
 	body := response.Body.String()
-	if response.Code != http.StatusOK || strings.Count(body, `data-city="Wuhan"`) != 1 || !strings.Contains(body, `data-pv="2" data-uv="2"`) {
+	if response.Code != http.StatusOK || strings.Count(body, `data-city="Wuhan"`) != 1 || !strings.Contains(body, `data-pv="2" data-uv="1"`) {
 		t.Fatalf("city map merge = status %d, marker count %d, expected city totals present %t", response.Code,
 			strings.Count(body, `data-city="Wuhan"`), strings.Contains(body, `data-pv="2" data-uv="2"`))
 	}

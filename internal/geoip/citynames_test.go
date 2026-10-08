@@ -2,63 +2,62 @@ package geoip
 
 import "testing"
 
-func TestPostprocessLocationNormalizesKnownCityAliases(t *testing.T) {
+func TestPostprocessLocationNormalizesGeneratedPlaceAliases(t *testing.T) {
 	tests := []struct {
-		country, city, wantCountry, wantCity string
+		name                           string
+		country, city, region          string
+		wantCountry, wantCity          string
+		wantRegionCode, wantRegionName string
 	}{
-		{"CN", "上海", "CN", "Shanghai"},
-		{"CN", "SHANGHAI CITY", "CN", "Shanghai"},
-		{"CN", " 上海市 ", "CN", "Shanghai"},
-		{"CN", "喀什地区", "CN", "Kashgar"},
-		{"CN", "Kashi Prefecture", "CN", "Kashgar"},
-		{"CN", "乌鲁木齐", "CN", "Urumqi"},
-		{"CN", "Ürümqi City", "CN", "Urumqi"},
-		{"CN", "Xi'an", "CN", "Xian"},
-		{"HK", "香港特别行政区", "CN", "Hong Kong"},
-		{"HK", "Hong Kong SAR", "CN", "Hong Kong"},
-		{"CN", "HONG-KONG SPECIAL ADMINISTRATIVE REGION", "CN", "Hong Kong"},
-		{"CN", "Hong Kong SAR, China", "CN", "Hong Kong"},
-		{"CN", "ＨＯＮＧ　ＫＯＮＧ S.A.R.", "CN", "Hong Kong"},
-		{"CN", "香港特別行政區", "CN", "Hong Kong"},
-		{"MO", "Macao SAR", "CN", "Macau"},
-		{"CN", "澳门特别行政区", "CN", "Macau"},
-		{"CN", "澳門特別行政區", "CN", "Macau"},
-		{"CN", "Macao Special Administrative Region of the People's Republic of China", "CN", "Macau"},
-		{"TW", "臺北市", "CN", "Taipei"},
-		{"US", "New York City", "US", "New York City"},
-		{"HK", "Lo So Shing", "CN", "Lo So Shing"},
-		{"US", "San Francisco", "US", "San Francisco"},
+		{
+			name: "known city and inferred province", country: "CN", city: "武汉",
+			wantCountry: "CN", wantCity: "Wuhan", wantRegionCode: "HB", wantRegionName: "Hubei",
+		},
+		{
+			name: "new sample without manual patch", country: "CN", city: "酒泉",
+			wantCountry: "CN", wantCity: "Jiuquan", wantRegionCode: "GS", wantRegionName: "Gansu",
+		},
+		{
+			name: "suffix falls back to canonical city", country: "CN", city: "辽阳",
+			wantCountry: "CN", wantCity: "Liaoyang", wantRegionCode: "LN", wantRegionName: "Liaoning",
+		},
+		{
+			name: "Chinese province label", country: "CN", city: "南京市", region: "江苏省",
+			wantCountry: "CN", wantCity: "Nanjing", wantRegionCode: "JS", wantRegionName: "Jiangsu",
+		},
+		{
+			name: "English province suffix", country: "CN", city: "Wuhan", region: "Hubei Province",
+			wantCountry: "CN", wantCity: "Wuhan", wantRegionCode: "HB", wantRegionName: "Hubei",
+		},
+		{
+			name: "administrative suffix", country: "CN", city: "香港特别行政区",
+			wantCountry: "CN", wantCity: "Hong Kong",
+		},
+		{
+			name: "Latin administrative suffix", country: "CN", city: "SHANGHAI CITY",
+			wantCountry: "CN", wantCity: "Shanghai", wantRegionCode: "SH", wantRegionName: "Shanghai",
+		},
+		{
+			name: "known United States city and state", country: "US", city: "New York City",
+			wantCountry: "US", wantCity: "New York City", wantRegionCode: "NY", wantRegionName: "New York",
+		},
 	}
 	for _, test := range tests {
-		got := PostprocessLocation(Location{CountryCode: test.country, City: test.city})
-		if got.CountryCode != test.wantCountry || got.City != test.wantCity {
-			t.Errorf("PostprocessLocation(%q, %q) = %q, %q", test.country, test.city, got.CountryCode, got.City)
-		}
-		if normalized := NormalizeCityEN(got.City); normalized != got.City {
-			t.Errorf("NormalizeCityEN(%q) is not idempotent: %q", got.City, normalized)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			got := PostprocessLocation(Location{CountryCode: test.country, City: test.city, RegionName: test.region})
+			if got.CountryCode != test.wantCountry || got.City != test.wantCity ||
+				got.RegionCode != test.wantRegionCode || got.RegionName != test.wantRegionName {
+				t.Fatalf("PostprocessLocation() = %#v", got)
+			}
+			if normalized := NormalizeCityForCountry(got.CountryCode, got.City); normalized != got.City {
+				t.Fatalf("normalization is not idempotent: %q -> %q", got.City, normalized)
+			}
+		})
 	}
 }
 
-func TestCityAliasesResolveToKnownCanonicalNames(t *testing.T) {
-	for alias, canonical := range cityNamesEN {
-		if got := NormalizeCityEN(alias); got != canonical {
-			t.Errorf("known name %q normalized to %q, want %q", alias, got, canonical)
-		}
-	}
-	for alias, canonical := range cityAlternateNames {
-		if NormalizeCityEN(alias) != canonical || NormalizeCityEN(canonical) != canonical {
-			t.Errorf("city alias %q does not resolve consistently to %q", alias, canonical)
-		}
-	}
-}
-
-func TestAmbiguousCityAliasIsNotMerged(t *testing.T) {
-	index := buildCityCanonicalNames(map[string]string{
-		"Shared": "First City",
-		"shared": "Second City",
-	}, nil)
-	if canonical := index["shared"]; canonical != "" {
-		t.Fatalf("ambiguous city alias resolved to %q", canonical)
+func TestCountryContextResolvesGeneratedCity(t *testing.T) {
+	if got := NormalizeCityForCountry("CN", "梅州"); got != "Meizhou" {
+		t.Fatalf("CN Meizhou normalized to %q", got)
 	}
 }

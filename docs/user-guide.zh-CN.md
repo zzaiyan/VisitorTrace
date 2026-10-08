@@ -33,15 +33,15 @@ make build
 
 ## 安装发布版
 
-正式版本在 GitHub Releases 提供带版本号且无需 Go 环境的 Linux 二进制。根据服务器架构选择 `visitortrace-<版本>-linux-amd64` 或 `visitortrace-<版本>-linux-arm64`，同时下载 `checksums.txt`。例如，校验 `0.4.3` 的 AMD64 版本：
+正式版本在 GitHub Releases 提供带版本号且无需 Go 环境的 Linux 二进制。根据服务器架构选择 `visitortrace-<版本>-linux-amd64` 或 `visitortrace-<版本>-linux-arm64`，同时下载 `checksums.txt`。例如，校验 `0.4.4` 的 AMD64 版本：
 
 ```sh
-grep ' visitortrace-0.4.3-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-0.4.3-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.4.4-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.4.4-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-实际安装时将 `0.4.3` 替换为下载的版本号；ARM64 服务器使用 `linux-arm64` 文件名。每个 Release 还会提供 GPL 文本和来自同一标签的对应源码归档。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
+实际安装时将 `0.4.4` 替换为下载的版本号；ARM64 服务器使用 `linux-arm64` 文件名。每个 Release 还会提供 GPL 文本和来自同一标签的对应源码归档。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
 
 ## 初始化
 
@@ -126,7 +126,7 @@ Site 管理页的“聚合分析”使用相同日期范围和交互组件，并
 
 同一个配置 Site 如果用于多个域名，每个 hostname 都会作为独立聚合行显示。Pageview Record 也会保存 tracker 上报且服务端从 Allowed Origin 确认的 hostname，因此不同域名上的同一访客会分别计入各自的 UV。
 
-Site 页面中的“刷新地理信息”会在后台使用当前 GeoIP 数据源重新查询全部仍在保留期内的 Pageview Record。页面显示唯一 IP 查询、记录更新和地理统计重算的进度；离开页面后刷新仍会继续，返回 Site 页面可查看当前进度。重复 IP 只查询一次，在线查询期间仍可采集新访问。操作会把已知城市别名统一为英文名称，并对这些记录覆盖的每个 Site 本地日期重算国家、地区和城市 PV/UV；已经没有任何明细的早期日期保持不变，整体、hostname、路径、浏览器和操作系统聚合也不会改变。有效 IP 如果在当前数据源中未命中，会清除旧地理信息并计入未知国家；格式无效的已保存 IP 会被跳过并保留原地理信息。只有 GeoIP 数据源可用时才能执行该操作，事务成功后地图缓存会立即失效。
+Site 页面中的“刷新地理信息”会在后台使用当前 GeoIP 数据源重新查询全部仍在保留期内的 Pageview Record。页面显示唯一 IP 查询、记录更新和地理统计重算的进度；离开页面后刷新仍会继续，返回 Site 页面可查看当前进度。重复 IP 只查询一次，在线查询期间仍可采集新访问。操作会使用内置的全局地名索引，从只有城市的记录补齐可用的一级行政区代码，并对这些记录覆盖的每个 Site 本地日期重算国家、地区和城市 PV/UV；已经没有任何明细的早期日期保持不变，整体、hostname、路径、浏览器和操作系统聚合也不会改变。有效 IP 如果在当前数据源中未命中，会清除旧地理信息并计入未知国家；格式无效的已保存 IP 会被跳过并保留原地理信息。只有 GeoIP 数据源可用时才能执行该操作，事务成功后地图缓存会立即失效。
 
 ## 网站接入
 
@@ -305,7 +305,7 @@ VisitorTrace 在启动时检查，并每 24 小时再次检查。DB-IP 与 IP2Lo
 
 已有安装不需要重新执行 `init` 即可切换后端：进入“管理员设置 > GeoIP”，按需填写新凭证并保存配置，然后从“维护与更新”页底部主动重启。此前保存的凭证会留在受保护配置中，以供后续切换使用。手动更新模式下，现有数据集的离线下载源和凭证变更可供下一次手动检查直接使用。
 
-GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/health/ready` 返回不可用，新 Pageview 不会获得地理位置。地图悬浮提示、后台预览和 Public Analytics 的定位来源说明共用一次“IP geolocation by”，并列显示当前生效方案中的国内外主服务及交叉校验主服务；备用库不列出。DB-IP 特有的区县层级清理仅用于 DB-IP；已知城市名称的中英文别名归一化适用于所有数据源，未知名称保留原样。 城市统计和地图标记会按已知中英文别名归一化名称；只有参与合并的记录均有坐标，且任意两点相距不超过 80 公里，才合为一个城市。地图采用访问量最多的位置作为标记坐标；无坐标的分组不会绕过距离校验。同名但相距较远的城市保持独立。城市 UV 由各位置分组的已有计数相加，同一访客跨定位源或位置分组时可能重复计数；已清理原始记录的历史 UV 无法回溯精确去重。
+GeoIP 不可用时，服务仍可启动并显示已有聚合与底图，但 `/health/ready` 返回不可用，新 Pageview 不会获得地理位置。地图悬浮提示、后台预览和 Public Analytics 的定位来源说明共用一次“IP geolocation by”，并列显示当前生效方案中的国内外主服务及交叉校验主服务；备用库不列出。DB-IP 特有的区县层级清理仅用于 DB-IP。各来源返回的城市名称会匹配内置的全局地名索引，常见中英文别名使用一致英文名称；一级行政区名称会解析为标准代码，只有城市的记录也可补齐可用代码。未匹配名称保留原样。城市统计和地图标记会按该索引归一化名称；只有参与合并的记录均有坐标，且任意两点相距不超过 80 公里，才合为一个城市。地图采用访问量最多的位置作为标记坐标；无坐标的分组不会绕过距离校验。同名但相距较远的城市保持独立。城市 UV 由各位置分组的已有计数相加，同一访客跨定位源或位置分组时可能重复计数；已清理原始记录的历史 UV 无法回溯精确去重。
 
 ## 备份与恢复
 
@@ -398,7 +398,7 @@ visitortrace update apply --config "$HOME/.config/visitortrace/config.json"
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.4.3-linux-amd64 \
+  --binary ./visitortrace-0.4.4-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 

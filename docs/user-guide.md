@@ -33,15 +33,15 @@ make build
 
 ## Install a Release
 
-GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.4.3` on AMD64:
+GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.4.4` on AMD64:
 
 ```sh
-grep ' visitortrace-0.4.3-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-0.4.3-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.4.4-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.4.4-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-Replace `0.4.3` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
+Replace `0.4.4` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
 
 ## Initialize
 
@@ -126,7 +126,7 @@ Aggregate export requires one Site and separately exports overall, hostname, pat
 
 When one configured Site is used on multiple domains, each hostname appears as an independent aggregate row. Pageview Records also retain the hostname that the tracker reported and the server confirmed from the allowed Origin; the same visitor is therefore counted independently on different hostnames.
 
-The **Refresh geography** action runs in the background and looks up retained Pageview Records using the active GeoIP sources. The Site page shows progress for distinct IP lookups, record updates, and geography totals; you can leave and return while it runs. Repeated IPs are looked up once, and new Pageviews can be collected during online lookups. The action maps known city aliases to consistent English names and rebuilds country, region, and city PV/UV for every Site-local date represented by those records. Dates with no remaining records are left untouched, as are overall, hostname, path, browser, and operating-system aggregates. A valid IP with no current match has stale geography cleared and is counted under the unknown country; a malformed stored IP is skipped and keeps its existing geography. The action requires an available GeoIP source and invalidates cached maps after a successful transaction.
+The **Refresh geography** action runs in the background and looks up retained Pageview Records using the active GeoIP sources. The Site page shows progress for distinct IP lookups, record updates, and geography totals; you can leave and return while it runs. Repeated IPs are looked up once, and new Pageviews can be collected during online lookups. The action uses the built-in global place-name index, fills available first-level region codes from city-only results, and rebuilds country, region, and city PV/UV for every Site-local date represented by those records. Dates with no remaining records are left untouched, as are overall, hostname, path, browser, and operating-system aggregates. A valid IP with no current match has stale geography cleared and is counted under the unknown country; a malformed stored IP is skipped and keeps its existing geography. The action requires an available GeoIP source and invalidates cached maps after a successful transaction.
 
 ## Website Integration
 
@@ -305,7 +305,7 @@ The account credentials are secrets. Keep the configuration at mode `0600`, rest
 
 Existing installations can switch providers without rerunning `init`: use **Administrator Settings > GeoIP**, enter new credentials when required, save, and restart manually from Maintenance and updates. Previously saved credentials remain in the protected configuration for later reuse. In **Manual only** mode, changes to the current local dataset download sources and credentials are available on the next manual check without a restart.
 
-Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. The map hover details, Admin previews, and Public Analytics show one “IP geolocation by” label followed by the domestic and foreign primary services in the active preset, including cross-checking primaries. Standby databases are omitted. DB-IP's district-level cleanup is specific to DB-IP; known Chinese and English city aliases are normalized for every source, while unknown names keep their original spelling. City statistics and map markers normalize known Chinese/English aliases. Groups merge only when every pair of contributing coordinates is at most 80 km apart; groups without coordinates do not bypass this check. Distant namesakes remain separate, and a merged marker uses the location with the most Pageviews. City UV is the sum of existing location-group counts, so a visitor seen across providers or location groups may be counted more than once. UV in historical aggregates whose records were removed cannot be deduplicated exactly.
+Without GeoIP, the service can still start and render existing aggregates and the basemap, but `/health/ready` remains unavailable and new Pageviews receive no geographic location. The map hover details, Admin previews, and Public Analytics show one “IP geolocation by” label followed by the domestic and foreign primary services in the active preset, including cross-checking primaries. Standby databases are omitted. DB-IP's district-level cleanup is specific to DB-IP. City labels from every source are matched against a built-in global place-name index, so common Chinese and English aliases use consistent English names; first-level region labels resolve to standard codes, and a city-only result can supply its available region code. Unmatched labels keep their original spelling. Groups merge only when every pair of contributing coordinates is at most 80 km apart; groups without coordinates do not bypass this check. Distant namesakes remain separate, and a merged marker uses the location with the most Pageviews. City UV is the sum of existing location-group counts, so a visitor seen across providers or location groups may be counted more than once. UV in historical aggregates whose records were removed cannot be deduplicated exactly.
 
 ## Backup and Restore
 
@@ -398,7 +398,7 @@ When a release binary has already been downloaded manually, use the repository s
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.4.3-linux-amd64 \
+  --binary ./visitortrace-0.4.4-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 

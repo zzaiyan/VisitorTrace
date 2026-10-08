@@ -123,6 +123,43 @@ func TestRecordPageviewCombinesKnownCityAliases(t *testing.T) {
 	}
 }
 
+func TestRecordPageviewInfersProvinceFromGeneratedCity(t *testing.T) {
+	ctx := context.Background()
+	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	site, err := st.CreateSite(ctx, CreateSiteParams{Name: "Province", AllowedOrigins: []string{"https://example.com"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := st.RecordPageview(ctx, PageviewObservation{
+		SiteID: site.ID, Hostname: "example.com", Path: "/", OriginalIP: "8.8.8.8",
+		CountryCode: "CN", City: "酒泉", VisitorDigest: bytes.Repeat([]byte{1}, 32),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var regionCode, regionAggregate string
+	if err := st.DB.QueryRowContext(ctx, `SELECT region_code FROM pageviews WHERE site_id = ?`, site.ID).Scan(&regionCode); err != nil || regionCode != "GS" {
+		t.Fatalf("stored region code = %q, %v", regionCode, err)
+	}
+	if err := st.DB.QueryRowContext(ctx, `
+		SELECT dimension_value FROM daily_aggregates
+		WHERE site_id = ? AND local_date = ? AND dimension_kind = 'region'
+	`, site.ID, result.LocalDate).Scan(&regionAggregate); err != nil || regionAggregate != "CN|GS" {
+		t.Fatalf("region aggregate = %q, %v", regionAggregate, err)
+	}
+}
+
+func TestNormalizedPageviewGeographyUsesGeneratedPlaceHierarchy(t *testing.T) {
+	got := normalizedPageviewGeography(PageviewGeography{CountryCode: "CN", City: "梅州"})
+	if got.CountryCode != "CN" || got.RegionCode != "GD" || got.City != "Meizhou" {
+		t.Fatalf("normalized geography = %#v", got)
+	}
+}
+
 func TestRecordPageviewRejectsInvalidDigestAtomically(t *testing.T) {
 	ctx := context.Background()
 	st, err := Initialize(ctx, filepath.Join(t.TempDir(), "visitortrace.sqlite3"), "test-hash")

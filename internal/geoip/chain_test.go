@@ -38,7 +38,7 @@ func TestRecommendedPairUsesDomesticCoordinateBearingPrimary(t *testing.T) {
 	}, "ipinfo", "ip2location", true)
 	chain.SetCross("", "")
 	location := chain.Lookup(context.Background(), netip.MustParseAddr("58.48.27.139"))
-	if NormalizeCityEN(location.City) != "Wuhan" || location.Latitude == nil || location.Longitude == nil || *location.Latitude != latitude || *location.Longitude != longitude {
+	if NormalizeCityForCountry(location.CountryCode, location.City) != "Wuhan" || location.Latitude == nil || location.Longitude == nil || *location.Latitude != latitude || *location.Longitude != longitude {
 		t.Fatalf("recommended domestic result = %+v", location)
 	}
 }
@@ -70,7 +70,7 @@ func TestChainDomesticConsensusRoutesToDomestic(t *testing.T) {
 		{Name: "tencent", Online: stubOnline{"58.48.27.139": {CountryCode: "CN", City: "武汉市"}}},
 	}, "ip2region", "ip2location", true)
 	location := chain.Lookup(context.Background(), netip.MustParseAddr("58.48.27.139"))
-	if NormalizeCityEN(location.City) != "Wuhan" || location.CountryCode != "CN" {
+	if NormalizeCityForCountry(location.CountryCode, location.City) != "Wuhan" || location.CountryCode != "CN" {
 		t.Fatalf("Lookup = %+v", location)
 	}
 }
@@ -113,7 +113,7 @@ func TestChainForeignConsensusRoutesToForeign(t *testing.T) {
 		{Name: "ipinfo", Online: stubOnline{"50.7.158.235": {CountryCode: "JP", City: "Tokyo"}}},
 	}, "ip2region", "ip2location", true)
 	location := chain.Lookup(context.Background(), netip.MustParseAddr("50.7.158.235"))
-	if NormalizeCityEN(location.City) != "Tokyo" {
+	if NormalizeCityForCountry(location.CountryCode, location.City) != "Tokyo" {
 		t.Fatalf("Lookup = %+v, want Tokyo via foreign branch", location)
 	}
 }
@@ -153,7 +153,7 @@ func TestChainDisputeFallsThroughToVote(t *testing.T) {
 		{Name: "bigdatacloud", Online: stubOnline{"111.60.83.6": {CountryCode: "CN", City: "Wuhan"}}},
 	}, "ip2region", "ip2location", true)
 	location := chain.Lookup(context.Background(), netip.MustParseAddr("111.60.83.6"))
-	if NormalizeCityEN(location.City) != "Wuhan" {
+	if NormalizeCityForCountry(location.CountryCode, location.City) != "Wuhan" {
 		t.Fatalf("Lookup = %+v, want Wuhan via vote", location)
 	}
 }
@@ -165,7 +165,7 @@ func TestChainTiePrefersBranchPrimary(t *testing.T) {
 		{Name: "tencent", Online: stubOnline{"1.2.4.8": {CountryCode: "CN", City: "上海"}}},
 	}, "ip2region", "ip2location", true)
 	location := chain.Lookup(context.Background(), netip.MustParseAddr("1.2.4.8"))
-	if NormalizeCityEN(location.City) != "Beijing" {
+	if NormalizeCityForCountry(location.CountryCode, location.City) != "Beijing" {
 		t.Fatalf("Lookup = %+v, want the branch primary city on ties", location)
 	}
 }
@@ -226,8 +226,8 @@ func TestChainGroundTruthRegression(t *testing.T) {
 			{Name: "bigdatacloud", Online: service(ip, "bigdatacloud"), DomesticWeight: 1.0, ForeignWeight: 0.3},
 		}, "ip2region", "ip2location", true)
 		location := chain.Lookup(context.Background(), netip.MustParseAddr(ip))
-		if NormalizeCityEN(location.City) != want {
-			t.Errorf("Lookup(%s) city = %q (%+v), want %q", ip, NormalizeCityEN(location.City), location, want)
+		if NormalizeCityForCountry(location.CountryCode, location.City) != want {
+			t.Errorf("Lookup(%s) city = %q (%+v), want %q", ip, NormalizeCityForCountry(location.CountryCode, location.City), location, want)
 		}
 		if !foreignExempt[ip] && location.CountryCode != "CN" {
 			t.Errorf("Lookup(%s) country = %q, want CN", ip, location.CountryCode)

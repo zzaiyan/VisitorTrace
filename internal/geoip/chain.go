@@ -248,8 +248,8 @@ func (c *Chain) Lookup(ctx context.Context, address netip.Addr) Location {
 			}
 		}
 	}
-	city := NormalizeCityEN(primary.City)
-	crossCity := NormalizeCityEN(cross.City)
+	city := NormalizeCityForCountry(primary.CountryCode, primary.City)
+	crossCity := NormalizeCityForCountry(cross.CountryCode, cross.City)
 	if city != "" && city == crossCity {
 		if primary.Latitude == nil && cross.Latitude != nil && (primary.CountryCode == "" || cross.CountryCode == "" || NormalizeCountryCode(primary.CountryCode) == NormalizeCountryCode(cross.CountryCode)) {
 			primary.Latitude = cross.Latitude
@@ -288,7 +288,7 @@ func (c *Chain) vote(ctx context.Context, address netip.Addr, domestic bool, fal
 			continue
 		}
 		location := backend.lookup(ctx, address)
-		key := NormalizeCityEN(location.City)
+		key := NormalizeCityForCountry(location.CountryCode, location.City)
 		if key == "" {
 			key = "country:" + strings.ToUpper(location.CountryCode)
 			if location.CountryCode == "" {
@@ -373,11 +373,26 @@ func NormalizeCountryCode(value string) string {
 
 // PostprocessLocation unifies country and city labels before they are stored.
 func PostprocessLocation(location Location) Location {
-	location.CountryCode = NormalizeCountryCode(location.CountryCode)
+	countryCode := NormalizeCountryCode(location.CountryCode)
+	if location.RegionName != "" {
+		if code, name, ok := normalizeRegion(countryCode, location.RegionName); ok {
+			location.RegionCode = code
+			location.RegionName = name
+		}
+	}
+	if city, ok := cityAliasFor(countryCode, location.City); ok {
+		location.City = city.City
+		if location.RegionCode == "" && city.RegionCode != "" {
+			location.RegionCode = city.RegionCode
+			location.RegionName = city.RegionName
+		}
+	} else {
+		location.City = strings.TrimSpace(location.City)
+	}
+	location.CountryCode = countryCode
 	switch location.CountryCode {
 	case "HK", "TW", "MO":
 		location.CountryCode = "CN"
 	}
-	location.City = NormalizeCityEN(location.City)
 	return location
 }
