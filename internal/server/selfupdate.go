@@ -17,7 +17,8 @@ const (
 
 type updateRestartData struct {
 	pageLayout
-	Version string
+	Version      string
+	ReconnectURL string
 }
 
 func (s *Server) adminRunSelfUpdate(w http.ResponseWriter, r *http.Request) {
@@ -121,8 +122,15 @@ func (s *Server) finishSelfUpdate(w http.ResponseWriter, r *http.Request, sessio
 		s.redirect(w, r, "/admin/settings/maintenance?saved=update-current#self-update", http.StatusSeeOther)
 		return
 	}
+	saved, err := s.savedSettings()
+	if err != nil {
+		s.redirectWithError(w, r, "/admin/settings/maintenance#self-update", err.Error())
+		return
+	}
+	reconnectURL := restartReconnectURL(saved.BaseURL, s.requestOrigin(r)+s.basePath) + "/admin"
 	s.renderPage(w, r, "update-restarting", updateRestartData{
 		pageLayout: s.adminLayout(r, session, translate(adminLanguage(r), "service_restarting"), "settings"), Version: result.Version,
+		ReconnectURL: reconnectURL,
 	})
 	go func() {
 		time.Sleep(300 * time.Millisecond)

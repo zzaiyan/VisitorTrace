@@ -119,6 +119,49 @@ func TestPrepareAndActivateLocalRejectsTamperedBinary(t *testing.T) {
 	}
 }
 
+func TestRemoteUpdateUsesDownloadedBytesInsteadOfContentLength(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("release layout uses symbolic links")
+	}
+	manager, st, cfg, configPath, closeServer := updateFixture(t)
+	defer closeServer()
+	defer st.Close()
+	if _, err := manager.Bootstrap(); err != nil {
+		t.Fatalf("Bootstrap() error = %v", err)
+	}
+	manifestData, candidate := fixtureReleaseFiles(t, manager)
+	manager.ConfigPath = configPath
+	manager.HTTPClient.Transport = misleadingContentLengthTransport{
+		manifest: manifestData,
+		asset:    candidate,
+	}
+	result, err := manager.PrepareAndActivate(context.Background())
+	if err != nil {
+		t.Fatalf("PrepareAndActivate() error = %v", err)
+	}
+	if result.Current || result.Version != "1.1.0" || !HasPending(cfg.DataDir) {
+		t.Fatalf("PrepareAndActivate() = %#v", result)
+	}
+}
+
+type misleadingContentLengthTransport struct {
+	manifest []byte
+	asset    []byte
+}
+
+func (t misleadingContentLengthTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	body := t.manifest
+	if strings.HasSuffix(request.URL.Path, "/visitortrace") {
+		body = t.asset
+	}
+	return &http.Response{
+		StatusCode:    http.StatusOK,
+		ContentLength: int64(len(body)) + 1,
+		Body:          io.NopCloser(bytes.NewReader(body)),
+		Request:       request,
+	}, nil
+}
+
 func TestThirdFailedStartupRollsBackReleaseAndDatabase(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("release layout uses symbolic links")

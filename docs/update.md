@@ -4,6 +4,11 @@
 
 This file records user-facing changes for each published VisitorTrace release.
 
+## 0.4.5 - 2026-10-08
+
+- Online updates now validate the bytes actually downloaded against the signed manifest instead of rejecting an asset when a proxy or mirror reports a misleading Content-Length value. Size errors now report downloaded and expected byte counts.
+- Manual restart and update restart pages use the configured Public Base URL for their reconnect link, avoiding a loopback address when a reverse proxy forwards the internal request host. SQLite Schema remains at 12.
+
 ## 0.4.4 - 2026-10-08
 
 - City labels now use a built-in global place-name index. Common Chinese and English aliases, administrative suffixes, case, punctuation, and full-width Latin text resolve to consistent English names; unmatched labels keep their original spelling.

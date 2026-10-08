@@ -25,6 +25,7 @@ import (
 	"github.com/zzaiyan/VisitorTrace/internal/geoip"
 	"github.com/zzaiyan/VisitorTrace/internal/maprender"
 	"github.com/zzaiyan/VisitorTrace/internal/password"
+	"github.com/zzaiyan/VisitorTrace/internal/selfupdate"
 	"github.com/zzaiyan/VisitorTrace/internal/store"
 )
 
@@ -1322,13 +1323,39 @@ func TestSettingsRestartNoticePersistsUntilManualRestart(t *testing.T) {
 	default:
 	}
 	response := post("/admin/settings/restart", url.Values{})
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "正在重启") {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "正在重启") ||
+		!strings.Contains(response.Body.String(), `href="https://stats.example.com/visitortrace/admin/settings"`) {
 		t.Fatalf("manual restart = %d: %s", response.Code, response.Body.String())
 	}
 	select {
 	case <-app.RestartRequested():
 	case <-time.After(2 * time.Second):
 		t.Fatal("manual restart was not requested")
+	}
+}
+
+func TestSelfUpdateRestartUsesSavedBaseURL(t *testing.T) {
+	app, _, _ := testAdminServer(t)
+	app.Config.BaseURL = "https://stats.example.com/visitortrace"
+	if err := config.Save(app.ConfigPath, app.Config); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	cookie, _ := loginAdmin(t, app)
+	request := httptest.NewRequest(http.MethodGet, "https://127.0.0.1:8790/admin/settings/maintenance", nil)
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	session, ok := app.requireAdmin(response, request)
+	if !ok {
+		t.Fatalf("requireAdmin = %d: %s", response.Code, response.Body.String())
+	}
+	app.finishSelfUpdate(response, request, session, selfupdate.PrepareResult{Version: "0.4.5"})
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `href="https://stats.example.com/visitortrace/admin"`) {
+		t.Fatalf("update restart = %d: %s", response.Code, response.Body.String())
+	}
+	select {
+	case <-app.RestartRequested():
+	case <-time.After(2 * time.Second):
+		t.Fatal("update restart was not requested")
 	}
 }
 

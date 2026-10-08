@@ -421,9 +421,6 @@ func (m *Manager) downloadFile(ctx context.Context, source, destination string, 
 	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("download release executable: HTTP %d", response.StatusCode)
 	}
-	if response.ContentLength >= 0 && response.ContentLength != asset.Size {
-		return fmt.Errorf("release executable size does not match manifest")
-	}
 	return writeCandidateFile(response.Body, destination, asset)
 }
 
@@ -445,7 +442,7 @@ func writeCandidateFile(source io.Reader, destination string, asset Asset) error
 		return fmt.Errorf("close release executable: %w", closeErr)
 	}
 	if written != asset.Size {
-		return fmt.Errorf("release executable size does not match manifest")
+		return fmt.Errorf("release executable size does not match manifest: downloaded %d bytes, want %d", written, asset.Size)
 	}
 	actual := hex.EncodeToString(hash.Sum(nil))
 	if !strings.EqualFold(actual, asset.SHA256) {

@@ -133,15 +133,15 @@ A production binary with self-update enabled can still be built locally:
 
 ```sh
 make build \
-  VERSION=0.4.4 \
+  VERSION=0.4.5 \
   UPDATE_PUBLIC_KEY="BASE64_RAW_ED25519_PUBLIC_KEY"
 ```
 
 Releases use semantic-version tags. Once CI on `main` is green, create and push a tag:
 
 ```sh
-git tag -a v0.4.4 -m "VisitorTrace v0.4.4"
-git push origin v0.4.4
+git tag -a v0.4.5 -m "VisitorTrace v0.4.5"
+git push origin v0.4.5
 ```
 
 `.github/workflows/release.yml` reruns the tests, builds `visitortrace-<version>-linux-amd64` and `visitortrace-<version>-linux-arm64` with `CGO_ENABLED=0`, and embeds the version, commit, build time, database schema, and public key. It derives SHA-256 digests, sizes, and the update manifest from the actual files, then verifies the result with the final public key. Each Release also carries the unmodified GPL text and a source archive generated from the same tagged commit; all files are covered by `checksums.txt`. Verified assets are uploaded to a draft Release and published only after every step succeeds. A rerun can refresh that draft but cannot overwrite an already published release. SemVer tags containing `-` become prereleases and do not replace the stable `releases/latest` target.
@@ -150,10 +150,10 @@ To generate a manifest locally:
 
 ```sh
 go run ./tools/release-manifest generate \
-  --version 0.4.4 \
+  --version 0.4.5 \
   --published-at 2026-10-08T00:00:00Z \
-  --asset linux-amd64=dist/visitortrace-0.4.4-linux-amd64 \
-  --asset linux-arm64=dist/visitortrace-0.4.4-linux-arm64 \
+  --asset linux-amd64=dist/visitortrace-0.4.5-linux-amd64 \
+  --asset linux-arm64=dist/visitortrace-0.4.5-linux-arm64 \
   --output manifest.unsigned.json
 
 go run ./tools/release-manifest sign \

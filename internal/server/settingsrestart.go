@@ -2,9 +2,8 @@ package server
 
 import (
 	"net/http"
+	"strings"
 	"time"
-
-	"github.com/zzaiyan/VisitorTrace/internal/config"
 )
 
 func (s *Server) adminRestartService(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +24,7 @@ func (s *Server) adminRestartService(w http.ResponseWriter, r *http.Request) {
 		s.redirectWithError(w, r, "/admin/settings/maintenance", err.Error())
 		return
 	}
-	reconnectURL := s.requestOrigin(r) + config.BasePath(saved.BaseURL) + "/admin/settings"
+	reconnectURL := restartReconnectURL(saved.BaseURL, s.requestOrigin(r)+s.basePath) + "/admin/settings"
 	s.renderPage(w, r, "settings-restarting", settingsRestartData{
 		pageLayout:   s.adminLayout(r, session, translate(adminLanguage(r), "service_restarting"), "settings"),
 		ReconnectURL: reconnectURL,
@@ -36,4 +35,11 @@ func (s *Server) adminRestartService(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(300 * time.Millisecond)
 		s.RequestRestart()
 	}()
+}
+
+func restartReconnectURL(savedBaseURL, requestBaseURL string) string {
+	if savedBaseURL = strings.TrimSuffix(strings.TrimSpace(savedBaseURL), "/"); savedBaseURL != "" {
+		return savedBaseURL
+	}
+	return strings.TrimSuffix(requestBaseURL, "/")
 }
