@@ -57,6 +57,8 @@ jobs:
         run: npm ci
       - name: Audit dependencies
         run: npm audit --omit=optional --audit-level=high
+      - name: Check basemap geometry
+        run: node --test tools/basemap/basemap.test.mjs
       - name: Rebuild committed assets
         run: npm run build:analytics
       - name: Verify generated assets are current

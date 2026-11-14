@@ -249,8 +249,9 @@ func TestInteractiveWidgetFrameRendersAndDoesNotCollect(t *testing.T) {
 	if err := writer.Close(); err != nil {
 		t.Fatalf("close interactive widget compressor: %v", err)
 	}
-	if compressed.Len() > 32*1024 {
-		t.Fatalf("interactive widget gzip size = %d bytes, want <= 32768", compressed.Len())
+	// Preserve the detailed community basemap, including small islands and dashes.
+	if compressed.Len() > 128*1024 {
+		t.Fatalf("interactive widget gzip size = %d bytes, want <= 128 KiB", compressed.Len())
 	}
 	if response.Header().Get("Cache-Control") != "public, max-age=300" || !strings.HasPrefix(response.Header().Get("Content-Type"), "text/html") || response.Header().Get("Cross-Origin-Resource-Policy") != "cross-origin" || !strings.Contains(response.Header().Get("Content-Security-Policy"), "frame-ancestors *") {
 		t.Fatalf("interactive widget headers = %#v", response.Header())
@@ -2066,8 +2067,8 @@ func TestAnalyticsAssetServesPrecompressedBundle(t *testing.T) {
 	if response.Code != http.StatusOK || response.Header().Get("Content-Encoding") != "br" || response.Header().Get("Vary") != "Accept-Encoding" {
 		t.Fatalf("analytics asset headers = status %d encoding %q vary %q", response.Code, response.Header().Get("Content-Encoding"), response.Header().Get("Vary"))
 	}
-	if response.Body.Len() > 250*1024 {
-		t.Fatalf("Brotli analytics asset = %d bytes, want <= 250 KiB", response.Body.Len())
+	if response.Body.Len() > 280*1024 {
+		t.Fatalf("Brotli analytics asset = %d bytes, want <= 280 KiB", response.Body.Len())
 	}
 }
 

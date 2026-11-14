@@ -33,15 +33,15 @@ make build
 
 ## 安装发布版
 
-正式版本在 GitHub Releases 提供带版本号且无需 Go 环境的 Linux 二进制。根据服务器架构选择 `visitortrace-<版本>-linux-amd64` 或 `visitortrace-<版本>-linux-arm64`，同时下载 `checksums.txt`。例如，校验 `0.4.5` 的 AMD64 版本：
+正式版本在 GitHub Releases 提供带版本号且无需 Go 环境的 Linux 二进制。根据服务器架构选择 `visitortrace-<版本>-linux-amd64` 或 `visitortrace-<版本>-linux-arm64`，同时下载 `checksums.txt`。例如，校验 `0.4.6` 的 AMD64 版本：
 
 ```sh
-grep ' visitortrace-0.4.5-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-0.4.5-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.4.6-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.4.6-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-实际安装时将 `0.4.5` 替换为下载的版本号；ARM64 服务器使用 `linux-arm64` 文件名。每个 Release 还会提供 GPL 文本和来自同一标签的对应源码归档。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
+实际安装时将 `0.4.6` 替换为下载的版本号；ARM64 服务器使用 `linux-arm64` 文件名。每个 Release 还会提供 GPL 文本和来自同一标签的对应源码归档。Release 清单另有 Ed25519 签名，供内置自更新器验证；手工安装时仍应先核对 `checksums.txt`。使用发布版时，后续示例中的 `./bin/visitortrace` 对应 `$HOME/.local/bin/visitortrace`。
 
 ## 初始化
 
@@ -193,7 +193,7 @@ Site 页面为四段可直接使用的代码提供一键复制，分别是“交
 
 后台支持尺寸、标题、PV/UV 标签、字体大小、显示内容、背景、陆地、边界、文字、标记颜色和标记指标。实时预览可在交互式 Widget 与 Image fallback 之间切换，无需先保存。Widget 预览与正式接入一致：悬停或聚焦圆点显示详情，触屏设备先展示详情，点击后进入 Public Analytics。拖动尝试既不会移动地图或触发跳转，也不会影响后续悬停和点击。Widget 有意不提供平移、缩放和 Reset；完整的 Public Analytics 与 Admin Analytics 地图继续保留这些高级交互。私有 Site 通过管理员专用端点获得相同的 Widget 行为，但只有开启公开展示后，其 Public Analytics 链接才可访问。宽度和高度旁的自动按钮会根据当前标题、统计栏和字体大小计算保持世界地图投影比例所需的另一维度。
 
-底图不包含南极洲，左右接缝位于白令海峡附近的 `170°W`，避免使用 `180°` 经线作为页面边界。
+底图内嵌社区数据 `@surbowl/world-geo-json-zh` 2.1.5，国家和区域名称统一使用英语。数据中台湾包含在中国几何内，并保留钓鱼岛、赤尾屿、南海诸岛和十段线。SVG 与交互地图使用同一套国家几何，跨越 ±180° 的同国多边形会拼合，避免出现内部描边。底图不包含南极洲，左右接缝位于白令海峡附近的 `170°W`。来源和使用条款见[第三方声明](../THIRD_PARTY_NOTICES.zh-CN.md)。
 
 公开地图支持以下参数：
 
@@ -398,7 +398,7 @@ visitortrace update apply --config "$HOME/.config/visitortrace/config.json"
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.4.5-linux-amd64 \
+  --binary ./visitortrace-0.4.6-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 

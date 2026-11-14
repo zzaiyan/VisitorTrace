@@ -7,6 +7,7 @@
   },
   "devDependencies": {
     "echarts": "6.1.0",
-    "esbuild": "0.28.1"
+    "esbuild": "0.28.1",
+    "polygon-clipping": "0.15.7"
   }
 }

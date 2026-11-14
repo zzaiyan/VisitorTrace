@@ -4,6 +4,13 @@
 
 This file records user-facing changes for each published VisitorTrace release.
 
+## 0.4.6 - 2026-11-14
+
+- World maps use the pinned community dataset `@surbowl/world-geo-json-zh` 2.1.5, which includes China-related boundary adjustments, Taiwan within China's geometry, Diaoyu/Chiwei islands, South China Sea islands, and the ten-dash line. SVG and interactive maps share this source; small islands and dashes are retained.
+- Country and region labels on the basemap use English, matching the English place names used by IP geolocation.
+- Joined country polygons across ±180° remove artificial internal outlines in Russia and Wrangel Island. The SVG ten-dash line has its own stroke layer so country-border styling cannot obscure it.
+- All basemap data remains embedded for offline use. SQLite Schema remains at 12.
+
 ## 0.4.5 - 2026-10-08
 
 - Online updates now validate the bytes actually downloaded against the signed manifest instead of rejecting an asset when a proxy or mirror reports a misleading Content-Length value. Size errors now report downloaded and expected byte counts.

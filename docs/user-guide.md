@@ -33,15 +33,15 @@ make build
 
 ## Install a Release
 
-GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.4.5` on AMD64:
+GitHub Releases provide versioned Linux executables that do not require a Go toolchain. Select `visitortrace-<version>-linux-amd64` or `visitortrace-<version>-linux-arm64` for the server architecture, download `checksums.txt` beside it, and verify it. For example, for version `0.4.6` on AMD64:
 
 ```sh
-grep ' visitortrace-0.4.5-linux-amd64$' checksums.txt | sha256sum -c -
-install -Dm700 visitortrace-0.4.5-linux-amd64 "$HOME/.local/bin/visitortrace"
+grep ' visitortrace-0.4.6-linux-amd64$' checksums.txt | sha256sum -c -
+install -Dm700 visitortrace-0.4.6-linux-amd64 "$HOME/.local/bin/visitortrace"
 "$HOME/.local/bin/visitortrace" version
 ```
 
-Replace `0.4.5` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
+Replace `0.4.6` with the downloaded release version and use the `linux-arm64` filename on an ARM64 server. Each Release also provides the GPL text and the corresponding source archive from the same tag. The release manifest carries an Ed25519 signature for the built-in updater; a manual installation should still check `checksums.txt` first. When using a release, substitute `$HOME/.local/bin/visitortrace` for `./bin/visitortrace` in the examples below.
 
 ## Initialize
 
@@ -193,7 +193,7 @@ The Site page provides one-click copy controls for four ready-to-use snippets: *
 
 The Admin Console configures dimensions, title, PV/UV labels, font size, visible content, background, land, border, text, marker color, and marker metric. Its live preview can switch between the Interactive Widget and the Image fallback without saving. The Widget preview matches the deployed Widget: hovering or focusing a marker shows its details, touch devices reveal details before navigation, and clicking opens Public Analytics. Drag attempts neither move the map nor trigger navigation, and do not disable later hover or click interaction. The Widget intentionally omits pan, zoom, and Reset; the full Public and Admin Analytics maps retain those advanced interactions. Private Sites use an Administrator-only preview with the same Widget behavior, but its Public Analytics link is available only while public publishing is enabled. The automatic dimension buttons account for the current title, statistics band, and font size before calculating the other dimension required to preserve the world-map projection ratio.
 
-The basemap omits Antarctica and places its left/right seam near the Bering Strait at `170°W` instead of using the `180°` meridian as the page boundary.
+The basemap is embedded from `@surbowl/world-geo-json-zh` 2.1.5 and uses English country and region names. It includes Taiwan within China’s geometry, Diaoyu/Chiwei islands, South China Sea islands and the ten-dash line. SVG and interactive maps use the same country geometries; country pieces crossing ±180° are joined to avoid internal outlines. Antarctica is omitted and the left/right seam is near the Bering Strait at `170°W`. Source and licensing details are in [Third-Party Notices](../THIRD_PARTY_NOTICES.md).
 
 The Public Map accepts these parameters:
 
@@ -398,7 +398,7 @@ When a release binary has already been downloaded manually, use the repository s
 
 ```sh
 sudo ./scripts/update-systemd-binary.sh \
-  --binary ./visitortrace-0.4.5-linux-amd64 \
+  --binary ./visitortrace-0.4.6-linux-amd64 \
   --checksum-file ./checksums.txt
 ```
 

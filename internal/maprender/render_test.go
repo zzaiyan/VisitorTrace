@@ -137,4 +137,7 @@ func TestRenderUsesBeringStraitLongitudeBoundary(t *testing.T) {
 	if strings.Count(value, `<path id="visitortrace-land" d=`) != 1 || strings.Count(value, `<use href="#visitortrace-land"`) != 2 {
 		t.Fatalf("wrapped basemap does not reuse one path: paths=%d uses=%d", strings.Count(value, `<path id="visitortrace-land" d=`), strings.Count(value, `<use href="#visitortrace-land"`))
 	}
+	if strings.Count(value, `<use href="#visitortrace-boundaries"`) != 2 {
+		t.Fatal("maritime boundary layer must wrap with the land layer")
+	}
 }

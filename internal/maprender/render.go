@@ -21,13 +21,17 @@ const (
 	mapBaseOffset    = (mapLeftLongitude + 180.0) / 360.0 * mapBaseWidth
 )
 
-//go:embed assets/world.path
+//go:embed assets/*.path
 var assets embed.FS
 
 func Render(data store.PublicMapData, options Options) ([]byte, error) {
 	pathData, err := assets.ReadFile("assets/world.path")
 	if err != nil {
 		return nil, fmt.Errorf("read world basemap: %w", err)
+	}
+	boundaryData, err := assets.ReadFile("assets/world-boundaries.path")
+	if err != nil {
+		return nil, fmt.Errorf("read world boundary layer: %w", err)
 	}
 	title := ""
 	if options.Show["title"] {
@@ -60,6 +64,7 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 	}
 	fmt.Fprintf(&output, "<rect width=\"100%%\" height=\"100%%\" fill=\"%s\"/>", backgroundFill)
 	fmt.Fprintf(&output, "<defs><clipPath id=\"visitortrace-map-clip\"><rect width=\"%d\" height=\"%d\"/></clipPath><path id=\"visitortrace-land\" d=\"%s\"/></defs>", options.Width, mapHeight, pathData)
+	fmt.Fprintf(&output, "<defs><path id=\"visitortrace-boundaries\" d=\"%s\"/></defs>", boundaryData)
 	if title != "" {
 		fmt.Fprintf(&output, "<text class=\"visitortrace-title\" x=\"%s\" y=\"%d\" text-anchor=\"middle\" fill=\"#%s\" font-family=\"system-ui,sans-serif\" font-size=\"%d\" font-weight=\"600\">%s</text>", format(float64(options.Width)/2), options.FontSize+3, options.Text, options.FontSize, html.EscapeString(title))
 	}
@@ -68,6 +73,7 @@ func Render(data store.PublicMapData, options Options) ([]byte, error) {
 	fmt.Fprintf(&output, "<g class=\"visitortrace-map\" transform=\"scale(%s %s)\">", format(float64(options.Width)/mapBaseWidth), format(float64(mapHeight)/mapBaseHeight))
 	for _, shift := range []float64{-mapBaseOffset, mapBaseWidth - mapBaseOffset} {
 		fmt.Fprintf(&output, "<use href=\"#visitortrace-land\" transform=\"translate(%s 0)\" fill=\"#%s\" stroke=\"#%s\" stroke-width=\"0.7\" vector-effect=\"non-scaling-stroke\"/>", format(shift), options.Land, options.Border)
+		fmt.Fprintf(&output, "<use href=\"#visitortrace-boundaries\" transform=\"translate(%s 0)\" fill=\"#%s\" stroke=\"#%s\" stroke-width=\"0.7\" vector-effect=\"non-scaling-stroke\"/>", format(shift), options.Land, options.Land)
 	}
 	output.WriteString("</g><g class=\"visitortrace-marker-layer\">")
 	maxMetric := int64(0)

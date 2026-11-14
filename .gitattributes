@@ -1,0 +1,4 @@
+# Preserve upstream bytes and checksums for vendored basemap sources.
+tools/basemap/world.zh.json -text -whitespace
+tools/basemap/world.zh.jsonc -text -whitespace
+tools/basemap/LICENSE -text -whitespace
